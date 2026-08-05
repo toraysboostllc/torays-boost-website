@@ -15,11 +15,14 @@ export const theme = {
       dark: "#171B52",
       light: "#333BA0",
     },
+    // bg is the page canvas (soft blue-gray, not flat white); surface is
+    // white so cards pop with contrast against it, per the Stripe-style
+    // reference the user asked to get closer to.
     neutral: {
-      bg: "#FFFFFF",
-      surface: "#F6F8FC",
-      surfaceAlt: "#EEF1FA",
-      line: "rgba(15,20,36,0.08)",
+      bg: "#EDF1F9",
+      surface: "#FFFFFF",
+      surfaceAlt: "#F4F6FB",
+      line: "rgba(15,20,36,0.10)",
     },
     text: {
       primary: "#0F1424",
@@ -28,8 +31,8 @@ export const theme = {
     },
   },
   glow: {
-    red: "0 8px 24px rgba(218,31,38,0.12)",
-    navy: "0 8px 24px rgba(32,38,111,0.10)",
+    red: "0 8px 24px rgba(218,31,38,0.16)",
+    navy: "0 8px 24px rgba(32,38,111,0.12)",
   },
   fonts: {
     heading: "'Space Grotesk', sans-serif",

@@ -27,7 +27,7 @@ export default {
       },
       backgroundImage: {
         "torays-gradient":
-          "radial-gradient(circle at 20% 0%, rgba(51,59,160,0.08) 0%, rgba(255,255,255,0) 45%), radial-gradient(circle at 85% 15%, rgba(218,31,38,0.06) 0%, rgba(255,255,255,0) 40%)",
+          "radial-gradient(circle at 20% 0%, rgba(51,59,160,0.14) 0%, rgba(237,241,249,0) 45%), radial-gradient(circle at 85% 15%, rgba(218,31,38,0.09) 0%, rgba(237,241,249,0) 40%)",
       },
       animation: {
         "pulse-glow": "pulse-glow 3s ease-in-out infinite",

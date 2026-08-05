@@ -11,12 +11,12 @@ import { buildContactLink } from "../lib/whatsapp.js";
  */
 function HeroVisual() {
   return (
-    <div className="relative aspect-square w-full max-w-md">
-      <div className="absolute inset-0 rounded-[2rem] bg-torays-surface border border-torays-line overflow-hidden">
-        <CircuitBackground opacity={0.08} />
+    <div className="relative aspect-square w-full max-w-xl">
+      <div className="absolute inset-0 rounded-[2rem] bg-torays-surface border border-torays-line shadow-[0_20px_50px_rgba(15,20,36,0.10)] overflow-hidden">
+        <CircuitBackground opacity={0.1} />
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="flex h-32 w-32 items-center justify-center rounded-full bg-torays-bg border border-torays-red/30 shadow-glow-red">
-            <Microscope size={56} className="text-torays-red" />
+          <div className="flex h-40 w-40 items-center justify-center rounded-full bg-torays-bg border border-torays-red/30 shadow-glow-red">
+            <Microscope size={64} className="text-torays-red" />
           </div>
         </div>
       </div>
@@ -42,20 +42,20 @@ export function Hero() {
   return (
     <section id="top" className="relative overflow-hidden pt-32 pb-20 sm:pt-40 sm:pb-28">
       <div className="absolute inset-0 bg-torays-gradient" />
-      <CircuitBackground opacity={0.035} />
+      <CircuitBackground opacity={0.05} />
 
-      <div className="relative mx-auto grid max-w-6xl grid-cols-1 items-center gap-14 px-5 sm:px-8 lg:grid-cols-2">
+      <div className="relative mx-auto grid max-w-6xl grid-cols-1 items-center gap-16 px-5 sm:px-8 lg:grid-cols-2 lg:gap-20">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
-          className="flex flex-col items-start gap-6"
+          className="flex flex-col items-start gap-7"
         >
           <span className="rounded-full border border-torays-red/30 bg-torays-red/10 px-4 py-1.5 text-xs font-heading font-semibold uppercase tracking-[0.2em] text-torays-red">
             Torays Boost LLC
           </span>
 
-          <h1 className="text-4xl font-heading font-bold leading-tight text-torays-text sm:text-5xl lg:text-6xl">
+          <h1 className="text-5xl font-heading font-bold leading-[1.05] text-torays-text sm:text-6xl lg:text-7xl">
             Professional Microsoldering &amp; Electronics Repair
           </h1>
 

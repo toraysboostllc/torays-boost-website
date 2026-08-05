@@ -6,7 +6,7 @@ export function Logo({ className = "" }) {
     <img
       src={logoSrc}
       alt="Torays Boost"
-      className={`h-9 w-auto object-contain sm:h-10 ${className}`}
+      className={`h-11 w-auto object-contain sm:h-14 ${className}`}
     />
   );
 }
