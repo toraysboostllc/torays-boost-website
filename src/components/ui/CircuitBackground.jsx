@@ -2,7 +2,7 @@
  * Original, hand-drawn PCB-trace pattern used as a subtle background motif.
  * Tiled via an SVG <pattern>, kept at low opacity so it never fights content.
  */
-export function CircuitBackground({ className = "", opacity = 0.14 }) {
+export function CircuitBackground({ className = "", opacity = 0.05 }) {
   const patternId = "torays-circuit-pattern";
 
   return (

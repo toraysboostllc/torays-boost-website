@@ -13,15 +13,11 @@ function HeroVisual() {
   return (
     <div className="relative aspect-square w-full max-w-md">
       <div className="absolute inset-0 rounded-[2rem] bg-torays-surface border border-torays-line overflow-hidden">
-        <CircuitBackground opacity={0.2} />
+        <CircuitBackground opacity={0.08} />
         <div className="absolute inset-0 flex items-center justify-center">
-          <motion.div
-            animate={{ boxShadow: ["0 0 30px rgba(218,31,38,0.25)", "0 0 60px rgba(218,31,38,0.5)", "0 0 30px rgba(218,31,38,0.25)"] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-            className="flex h-32 w-32 items-center justify-center rounded-full bg-torays-bg border border-torays-red/40"
-          >
+          <div className="flex h-32 w-32 items-center justify-center rounded-full bg-torays-bg border border-torays-red/30 shadow-glow-red">
             <Microscope size={56} className="text-torays-red" />
-          </motion.div>
+          </div>
         </div>
       </div>
 
@@ -46,7 +42,7 @@ export function Hero() {
   return (
     <section id="top" className="relative overflow-hidden pt-32 pb-20 sm:pt-40 sm:pb-28">
       <div className="absolute inset-0 bg-torays-gradient" />
-      <CircuitBackground opacity={0.08} />
+      <CircuitBackground opacity={0.035} />
 
       <div className="relative mx-auto grid max-w-6xl grid-cols-1 items-center gap-14 px-5 sm:px-8 lg:grid-cols-2">
         <motion.div

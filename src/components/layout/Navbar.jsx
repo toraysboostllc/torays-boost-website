@@ -7,6 +7,7 @@ import { buildContactLink } from "../../lib/whatsapp.js";
 
 const LINKS = [
   { href: "#services", label: "Services" },
+  { href: "#about", label: "About" },
   { href: "#how-it-works", label: "How It Works" },
   { href: "#faq", label: "FAQ" },
   { href: "#contact", label: "Contact" },

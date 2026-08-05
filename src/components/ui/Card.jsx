@@ -9,7 +9,7 @@ export function Card({ className = "", glow = "none", children, ...props }) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-60px" }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      className={`rounded-2xl border border-torays-line bg-torays-surface p-6 transition-shadow duration-300 ${glowClass} ${className}`}
+      className={`rounded-2xl border border-torays-line bg-torays-surface p-6 shadow-[0_1px_2px_rgba(15,20,36,0.04),0_1px_3px_rgba(15,20,36,0.06)] transition-shadow duration-300 ${glowClass} ${className}`}
       {...props}
     >
       {children}

@@ -1,6 +1,7 @@
 /**
  * Brand tokens color-picked directly from the official logo file
  * (D:\Torays Logo\logo-01.png — red center #DA1F26, navy bars #20266F).
+ * Site theme is light/premium (white, soft neutrals) — red/navy stay exact.
  */
 export const theme = {
   colors: {
@@ -14,21 +15,21 @@ export const theme = {
       dark: "#171B52",
       light: "#333BA0",
     },
-    dark: {
-      bg: "#0A0E17",
-      surface: "#10141F",
-      surfaceAlt: "#151A28",
-      line: "rgba(255,255,255,0.08)",
+    neutral: {
+      bg: "#FFFFFF",
+      surface: "#F6F8FC",
+      surfaceAlt: "#EEF1FA",
+      line: "rgba(15,20,36,0.08)",
     },
     text: {
-      primary: "#F4F6FB",
-      secondary: "#9BA3B7",
-      muted: "#6B7386",
+      primary: "#0F1424",
+      secondary: "#525B78",
+      muted: "#8A91AC",
     },
   },
   glow: {
-    red: "0 0 24px rgba(218,31,38,0.35)",
-    navy: "0 0 24px rgba(51,59,160,0.45)",
+    red: "0 8px 24px rgba(218,31,38,0.12)",
+    navy: "0 8px 24px rgba(32,38,111,0.10)",
   },
   fonts: {
     heading: "'Space Grotesk', sans-serif",

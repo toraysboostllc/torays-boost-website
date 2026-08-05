@@ -26,7 +26,7 @@
   }
 
   ::selection {
-    @apply bg-torays-red/40 text-white;
+    @apply bg-torays-red/15 text-torays-text;
   }
 }
 

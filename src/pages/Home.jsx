@@ -6,6 +6,7 @@ import { Hero } from "../sections/Hero.jsx";
 import { QuoteEstimator } from "../sections/QuoteEstimator.jsx";
 import { Services } from "../sections/Services.jsx";
 import { WhyChooseUs } from "../sections/WhyChooseUs.jsx";
+import { AboutUs } from "../sections/AboutUs.jsx";
 import { HowItWorks } from "../sections/HowItWorks.jsx";
 import { Testimonials } from "../sections/Testimonials.jsx";
 import { FAQ } from "../sections/FAQ.jsx";
@@ -22,6 +23,7 @@ export function Home() {
         <QuoteEstimator />
         <Services />
         <WhyChooseUs />
+        <AboutUs />
         <HowItWorks />
         <Testimonials />
         <FAQ />
