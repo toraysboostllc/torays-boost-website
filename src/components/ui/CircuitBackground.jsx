@@ -26,10 +26,15 @@ export function CircuitBackground({ className = "", opacity = 0.05 }) {
             strokeWidth="1.5"
           />
           <path d="M60 90H0" fill="none" stroke="#4A5DB8" strokeWidth="1.5" />
+          <path d="M100 180V150H150V110" fill="none" stroke="#4A5DB8" strokeWidth="1.5" />
+          <path d="M180 20H160V60" fill="none" stroke="#4A5DB8" strokeWidth="1.5" />
           <circle cx="60" cy="90" r="3.5" fill="#DA1F26" />
           <circle cx="140" cy="180" r="3" fill="#4A5DB8" />
           <circle cx="20" cy="0" r="3" fill="#4A5DB8" />
           <circle cx="120" cy="60" r="3.5" fill="#DA1F26" />
+          <circle cx="150" cy="110" r="2.5" fill="#4A5DB8" />
+          <circle cx="160" cy="60" r="2.5" fill="#4A5DB8" />
+          <circle cx="100" cy="150" r="2" fill="none" stroke="#4A5DB8" strokeWidth="1" />
         </pattern>
       </defs>
       <rect width="100%" height="100%" fill={`url(#${patternId})`} />

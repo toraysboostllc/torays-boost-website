@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, MessageCircle, Microscope } from "lucide-react";
 import * as Icons from "lucide-react";
 import { Button } from "../components/ui/Button.jsx";
@@ -19,18 +19,66 @@ const trustBadges = TRUST_BADGE_IDS.map((id) => whyChooseUs.find((item) => item.
  * shadow, glow, and floating device badges around it stay as-is.
  */
 function HeroVisual() {
+  // framer-motion animations run via JS, not CSS, so the global
+  // prefers-reduced-motion CSS override (index.css) can't reach them —
+  // this hook is the correct way to opt the infinite pulse out.
+  const reduceMotion = useReducedMotion();
+
   return (
     <div className="relative aspect-square w-full max-w-2xl">
-      {/* Soft light glow behind the panel for depth */}
-      <div className="absolute -inset-8 rounded-[3rem] bg-gradient-to-br from-torays-navy/10 via-torays-red/5 to-transparent blur-3xl" />
+      {/* Soft two-tone light glow behind the panel — the "lit lab" cue, brand colors only */}
+      <div className="absolute -inset-8 rounded-[3rem] bg-gradient-to-br from-torays-navy/[0.14] via-transparent via-40% to-torays-red/[0.08] blur-3xl" />
 
       <div className="absolute inset-0 rounded-[2rem] bg-torays-surface ring-1 ring-white/60 border border-torays-line shadow-[0_35px_90px_rgba(15,20,36,0.18)] overflow-hidden">
-        <CircuitBackground opacity={0.1} />
+        {/* Faint blueprint grid — engineering/lab cue, well under the circuit pattern */}
+        <div
+          className="absolute inset-0 opacity-[0.05]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(32,38,111,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(32,38,111,0.5) 1px, transparent 1px)",
+            backgroundSize: "28px 28px",
+          }}
+        />
+        <CircuitBackground opacity={0.13} />
+
+        {/* Corner brackets — precision-instrument framing, static, no motion */}
+        {[
+          "left-5 top-5 border-l border-t",
+          "right-5 top-5 border-r border-t",
+          "left-5 bottom-5 border-l border-b",
+          "right-5 bottom-5 border-r border-b",
+        ].map((pos) => (
+          <div key={pos} className={`absolute h-7 w-7 border-torays-navy/25 ${pos}`} />
+        ))}
+
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="h-56 w-56 rounded-full border border-dashed border-torays-navy/15" />
+        </div>
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="flex h-44 w-44 items-center justify-center rounded-full bg-torays-bg border border-torays-red/30 shadow-glow-red">
             <Microscope size={72} className="text-torays-red" />
           </div>
         </div>
+
+        {/* Discrete light accents — very low opacity, gentle pulse (disabled via prefers-reduced-motion globally) */}
+        {[
+          { top: "22%", left: "18%", color: "bg-torays-navy", delay: 0 },
+          { top: "70%", left: "82%", color: "bg-torays-red", delay: 0.8 },
+          { top: "78%", left: "24%", color: "bg-torays-navy", delay: 1.6 },
+        ].map((dot, i) => (
+          <motion.span
+            key={i}
+            animate={reduceMotion ? { opacity: 0.45 } : { opacity: [0.25, 0.7, 0.25] }}
+            transition={
+              reduceMotion
+                ? { duration: 0 }
+                : { duration: 3, repeat: Infinity, delay: dot.delay, ease: "easeInOut" }
+            }
+            className={`absolute h-1.5 w-1.5 rounded-full ${dot.color} blur-[1px]`}
+            style={{ top: dot.top, left: dot.left }}
+          />
+        ))}
+
         {/* Bottom vignette — doubles as a caption-ready gradient once a real photo is dropped in */}
         <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-torays-text/10 to-transparent" />
       </div>
@@ -74,7 +122,7 @@ export function Hero() {
   return (
     <section id="top" className="relative overflow-hidden pt-32 pb-20 sm:pt-40 sm:pb-28">
       <div className="absolute inset-0 bg-torays-gradient" />
-      <CircuitBackground opacity={0.05} />
+      <CircuitBackground opacity={0.07} />
 
       <div className="relative mx-auto grid max-w-6xl grid-cols-1 items-center gap-16 px-5 sm:px-8 lg:grid-cols-2 lg:gap-20">
         <motion.div
