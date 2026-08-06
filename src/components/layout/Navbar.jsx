@@ -29,9 +29,9 @@ export function Navbar() {
         scrolled ? "bg-torays-bg/90 backdrop-blur border-b border-torays-line" : "bg-transparent"
       }`}
     >
-      <nav className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8">
+      <nav className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3 sm:px-8">
         <a href="#top" aria-label="Torays Boost home">
-          <Logo />
+          <Logo size="lg" />
         </a>
 
         <div className="hidden md:flex items-center gap-8">
@@ -72,7 +72,7 @@ export function Navbar() {
             className="fixed inset-0 z-50 bg-torays-bg md:hidden"
           >
             <div className="flex items-center justify-between px-5 py-4">
-              <Logo />
+              <Logo size="lg" />
               <button
                 type="button"
                 onClick={() => setOpen(false)}

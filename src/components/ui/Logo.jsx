@@ -1,12 +1,17 @@
 import logoSrc from "../../assets/torays-boost-logo.png";
 
+const SIZES = {
+  default: "h-11 sm:h-14",
+  lg: "h-16 sm:h-20",
+};
+
 /** Official TORAYS BOOST logo — do not redraw or recolor. */
-export function Logo({ className = "" }) {
+export function Logo({ className = "", size = "default" }) {
   return (
     <img
       src={logoSrc}
       alt="Torays Boost"
-      className={`h-11 w-auto object-contain sm:h-14 ${className}`}
+      className={`w-auto object-contain ${SIZES[size]} ${className}`}
     />
   );
 }
