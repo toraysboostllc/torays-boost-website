@@ -39,7 +39,7 @@ function HeroVisual() {
             backgroundSize: "28px 28px",
           }}
         />
-        <CircuitBackground opacity={0.13} />
+        <CircuitBackground opacity={0.9} />
 
         {/* Corner brackets — precision-instrument framing, static, no motion */}
         {[
@@ -122,7 +122,7 @@ export function Hero() {
   return (
     <section id="top" className="relative overflow-hidden pt-32 pb-20 sm:pt-40 sm:pb-28">
       <div className="absolute inset-0 bg-torays-gradient" />
-      <CircuitBackground opacity={0.07} />
+      <CircuitBackground opacity={0.55} />
 
       <div className="relative mx-auto grid max-w-6xl grid-cols-1 items-center gap-16 px-5 sm:px-8 lg:grid-cols-2 lg:gap-20">
         <motion.div
