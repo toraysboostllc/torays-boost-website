@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Instagram, Facebook } from "lucide-react";
 import { Logo } from "../ui/Logo.jsx";
 import { siteConfig } from "../../config/site.config.js";
@@ -56,7 +57,15 @@ export function Footer() {
           <p className="text-xs text-torays-text-muted">
             © {year} {siteConfig.businessName}. All rights reserved.
           </p>
-          <p className="text-xs text-torays-text-muted">{siteConfig.domain}</p>
+          <div className="flex items-center gap-x-5 gap-y-2 flex-wrap">
+            <Link to="/privacy" className="text-xs text-torays-text-muted transition-colors hover:text-torays-text">
+              Privacy Policy
+            </Link>
+            <Link to="/terms" className="text-xs text-torays-text-muted transition-colors hover:text-torays-text">
+              Terms &amp; Conditions
+            </Link>
+            <p className="text-xs text-torays-text-muted">{siteConfig.domain}</p>
+          </div>
         </div>
       </div>
     </footer>
