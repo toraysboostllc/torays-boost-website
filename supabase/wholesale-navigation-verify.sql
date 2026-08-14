@@ -128,3 +128,44 @@ select id, slug, pricing_type, fixed_price, price_min, price_max, currency
 from wholesale_services
 order by slug;
 -- expect exactly 74 rows, pricing_type only 'fixed' or 'range', currency = 'USD' on every row
+
+-- 10. Categories checksum — byte-for-byte the SAME query as
+--     wholesale-navigation-preflight.sql's query 6, run BEFORE this
+--     migration. Compare the two hashes: identical means this migration
+--     changed none of slug/name/notes/diagnostic_fee/diagnostic_description/
+--     active/sort_order on any existing category — exactly what it promises.
+select md5(string_agg(
+  coalesce(slug, '␀') || '|' ||
+  coalesce(name, '␀') || '|' ||
+  coalesce(notes, '␀') || '|' ||
+  coalesce(diagnostic_fee::text, '␀') || '|' ||
+  coalesce(diagnostic_description, '␀') || '|' ||
+  active::text || '|' ||
+  sort_order::text,
+  E'\n' order by slug
+)) as categories_checksum
+from wholesale_categories;
+
+-- 11. Services checksum — byte-for-byte the SAME query as
+--     wholesale-navigation-preflight.sql's query 7, run BEFORE this
+--     migration. Compare the two hashes: identical means this migration
+--     changed none of slug/category_id/name/pricing_type/fixed_price/
+--     price_min/price_max/notes/active/sort_order on any existing service —
+--     the only new thing any existing row gained is `currency`, which is
+--     deliberately NOT part of this checksum (it never existed before this
+--     migration, so a before/after diff of a field that didn't exist before
+--     would be meaningless).
+select md5(string_agg(
+  coalesce(slug, '␀') || '|' ||
+  coalesce(category_id::text, '␀') || '|' ||
+  coalesce(name, '␀') || '|' ||
+  coalesce(pricing_type, '␀') || '|' ||
+  coalesce(fixed_price::text, '␀') || '|' ||
+  coalesce(price_min::text, '␀') || '|' ||
+  coalesce(price_max::text, '␀') || '|' ||
+  coalesce(notes, '␀') || '|' ||
+  active::text || '|' ||
+  sort_order::text,
+  E'\n' order by slug
+)) as services_checksum
+from wholesale_services;

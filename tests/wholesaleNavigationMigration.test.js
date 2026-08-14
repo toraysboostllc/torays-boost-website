@@ -9,19 +9,29 @@ const supabaseDir = join(__dirname, "..", "supabase");
 const migration = readFileSync(join(supabaseDir, "wholesale-navigation-migration.sql"), "utf8");
 const verify = readFileSync(join(supabaseDir, "wholesale-navigation-verify.sql"), "utf8");
 const rollback = readFileSync(join(supabaseDir, "wholesale-navigation-rollback.sql"), "utf8");
+const preflight = readFileSync(join(supabaseDir, "wholesale-navigation-preflight.sql"), "utf8");
 
-/** Strips "-- ..." comment lines — for checks that must only look at actual
- *  SQL statements, not at prose that happens to mention a keyword/table name
- *  while explaining what the statements do or don't do. */
+/** Strips SQL "-- ..." comments — both whole comment lines AND trailing
+ *  inline comments after real code on the same line (e.g. "...;    -- expect
+ *  0") — for checks that must only look at actual SQL statements, not at
+ *  prose that happens to mention a keyword/table name while explaining what
+ *  the statements do or don't do. None of these files ever put a literal
+ *  "--" inside a string value, so truncating at the first "--" on each line
+ *  is safe. */
 function stripComments(sql) {
   return sql
     .split("\n")
-    .filter((line) => !line.trim().startsWith("--"))
+    .map((line) => {
+      const idx = line.indexOf("--");
+      return idx === -1 ? line : line.slice(0, idx);
+    })
+    .filter((line) => line.trim().length > 0)
     .join("\n");
 }
 const verifyCode = stripComments(verify);
 const rollbackCode = stripComments(rollback);
 const migrationCode = stripComments(migration);
+const preflightCode = stripComments(preflight);
 
 /**
  * These tests read the migration SQL as text — there's no live Postgres
@@ -657,5 +667,154 @@ describe("rollback.sql: documented, never auto-run", () => {
   it("drops the currency column and its constraint from wholesale_services", () => {
     expect(rollback).toMatch(/drop constraint if exists wholesale_services_currency_check/);
     expect(rollback).toMatch(/drop column if exists currency/);
+  });
+});
+
+// Extracts one "select md5(string_agg( ... from <table>" checksum statement
+// out of a comment-stripped, semicolon-split SQL file. Splitting on ";" (not
+// a lazy regex scan across the whole file) is what makes this precise: two
+// checksum statements exist in each file (categories, services), and a lazy
+// regex scan risks the well-known "over-match past the wrong closing marker"
+// bug — splitting into discrete statements first sidesteps that entirely.
+function extractChecksumStatement(code, table) {
+  const statements = code
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return statements.find((s) => s.startsWith("select md5(string_agg(") && s.endsWith(`from ${table}`)) || null;
+}
+
+describe("preflight.sql: 100% read-only, no sensitive data, matches verify.sql's checksums exactly", () => {
+  it("documents that it must run before the migration, and verify.sql's checksums after it", () => {
+    expect(preflight).toMatch(/before wholesale-navigation-migration\.sql/i);
+    expect(preflight).toMatch(/wholesale-navigation-verify\.sql/);
+  });
+
+  it("contains ONLY SELECT statements — every comment-stripped, semicolon-split statement starts with SELECT", () => {
+    const statements = preflightCode
+      .split(";")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    expect(statements.length).toBeGreaterThanOrEqual(7); // 5 checks + 2 checksums
+    for (const stmt of statements) {
+      expect(stmt.toLowerCase().startsWith("select"), `non-SELECT statement found: "${stmt.slice(0, 60)}..."`).toBe(true);
+    }
+  });
+
+  it("contains no data-modifying or schema-modifying statement, and no RPC/function call", () => {
+    for (const forbidden of [
+      /\binsert into\b/i,
+      /\bupdate\b/i,
+      /\bdelete from\b/i,
+      /\balter\b/i,
+      /\bcreate\b/i,
+      /\bdrop\b/i,
+      /\bgrant\b/i,
+      /\brevoke\b/i,
+      /\bdo\s*\$\$/i,
+      /\bperform\b/i,
+      /wholesale_update_service_price\s*\(/i,
+      /wholesale_regenerate_shop_code\s*\(/i,
+    ]) {
+      expect(preflightCode).not.toMatch(forbidden);
+    }
+  });
+
+  it("never reads code_hash, token hashes, cookies, or user_agent/ip anywhere in the file", () => {
+    for (const forbidden of [/code_hash/i, /device_token_hash/i, /session_token_hash/i, /\bcookie/i, /\buser_agent\b/i, /\bip\b/i]) {
+      expect(preflightCode).not.toMatch(forbidden);
+    }
+  });
+
+  it("touches wholesale_shops/_devices/_sessions/_access_log ONLY via a single count(*) subquery each — never a column of their row data", () => {
+    for (const table of ["wholesale_shops", "wholesale_devices", "wholesale_sessions", "wholesale_access_log"]) {
+      const occurrences = preflightCode.match(new RegExp(`\\b${table}\\b`, "g")) || [];
+      expect(occurrences, `expected exactly one reference to ${table} in the whole file`).toHaveLength(1);
+      expect(preflightCode).toMatch(new RegExp(`\\(select count\\(\\*\\) from ${table}\\)`));
+    }
+  });
+
+  it("reports the 4 expected core counts: 21 categories, 74 services, 1 active category, 0 active services", () => {
+    expect(preflight).toMatch(/category_count/);
+    expect(preflight).toMatch(/-- expect 21/);
+    expect(preflight).toMatch(/service_count/);
+    expect(preflight).toMatch(/-- expect 74/);
+    expect(preflight).toMatch(/active_category_count/);
+    expect(preflight).toMatch(/-- expect 1/);
+    expect(preflight).toMatch(/active_service_count/);
+    expect(preflight).toMatch(/-- expect 0/);
+  });
+
+  it("checks for duplicate or null slugs on both categories and services", () => {
+    expect(preflightCode).toMatch(/from wholesale_categories\s*\ngroup by slug\s*\nhaving slug is null or count\(\*\) > 1/);
+    expect(preflightCode).toMatch(/from wholesale_services\s*\ngroup by slug\s*\nhaving slug is null or count\(\*\) > 1/);
+  });
+
+  it("checks for services whose stored price shape is invalid for their own pricing_type", () => {
+    expect(preflightCode).toMatch(/pricing_type = 'fixed' and fixed_price is not null and price_min is null and price_max is null/);
+    expect(preflightCode).toMatch(/pricing_type = 'range' and fixed_price is null and price_min is not null and price_max is not null/);
+  });
+
+  it("defines exactly one categories checksum and one services checksum", () => {
+    expect(extractChecksumStatement(preflightCode, "wholesale_categories")).toBeTruthy();
+    expect(extractChecksumStatement(preflightCode, "wholesale_services")).toBeTruthy();
+  });
+
+  it("its checksum statements are byte-for-byte identical to the ones appended to verify.sql — required for a meaningful before/after diff", () => {
+    const preflightCategories = extractChecksumStatement(preflightCode, "wholesale_categories");
+    const verifyCategories = extractChecksumStatement(verifyCode, "wholesale_categories");
+    const preflightServices = extractChecksumStatement(preflightCode, "wholesale_services");
+    const verifyServices = extractChecksumStatement(verifyCode, "wholesale_services");
+    expect(verifyCategories).toBeTruthy();
+    expect(verifyServices).toBeTruthy();
+    expect(preflightCategories).toBe(verifyCategories);
+    expect(preflightServices).toBe(verifyServices);
+  });
+
+  it("the categories checksum covers exactly slug/name/notes/diagnostic_fee/diagnostic_description/active/sort_order", () => {
+    const stmt = extractChecksumStatement(preflightCode, "wholesale_categories");
+    for (const field of ["slug", "name", "notes", "diagnostic_fee", "diagnostic_description", "active", "sort_order"]) {
+      expect(stmt).toMatch(new RegExp(`\\b${field}\\b`));
+    }
+    expect(stmt).not.toMatch(/currency/); // categories never had a currency column
+  });
+
+  it("the services checksum covers exactly slug/category_id/name/pricing_type/fixed_price/price_min/price_max/notes/active/sort_order, deliberately excluding currency", () => {
+    const stmt = extractChecksumStatement(preflightCode, "wholesale_services");
+    for (const field of [
+      "slug",
+      "category_id",
+      "name",
+      "pricing_type",
+      "fixed_price",
+      "price_min",
+      "price_max",
+      "notes",
+      "active",
+      "sort_order",
+    ]) {
+      expect(stmt).toMatch(new RegExp(`\\b${field}\\b`));
+    }
+    // currency didn't exist before this migration — comparing it before/after
+    // would be meaningless, so it's intentionally not part of this checksum.
+    expect(stmt).not.toMatch(/currency/);
+  });
+
+  it("both checksums order rows deterministically by slug, so re-running produces the same hash regardless of physical row order", () => {
+    expect(extractChecksumStatement(preflightCode, "wholesale_categories")).toMatch(/order by slug/);
+    expect(extractChecksumStatement(preflightCode, "wholesale_services")).toMatch(/order by slug/);
+  });
+});
+
+describe("verify.sql: checksums section", () => {
+  it("appends the same two checksum statements as preflight.sql, after all the other verification queries", () => {
+    const catIdx = verify.indexOf("categories_checksum");
+    const svcIdx = verify.indexOf("services_checksum");
+    expect(catIdx).toBeGreaterThan(-1);
+    expect(svcIdx).toBeGreaterThan(catIdx);
+  });
+
+  it("references wholesale-navigation-preflight.sql by name, so the comparison step is discoverable from this file alone", () => {
+    expect(verify).toMatch(/wholesale-navigation-preflight\.sql/);
   });
 });
