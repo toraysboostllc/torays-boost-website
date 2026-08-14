@@ -1,8 +1,15 @@
 import { useEffect } from "react";
 import { siteConfig } from "../config/site.config.js";
 
-/** Sets document title + meta description for the current page. */
-export function useSEO({ title, description } = {}) {
+/**
+ * Sets document title + meta description for the current page, and
+ * optionally a noindex meta tag.
+ *
+ * The meta tag is defense-in-depth only — the real guarantee for
+ * /wholesale is the X-Robots-Tag HTTP header set in vercel.json, since a
+ * crawler that doesn't execute JS would never see this React-added tag.
+ */
+export function useSEO({ title, description, noindex = false } = {}) {
   useEffect(() => {
     document.title = title
       ? `${title} | ${siteConfig.shortName}`
@@ -15,5 +22,17 @@ export function useSEO({ title, description } = {}) {
       document.head.appendChild(meta);
     }
     meta.content = description || siteConfig.seo.defaultDescription;
-  }, [title, description]);
+
+    let robotsMeta = document.querySelector('meta[name="robots"]');
+    if (noindex) {
+      if (!robotsMeta) {
+        robotsMeta = document.createElement("meta");
+        robotsMeta.name = "robots";
+        document.head.appendChild(robotsMeta);
+      }
+      robotsMeta.content = "noindex, nofollow, noarchive";
+    } else if (robotsMeta) {
+      robotsMeta.remove();
+    }
+  }, [title, description, noindex]);
 }

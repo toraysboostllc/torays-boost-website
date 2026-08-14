@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /wholesale
 
 Sitemap: https://toraysboost.com/sitemap.xml
