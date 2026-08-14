@@ -133,19 +133,22 @@ export default async function handler(req, res) {
   let deviceToken = incomingDeviceToken;
   const setCookies = [];
 
-  if (!device) {
-    // Unrecognized browser — always created pending. No exceptions, ever.
+  if (!device || device.status === "revoked") {
+    // Unrecognized browser, OR a browser whose device was revoked (code
+    // regeneration revokes every device; an admin can also revoke one
+    // directly) — the code just verified above is the CURRENT correct one,
+    // so the shop is who they say they are, but a revoked/unknown browser
+    // never gets back in automatically. Mint a brand-new device token and a
+    // brand-new "pending" row every time; the old revoked row (if any) is
+    // left completely untouched, so the audit trail of what got revoked and
+    // when never disappears. Same rule whether the shop got here via a
+    // rotated code or by knowing the still-current one after a manual
+    // revoke — either way this is a fresh approval request, never a
+    // reinstatement of the old device.
     deviceToken = randomToken();
     device = await createDevice(env, { shopId: shop.id, tokenHash: sha256Hex(deviceToken), status: "pending", userAgent });
     setCookies.push(serialize("ws_device", deviceToken, cookieOpts(DEVICE_COOKIE_DAYS * 24 * 60 * 60)));
     await logEvent(env, { shopId: shop.id, deviceId: device.id, event: "device_pending", ip, userAgent }).catch(() => {});
-  }
-
-  if (device.status === "revoked") {
-    await logEvent(env, { shopId: shop.id, deviceId: device.id, event: "login_failed", ip, userAgent }).catch(() => {});
-    if (setCookies.length) res.setHeader("Set-Cookie", setCookies);
-    res.status(403).json({ error: "device_revoked", message: "This device's access was revoked. Contact Torays Boost." });
-    return;
   }
 
   if (device.status === "pending") {
