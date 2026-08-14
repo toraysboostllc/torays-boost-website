@@ -169,3 +169,131 @@ select md5(string_agg(
   E'\n' order by slug
 )) as services_checksum
 from wholesale_services;
+
+-- ============================================================================
+-- 12. POST-MIGRATION SUMMARY — the same one-row rollup as
+--     wholesale-navigation-preflight.sql's "PRE-FLIGHT SUMMARY" (query 8),
+--     run AFTER the migration. Same CTE structure, still a single SELECT —
+--     no stored function, no PL/pgSQL block. Shows the identical 13 core
+--     fields as before (so the two summary rows can be eyeballed side by
+--     side) plus 4 fields that only make sense post-migration:
+--     equipment_type_count, unmapped_category_count, non_usd_count, and
+--     invalid_image_owner_count. Never shows a shop name, code, hash,
+--     token, IP, or user-agent — the 4 auth-related tables are still
+--     touched only via count(*).
+--
+--     One deliberate difference from the preflight version:
+--     invalid_price_count here also accepts 'quote' as a valid shape (the
+--     CHECK constraint this migration installs allows it), where
+--     preflight's pre-migration version only knew about 'fixed'/'range'.
+--
+--     overall_status is 'PASS' only when EVERY one of these holds:
+--       category_count = 21, service_count = 74, active_category_count = 1,
+--       active_service_count = 0, invalid_category_slug_count = 0,
+--       invalid_service_slug_count = 0, invalid_price_count = 0,
+--       equipment_type_count = 8, unmapped_category_count = 0,
+--       non_usd_count = 0, invalid_image_owner_count = 0.
+-- ============================================================================
+with counts as (
+  select
+    (select count(*) from wholesale_categories) as category_count,
+    (select count(*) from wholesale_services) as service_count,
+    (select count(*) from wholesale_categories where active) as active_category_count,
+    (select count(*) from wholesale_services where active) as active_service_count,
+    (select count(*) from wholesale_shops) as shop_count,
+    (select count(*) from wholesale_devices) as device_count,
+    (select count(*) from wholesale_sessions) as session_count,
+    (select count(*) from wholesale_access_log) as access_log_count,
+    (select count(*) from wholesale_equipment_types) as equipment_type_count,
+    (select count(*) from wholesale_categories where equipment_type_id is null) as unmapped_category_count,
+    (select count(*) from wholesale_services where currency is distinct from 'USD') as non_usd_count,
+    (select count(*) from wholesale_images where (
+      (case when equipment_type_id is not null then 1 else 0 end
+       + case when category_id is not null then 1 else 0 end
+       + case when service_id is not null then 1 else 0 end)
+    ) <> 1) as invalid_image_owner_count
+),
+invalid_category_slugs as (
+  select count(*) as n from (
+    select slug from wholesale_categories group by slug having slug is null or count(*) > 1
+  ) x
+),
+invalid_service_slugs as (
+  select count(*) as n from (
+    select slug from wholesale_services group by slug having slug is null or count(*) > 1
+  ) x
+),
+invalid_prices as (
+  -- Post-migration shape check: pricing_type may now legitimately be
+  -- 'fixed', 'range', OR 'quote' — the CHECK constraint this migration
+  -- installs. Differs from preflight's pre-migration 2-type check.
+  select count(*) as n from wholesale_services
+  where not (
+    (pricing_type = 'fixed' and fixed_price is not null and price_min is null and price_max is null)
+    or (pricing_type = 'range' and fixed_price is null and price_min is not null and price_max is not null)
+    or (pricing_type = 'quote' and fixed_price is null and price_min is null and price_max is null)
+  )
+),
+category_checksum as (
+  select md5(string_agg(
+    coalesce(slug, '␀') || '|' ||
+    coalesce(name, '␀') || '|' ||
+    coalesce(notes, '␀') || '|' ||
+    coalesce(diagnostic_fee::text, '␀') || '|' ||
+    coalesce(diagnostic_description, '␀') || '|' ||
+    active::text || '|' ||
+    sort_order::text,
+    E'\n' order by slug
+  )) as checksum
+  from wholesale_categories
+),
+service_checksum as (
+  select md5(string_agg(
+    coalesce(slug, '␀') || '|' ||
+    coalesce(category_id::text, '␀') || '|' ||
+    coalesce(name, '␀') || '|' ||
+    coalesce(pricing_type, '␀') || '|' ||
+    coalesce(fixed_price::text, '␀') || '|' ||
+    coalesce(price_min::text, '␀') || '|' ||
+    coalesce(price_max::text, '␀') || '|' ||
+    coalesce(notes, '␀') || '|' ||
+    active::text || '|' ||
+    sort_order::text,
+    E'\n' order by slug
+  )) as checksum
+  from wholesale_services
+)
+select
+  counts.category_count,
+  counts.service_count,
+  counts.active_category_count,
+  counts.active_service_count,
+  counts.shop_count,
+  counts.device_count,
+  counts.session_count,
+  counts.access_log_count,
+  invalid_category_slugs.n as invalid_category_slug_count,
+  invalid_service_slugs.n as invalid_service_slug_count,
+  invalid_prices.n as invalid_price_count,
+  category_checksum.checksum as category_checksum,
+  service_checksum.checksum as service_checksum,
+  counts.equipment_type_count,
+  counts.unmapped_category_count,
+  counts.non_usd_count,
+  counts.invalid_image_owner_count,
+  case
+    when counts.category_count = 21
+     and counts.service_count = 74
+     and counts.active_category_count = 1
+     and counts.active_service_count = 0
+     and invalid_category_slugs.n = 0
+     and invalid_service_slugs.n = 0
+     and invalid_prices.n = 0
+     and counts.equipment_type_count = 8
+     and counts.unmapped_category_count = 0
+     and counts.non_usd_count = 0
+     and counts.invalid_image_owner_count = 0
+    then 'PASS'
+    else 'FAIL'
+  end as overall_status
+from counts, invalid_category_slugs, invalid_service_slugs, invalid_prices, category_checksum, service_checksum;

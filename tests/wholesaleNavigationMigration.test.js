@@ -690,14 +690,15 @@ describe("preflight.sql: 100% read-only, no sensitive data, matches verify.sql's
     expect(preflight).toMatch(/wholesale-navigation-verify\.sql/);
   });
 
-  it("contains ONLY SELECT statements — every comment-stripped, semicolon-split statement starts with SELECT", () => {
+  it("contains ONLY SELECT statements (including WITH-prefixed CTEs, still a single SELECT) — every comment-stripped, semicolon-split statement starts with SELECT or WITH", () => {
     const statements = preflightCode
       .split(";")
       .map((s) => s.trim())
       .filter(Boolean);
-    expect(statements.length).toBeGreaterThanOrEqual(7); // 5 checks + 2 checksums
+    expect(statements.length).toBeGreaterThanOrEqual(8); // 5 checks + 2 checksums + 1 CTE-based summary
     for (const stmt of statements) {
-      expect(stmt.toLowerCase().startsWith("select"), `non-SELECT statement found: "${stmt.slice(0, 60)}..."`).toBe(true);
+      const startsOk = stmt.toLowerCase().startsWith("select") || stmt.toLowerCase().startsWith("with");
+      expect(startsOk, `non-SELECT/WITH statement found: "${stmt.slice(0, 60)}..."`).toBe(true);
     }
   });
 
@@ -726,11 +727,16 @@ describe("preflight.sql: 100% read-only, no sensitive data, matches verify.sql's
     }
   });
 
-  it("touches wholesale_shops/_devices/_sessions/_access_log ONLY via a single count(*) subquery each — never a column of their row data", () => {
+  it("touches wholesale_shops/_devices/_sessions/_access_log ONLY via count(*) subqueries — never a column of their row data, however many times each is referenced", () => {
     for (const table of ["wholesale_shops", "wholesale_devices", "wholesale_sessions", "wholesale_access_log"]) {
-      const occurrences = preflightCode.match(new RegExp(`\\b${table}\\b`, "g")) || [];
-      expect(occurrences, `expected exactly one reference to ${table} in the whole file`).toHaveLength(1);
-      expect(preflightCode).toMatch(new RegExp(`\\(select count\\(\\*\\) from ${table}\\)`));
+      // every occurrence of "from <table>" must be immediately preceded by
+      // "count(*) " — i.e. it's always inside a count(*) subquery, never a
+      // query selecting an actual column from that table.
+      const matches = [...preflightCode.matchAll(new RegExp(`([\\s\\S]{0,20})from ${table}\\b`, "g"))];
+      expect(matches.length, `expected at least one reference to ${table}`).toBeGreaterThan(0);
+      for (const m of matches) {
+        expect(m[1], `found a non-count(*) query against ${table}: "...${m[0]}"`).toMatch(/count\(\*\)\s*$/);
+      }
     }
   });
 
@@ -816,5 +822,142 @@ describe("verify.sql: checksums section", () => {
 
   it("references wholesale-navigation-preflight.sql by name, so the comparison step is discoverable from this file alone", () => {
     expect(verify).toMatch(/wholesale-navigation-preflight\.sql/);
+  });
+});
+
+// Finds the single-row summary statement (a WITH ... SELECT ...) in a
+// comment-stripped, semicolon-split file — there is exactly one per file.
+function extractSummaryStatement(code) {
+  const statements = code
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return statements.find((s) => s.toLowerCase().startsWith("with counts as")) || null;
+}
+
+const CORE_SUMMARY_FIELDS = [
+  "category_count",
+  "service_count",
+  "active_category_count",
+  "active_service_count",
+  "shop_count",
+  "device_count",
+  "session_count",
+  "access_log_count",
+  "invalid_category_slug_count",
+  "invalid_service_slug_count",
+  "invalid_price_count",
+  "category_checksum",
+  "service_checksum",
+];
+
+function assertOnlyCountUsage(summary, table) {
+  const matches = [...summary.matchAll(new RegExp(`([\\s\\S]{0,20})from ${table}\\b`, "g"))];
+  expect(matches.length, `expected at least one reference to ${table}`).toBeGreaterThan(0);
+  for (const m of matches) {
+    expect(m[1], `found a non-count(*) query against ${table} inside the summary`).toMatch(/count\(\*\)\s*$/);
+  }
+}
+
+describe("preflight.sql: PRE-FLIGHT SUMMARY (single-row rollup)", () => {
+  const summary = extractSummaryStatement(preflightCode);
+
+  it("exists as a single WITH/SELECT statement (a CTE, not a stored function)", () => {
+    expect(summary).toBeTruthy();
+  });
+
+  it("is titled 'PRE-FLIGHT SUMMARY' in the file", () => {
+    expect(preflight).toMatch(/PRE-FLIGHT SUMMARY/);
+  });
+
+  it("returns exactly the 13 requested fields plus overall_status", () => {
+    for (const field of [...CORE_SUMMARY_FIELDS, "overall_status"]) {
+      expect(summary, `missing field "${field}" in PRE-FLIGHT SUMMARY`).toMatch(new RegExp(`\\b${field}\\b`));
+    }
+  });
+
+  it("overall_status is PASS only when all 7 pre-migration conditions hold", () => {
+    expect(summary).toMatch(/counts\.category_count = 21/);
+    expect(summary).toMatch(/counts\.service_count = 74/);
+    expect(summary).toMatch(/counts\.active_category_count = 1/);
+    expect(summary).toMatch(/counts\.active_service_count = 0/);
+    expect(summary).toMatch(/invalid_category_slugs\.n = 0/);
+    expect(summary).toMatch(/invalid_service_slugs\.n = 0/);
+    expect(summary).toMatch(/invalid_prices\.n = 0/);
+    expect(summary).toMatch(/then 'PASS'/);
+    expect(summary).toMatch(/else 'FAIL'/);
+  });
+
+  it("never selects a column from the 4 auth-related tables beyond count(*), even inside the CTE", () => {
+    for (const table of ["wholesale_shops", "wholesale_devices", "wholesale_sessions", "wholesale_access_log"]) {
+      assertOnlyCountUsage(summary, table);
+    }
+  });
+
+  it("never leaks a shop name, code, hash, token, cookie, IP, or user-agent", () => {
+    for (const forbidden of [/code_hash/i, /device_token_hash/i, /session_token_hash/i, /\bcookie/i, /\buser_agent\b/i, /\bip\b/i]) {
+      expect(summary).not.toMatch(forbidden);
+    }
+  });
+
+  it("uses the pre-migration (2-shape) price validity check — no 'quote' branch, matching query 5", () => {
+    expect(summary).not.toMatch(/pricing_type = 'quote'/);
+  });
+});
+
+describe("verify.sql: POST-MIGRATION SUMMARY (single-row rollup)", () => {
+  const summary = extractSummaryStatement(verifyCode);
+
+  it("exists as a single WITH/SELECT statement (a CTE, not a stored function)", () => {
+    expect(summary).toBeTruthy();
+  });
+
+  it("is titled 'POST-MIGRATION SUMMARY' in the file", () => {
+    expect(verify).toMatch(/POST-MIGRATION SUMMARY/);
+  });
+
+  it("returns the same 13 core fields as preflight's summary, plus the 4 post-migration-only fields, plus overall_status", () => {
+    for (const field of [
+      ...CORE_SUMMARY_FIELDS,
+      "equipment_type_count",
+      "unmapped_category_count",
+      "non_usd_count",
+      "invalid_image_owner_count",
+      "overall_status",
+    ]) {
+      expect(summary, `missing field "${field}" in POST-MIGRATION SUMMARY`).toMatch(new RegExp(`\\b${field}\\b`));
+    }
+  });
+
+  it("overall_status is PASS only when all 7 core conditions AND all 4 post-migration conditions hold", () => {
+    expect(summary).toMatch(/counts\.category_count = 21/);
+    expect(summary).toMatch(/counts\.service_count = 74/);
+    expect(summary).toMatch(/counts\.active_category_count = 1/);
+    expect(summary).toMatch(/counts\.active_service_count = 0/);
+    expect(summary).toMatch(/invalid_category_slugs\.n = 0/);
+    expect(summary).toMatch(/invalid_service_slugs\.n = 0/);
+    expect(summary).toMatch(/invalid_prices\.n = 0/);
+    expect(summary).toMatch(/counts\.equipment_type_count = 8/);
+    expect(summary).toMatch(/counts\.unmapped_category_count = 0/);
+    expect(summary).toMatch(/counts\.non_usd_count = 0/);
+    expect(summary).toMatch(/counts\.invalid_image_owner_count = 0/);
+    expect(summary).toMatch(/then 'PASS'/);
+    expect(summary).toMatch(/else 'FAIL'/);
+  });
+
+  it("its price-shape check accepts 'quote' as valid, unlike preflight's pre-migration version", () => {
+    expect(summary).toMatch(/pricing_type = 'quote' and fixed_price is null and price_min is null and price_max is null/);
+  });
+
+  it("never selects a column from the 4 auth-related tables beyond count(*), even inside the CTE", () => {
+    for (const table of ["wholesale_shops", "wholesale_devices", "wholesale_sessions", "wholesale_access_log"]) {
+      assertOnlyCountUsage(summary, table);
+    }
+  });
+
+  it("never leaks a shop name, code, hash, token, cookie, IP, or user-agent", () => {
+    for (const forbidden of [/code_hash/i, /device_token_hash/i, /session_token_hash/i, /\bcookie/i, /\buser_agent\b/i, /\bip\b/i]) {
+      expect(summary).not.toMatch(forbidden);
+    }
   });
 });
