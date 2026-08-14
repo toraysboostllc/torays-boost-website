@@ -11,7 +11,11 @@ import crypto from "node:crypto";
 
 export function getEnv() {
   const SUPABASE_URL = process.env.SUPABASE_URL;
-  const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // SUPABASE_SECRET_KEY is Supabase's modern replacement for the legacy
+  // service_role JWT — same bypass-RLS privilege, new key format. Prefer it
+  // when present; SUPABASE_SERVICE_ROLE_KEY stays supported as a fallback
+  // for installs that haven't rotated yet.
+  const SERVICE_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!SUPABASE_URL || !SERVICE_KEY) {
     throw new Error("not_configured");
   }
