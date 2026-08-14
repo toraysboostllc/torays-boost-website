@@ -50,6 +50,23 @@ export function createFakeSupabase() {
     };
   }
 
+  /** A response with a genuinely empty body — real PostgREST sends this for
+   *  PATCH/DELETE with Prefer: return=minimal (status 204), AND for POST with
+   *  Prefer: return=minimal (status 201, NOT 204 — POST always answers 201
+   *  Created, minimal only strips the body). `.json()` throws on an empty
+   *  body here exactly like a real fetch Response would, so tests exercise
+   *  the same "no body to parse" handling rest() has to deal with for real. */
+  function emptyResponse(status) {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      json: async () => {
+        throw new SyntaxError("Unexpected end of JSON input");
+      },
+      text: async () => "",
+    };
+  }
+
   async function fakeFetch(url, options = {}) {
     const u = new URL(url);
     const method = (options.method || "GET").toUpperCase();
@@ -117,7 +134,13 @@ export function createFakeSupabase() {
       const row = { id: nextId(), created_at: new Date().toISOString(), ...body };
       db[table].push(row);
       const prefer = (options.headers && options.headers.Prefer) || "";
-      return prefer.includes("minimal") ? jsonResponse(204, null) : jsonResponse(200, [row]);
+      // Real PostgREST: an insert is ALWAYS 201 Created, whether or not the
+      // caller asked for the representation back — Prefer: return=minimal
+      // only removes the body, it never changes the status to 204 (that's
+      // PATCH/DELETE's status). Getting this exactly right is the whole point:
+      // it's what makes this fake able to catch the rest() bug it's here to
+      // guard against, instead of masking it like the old (wrong) 204 did.
+      return prefer.includes("minimal") ? emptyResponse(201) : jsonResponse(201, [row]);
     }
 
     if (method === "PATCH") {

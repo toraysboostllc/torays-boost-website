@@ -61,8 +61,16 @@ async function rest(env, path, options = {}) {
     const detail = await res.text().catch(() => "");
     throw new Error(`supabase_rest_failed: ${res.status} ${detail}`);
   }
-  return res.status === 204 ? null : res.json();
+  // Real PostgREST sends an empty body on more than just 204 — a POST with
+  // Prefer: return=minimal answers 201 Created with NO body, not 204. Reading
+  // as text first (and only parsing when there's actually something to parse)
+  // handles every "no body" case Supabase can send, instead of assuming 204
+  // is the only one — that wrong assumption is what silently crashed
+  // createSession() after a successful insert (see wholesale-login.js).
+  const text = await res.text();
+  return text.trim() ? JSON.parse(text) : null;
 }
+export { rest };
 
 export async function getShopByName(env, name) {
   const rows = await rest(env, `wholesale_shops?name=eq.${encodeURIComponent(name)}&select=*`);
