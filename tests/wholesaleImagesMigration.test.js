@@ -137,25 +137,37 @@ describe("migration file: private Storage bucket, WebP-only, 5 MB cap, no public
   });
 });
 
-describe("preflight.sql: 100% read-only, gates on pre-existing duplicate owners", () => {
-  it("contains only SELECT/WITH statements", () => {
+describe("preflight.sql: a single consolidated statement, compatible with Supabase SQL Editor showing only one result table", () => {
+  it("is exactly ONE statement (a single trailing semicolon in the comment-stripped file)", () => {
     const statements = preflightCode.split(";").map((s) => s.trim()).filter(Boolean);
-    expect(statements.length).toBeGreaterThan(0);
-    for (const stmt of statements) {
-      const ok = stmt.toLowerCase().startsWith("select") || stmt.toLowerCase().startsWith("with");
-      expect(ok, `non-SELECT/WITH statement: "${stmt.slice(0, 60)}..."`).toBe(true);
-    }
+    expect(statements).toHaveLength(1);
+    const stmt = statements[0].toLowerCase();
+    expect(stmt.startsWith("with") || stmt.startsWith("select")).toBe(true);
   });
 
   it("contains no data-modifying or schema-modifying statement", () => {
-    for (const forbidden of [/\binsert into\b/i, /\bupdate\b/i, /\bdelete from\b/i, /\balter\b/i, /\bcreate\b/i, /\bdrop\b/i]) {
+    // Scoped to actual statement shapes, not bare words: this file's own
+    // details/status text legitimately uses "create"/"update" as ordinary
+    // English verbs describing what wholesale-images-migration.sql does
+    // (e.g. "the migration will create it", "via its own idempotent
+    // upsert") — a bare \bcreate\b/\bupdate\b would false-positive on that
+    // prose. What actually matters is that no real DDL/DML statement shape
+    // appears anywhere in this file.
+    for (const forbidden of [
+      /\binsert into\b/i,
+      /\bupdate\s+\w+\s+set\b/i,
+      /\bdelete from\b/i,
+      /\balter\s+(table|column|index)\b/i,
+      /\bcreate\s+(or replace\s+)?(table|index|unique index|policy|function|extension)\b/i,
+      /\bdrop\s+(table|index|column|constraint|policy|function)\b/i,
+    ]) {
       expect(preflightCode).not.toMatch(forbidden);
     }
   });
 
   it("checks for pre-existing duplicate owners on both equipment_type_id and category_id — the exact condition that would break the migration's unique indexes", () => {
-    expect(preflightCode).toMatch(/where equipment_type_id is not null\s*\ngroup by equipment_type_id\s*\nhaving count\(\*\) > 1/);
-    expect(preflightCode).toMatch(/where category_id is not null\s*\ngroup by category_id\s*\nhaving count\(\*\) > 1/);
+    expect(preflightCode).toMatch(/where equipment_type_id is not null\s*\n\s*group by equipment_type_id having count\(\*\) > 1/);
+    expect(preflightCode).toMatch(/where category_id is not null\s*\n\s*group by category_id having count\(\*\) > 1/);
   });
 
   it("references the migration file it gates, by name", () => {
@@ -168,12 +180,67 @@ describe("preflight.sql: 100% read-only, gates on pre-existing duplicate owners"
     }
   });
 
-  it("includes a PRE-FLIGHT SUMMARY that fails whenever either duplicate-owner count is non-zero", () => {
-    expect(preflight).toMatch(/PRE-FLIGHT SUMMARY/);
-    const summary = preflightCode.slice(preflightCode.indexOf("with duplicate_equipment_type_owners"));
-    expect(summary).toMatch(/duplicate_equipment_type_owners\.n > 0/);
-    expect(summary).toMatch(/duplicate_category_owners\.n > 0/);
-    expect(summary).toMatch(/then 'FAIL'/);
+  it("final output has exactly the 3 recommended columns: check_name, status, details", () => {
+    const finalSelect = preflightCode.slice(preflightCode.lastIndexOf("select check_name, status, details"));
+    expect(finalSelect).toMatch(/^select check_name, status, details/);
+  });
+
+  it("produces a row for every required check: columns, duplicate owners, existing images, bucket state, bucket config, storage policies total, public/anon policies, and a final OVERALL STATUS row", () => {
+    for (const checkName of [
+      "columns_present",
+      "duplicate_owners",
+      "existing_images",
+      "bucket_exists",
+      "bucket_config_private_webp_5mb",
+      "storage_objects_policies_total",
+      "storage_public_anon_policies",
+    ]) {
+      expect(preflight, `missing check row: ${checkName}`).toContain(`'${checkName}'`);
+    }
+    expect(preflight).toContain("'OVERALL STATUS'");
+  });
+
+  it("every check row's status is computed as PASS, REVIEW REQUIRED, or FAIL — no other literal status value appears", () => {
+    const checksBlock = preflightCode.slice(preflightCode.indexOf("checks as ("), preflightCode.indexOf("overall as ("));
+    // Status literals ('PASS', 'FAIL', 'REVIEW REQUIRED') and details
+    // literals (full sentences, plus the singular/plural "y"/"ies" suffix
+    // literal used for "polic(y/ies)") both appear as "then '...'"/
+    // "else '...'" inside this block. Status literals are the only ones
+    // that are both short AND entirely uppercase letters/spaces — every
+    // details literal and grammar-suffix literal is either long or
+    // lowercase, so this filter cannot mistake one for a status value.
+    const candidates = [...checksBlock.matchAll(/(?:then|else) '([^']*)'/g)]
+      .map((m) => m[1])
+      .filter((s) => s.length <= 20 && /^[A-Z ]+$/.test(s));
+    expect(candidates.length).toBeGreaterThan(0);
+    const allowed = new Set(["PASS", "REVIEW REQUIRED", "FAIL"]);
+    for (const lit of candidates) {
+      expect(allowed.has(lit), `unexpected short literal that looks like a status value: "${lit}"`).toBe(true);
+    }
+  });
+
+  it("the duplicate_owners row is the one FAIL-capable check tied directly to the migration's unique-index gate", () => {
+    const row = preflightCode.slice(preflightCode.indexOf("'duplicate_owners'"), preflightCode.indexOf("'existing_images'"));
+    expect(row).toMatch(/dup_equipment_type_owners = 0 and dup_category_owners = 0.*?then 'PASS'/s);
+    expect(row).toMatch(/else 'FAIL'/);
+  });
+
+  it("OVERALL STATUS aggregates every check row's status: any FAIL wins, else any REVIEW REQUIRED wins, else PASS", () => {
+    const overallCte = preflightCode.slice(preflightCode.indexOf("overall as ("), preflightCode.indexOf(")\nselect check_name"));
+    expect(overallCte).toMatch(/bool_or\(status = 'FAIL'\)\s*then 'FAIL'/);
+    expect(overallCte).toMatch(/bool_or\(status = 'REVIEW REQUIRED'\)\s*then 'REVIEW REQUIRED'/);
+    expect(overallCte).toMatch(/else 'PASS'/);
+    expect(overallCte).toMatch(/from checks/);
+  });
+
+  it("the final OVERALL STATUS row is unioned from the overall CTE, not hardcoded", () => {
+    expect(preflightCode).toMatch(/99,\s*\n\s*'OVERALL STATUS',\s*\n\s*overall\.status/);
+  });
+
+  it("orders the output by an internal ord column that never leaks into the final 3-column result", () => {
+    const finalSelect = preflightCode.slice(preflightCode.lastIndexOf("select check_name, status, details"));
+    expect(finalSelect).toMatch(/order by ord;$/);
+    expect(finalSelect.split("\n")[0]).not.toMatch(/\bord\b/);
   });
 });
 
@@ -241,31 +308,14 @@ describe("verify.sql: read-only, confirms every object the migration promises", 
   });
 });
 
-describe("preflight.sql and verify.sql: storage.objects policy audit — never a false PASS", () => {
-  it("both files list policyname/roles/cmd/qual/with_check for every storage.objects policy", () => {
-    for (const file of [preflight, verify]) {
-      expect(file).toMatch(/select\s*\n\s*policyname,\s*\n\s*roles,\s*\n\s*cmd,\s*\n\s*qual,\s*\n\s*with_check/);
-      expect(file).toMatch(/from pg_policies\s*\nwhere schemaname = 'storage' and tablename = 'objects'/);
-    }
+describe("verify.sql: storage.objects policy audit — never a false PASS (verify.sql's own standalone listing query, untouched by this round)", () => {
+  it("lists policyname/roles/cmd/qual/with_check for every storage.objects policy as a real, standalone query", () => {
+    expect(verify).toMatch(/select\s*\n\s*policyname,\s*\n\s*roles,\s*\n\s*cmd,\s*\n\s*qual,\s*\n\s*with_check/);
+    expect(verify).toMatch(/from pg_policies\s*\nwhere schemaname = 'storage' and tablename = 'objects'/);
   });
 
-  it("both files flag any public/anon policy as POLICY_REVIEW_REQUIRED via the roles && array['public','anon'] overlap check — never trying to parse qual/with_check to prove safety", () => {
-    for (const file of [preflight, verify]) {
-      expect(file).toMatch(/roles && array\['public', 'anon'\]::name\[\]/);
-      expect(file).toMatch(/POLICY_REVIEW_REQUIRED/);
-    }
-  });
-
-  it("documents explicitly that qual/with_check are shown for a human to read, not auto-parsed to certify safety", () => {
-    expect(preflight).toMatch(/cannot soundly decide/);
-    expect(preflight).toMatch(/[Nn]ever auto-cleared to PASS/);
-  });
-
-  it("both summary CTEs compute has_public_or_anon_storage_policy the same way", () => {
-    const preflightCte = preflightCode.slice(preflightCode.indexOf("storage_policy_check as ("), preflightCode.indexOf("storage_policy_check as (") + 250);
-    const verifyCte = verifyCode.slice(verifyCode.indexOf("storage_policy_check as ("), verifyCode.indexOf("storage_policy_check as (") + 250);
-    expect(preflightCte).toContain("roles && array['public', 'anon']::name[]");
-    expect(verifyCte).toContain("roles && array['public', 'anon']::name[]");
+  it("flags any public/anon policy via the roles && array['public','anon'] overlap check — never trying to parse qual/with_check to prove safety", () => {
+    expect(verify).toMatch(/roles && array\['public', 'anon'\]::name\[\]/);
   });
 
   it("the migration itself creates zero storage.objects policies — the audit exists to catch a PRE-EXISTING one, not something this file adds", () => {
@@ -274,18 +324,48 @@ describe("preflight.sql and verify.sql: storage.objects policy audit — never a
   });
 });
 
-describe("preflight.sql: PRE-FLIGHT SUMMARY is also a 3-state result", () => {
-  it("overall_status can be PASS, REVIEW REQUIRED, or FAIL — never a plain boolean collapse", () => {
-    const summary = preflightCode.slice(preflightCode.indexOf("with duplicate_equipment_type_owners"));
-    expect(summary).toMatch(/then 'FAIL'/);
-    expect(summary).toMatch(/then 'REVIEW REQUIRED'/);
-    expect(summary).toMatch(/else 'PASS'/);
+describe("preflight.sql: storage.objects policy audit — folded into the consolidated table, not a separate result set", () => {
+  it("computes the public/anon policy count using the same roles && array['public','anon'] overlap check as verify.sql", () => {
+    expect(preflightCode).toMatch(/roles && array\['public', 'anon'\]::name\[\]/);
   });
 
-  it("duplicate owners always win as FAIL, even if no storage policy issue exists — the unique-index gate is still the hardest blocker", () => {
-    const summary = preflightCode.slice(preflightCode.indexOf("with duplicate_equipment_type_owners"));
-    const statusCase = summary.slice(summary.indexOf("case", summary.lastIndexOf("as storage_policy_status")));
-    expect(statusCase).toMatch(/duplicate_equipment_type_owners\.n > 0 or duplicate_category_owners\.n > 0[\s\S]{0,20}then 'FAIL'/);
+  it("documents why qual/with_check are never auto-parsed to certify safety", () => {
+    expect(preflight).toMatch(/cannot soundly decide/);
+    expect(preflight).toMatch(/[Nn]ever auto-cleared to PASS/i);
+  });
+
+  it("raw CTE aggregates the actual policyname/roles/cmd/qual/with_check of every public/anon policy as JSON — the real audit data, not a query to run separately", () => {
+    const rawCte = preflightCode.slice(preflightCode.indexOf("with raw as ("), preflightCode.indexOf("checks as ("));
+    expect(rawCte).toMatch(/jsonb_agg\(\s*\n\s*jsonb_build_object\(/);
+    for (const field of ["'policyname', policyname", "'roles', to_jsonb\\(roles\\)", "'cmd', cmd", "'qual', qual", "'with_check', with_check"]) {
+      expect(rawCte, `missing field in jsonb_build_object: ${field}`).toMatch(new RegExp(field));
+    }
+    expect(rawCte).toContain("as storage_public_anon_policies_json");
+  });
+
+  it("the jsonb_agg draws from the exact same public/anon overlap filter as the count, not a different or looser condition", () => {
+    const jsonSubquery = preflightCode.slice(
+      preflightCode.indexOf("jsonb_agg("),
+      preflightCode.indexOf("as storage_public_anon_policies_json")
+    );
+    expect(jsonSubquery).toMatch(/from pg_policies\s*\n\s*where schemaname = 'storage' and tablename = 'objects'\s*\n\s*and roles && array\['public', 'anon'\]::name\[\]/);
+  });
+
+  it("the storage_public_anon_policies row's details cell is the JSON payload itself (or the literal 'none'), never a SELECT statement as text", () => {
+    const row = preflightCode.slice(preflightCode.indexOf("'storage_public_anon_policies'"), preflightCode.indexOf("'storage_public_anon_policies'") + 400);
+    expect(row).toContain("storage_public_anon_policies_json::text");
+    expect(row).toMatch(/when storage_public_anon_policy_count = 0 then 'none'/);
+    // the old design's embedded-query-as-text is gone from this row entirely
+    expect(row).not.toMatch(/select policyname, roles, cmd, qual, with_check from pg_policies/);
+  });
+
+  it("jsonb_agg orders by policyname for deterministic output across runs", () => {
+    const jsonSubquery = preflightCode.slice(preflightCode.indexOf("jsonb_agg("), preflightCode.indexOf("as storage_public_anon_policies_json"));
+    expect(jsonSubquery).toMatch(/\)\s*order by policyname\s*\n\s*\)/);
+  });
+
+  it("uses only the 3 standardized status labels (PASS/REVIEW REQUIRED/FAIL) — never the old POLICY_REVIEW_REQUIRED label", () => {
+    expect(preflight).not.toContain("POLICY_REVIEW_REQUIRED");
   });
 });
 
