@@ -216,9 +216,36 @@ describe("wholesalePortal.css: PCB background is cover/center/no-repeat, non-rep
     expect(rule).toMatch(/background-repeat:\s*no-repeat,\s*no-repeat;/);
   });
 
-  it("layers a translucent blue-gray overlay UNDER the text (a same-color-both-stops linear-gradient) on top of the PCB photo, so text stays legible over the busy circuit texture", () => {
+  it("layers a translucent overlay UNDER the text (a same-color-both-stops linear-gradient, driven by --wsp-overlay-rgb) on top of the PCB photo, so text stays legible over the busy circuit texture", () => {
     const rule = css.match(/\.wsp-scope\s*\{[\s\S]*?\n\}/)[0];
-    expect(rule).toMatch(/background-image:\s*linear-gradient\(rgba\([^)]+\),\s*rgba\([^)]+\)\),\s*url\(/);
+    expect(rule).toContain(
+      "background-image: linear-gradient(rgba(var(--wsp-overlay-rgb), 0.62), rgba(var(--wsp-overlay-rgb), 0.62)),"
+    );
+    expect(rule).toMatch(/rgba\(var\(--wsp-overlay-rgb\),\s*0\.62\).*\n?\s*url\(/);
+  });
+
+  it("the overlay is a LIGHT blue-gray, not a dark one — Preview feedback: the previous round read as ~100% dark mode", () => {
+    const overlayRgb = css.match(/--wsp-overlay-rgb:\s*([\d, ]+);/)[1].split(",").map((n) => Number(n.trim()));
+    const sum = overlayRgb.reduce((a, b) => a + b, 0);
+    expect(sum).toBeGreaterThan(600); // e.g. 215+225+240 — a light tint, nowhere near the old rgba(9,15,32) dark one
+    // --wsp-overlay-rgb must actually be the split-out triplet of --wsp-page-bg, not an independently drifting value
+    const pageBgHex = css.match(/--wsp-page-bg:\s*(#[0-9a-fA-F]{6})/)[1];
+    const [r, g, b] = [pageBgHex.slice(1, 3), pageBgHex.slice(3, 5), pageBgHex.slice(5, 7)].map((h) => parseInt(h, 16));
+    expect(overlayRgb).toEqual([r, g, b]);
+  });
+
+  it("the overlay's alpha is mid-range (not near-opaque) — the PCB must stay clearly visible through it, not be hidden by it", () => {
+    const alphas = [...css.matchAll(/rgba\(var\(--wsp-overlay-rgb\),\s*([\d.]+)\)/g)].map((m) => Number(m[1]));
+    expect(alphas.length).toBeGreaterThan(0);
+    for (const alpha of alphas) {
+      expect(alpha).toBeGreaterThan(0.3);
+      expect(alpha).toBeLessThan(0.8);
+    }
+  });
+
+  it("never lightens via the `opacity` CSS property on .wsp-scope or its content — only via background-image layer alpha", () => {
+    const scopeRule = css.match(/\.wsp-scope\s*\{[\s\S]*?\n\}/)[0];
+    expect(scopeRule).not.toMatch(/(?<!background-)opacity:/);
   });
 
   it("the background lives ONLY on .wsp-scope — WholesaleLogin.jsx (the only other wholesale page) never applies this class, so the login screen never shows the PCB background", () => {
@@ -234,7 +261,41 @@ describe("wholesalePortal.css: PCB background is cover/center/no-repeat, non-rep
   });
 });
 
-describe("wholesalePortal.css: cards are white/ice-blue — lighter than the dark PCB page background", () => {
+describe("wholesalePortal.css: page tone — medium-light blue-gray, darker than the cards but not dark-mode-dark", () => {
+  const css = read("src/styles/wholesalePortal.css");
+  const luminanceOf = (hex) => {
+    const n = parseInt(hex.slice(1), 16);
+    return ((n >> 16) & 255) + ((n >> 8) & 255) + (n & 255);
+  };
+
+  it("--wsp-page-bg is light overall (a blue-gray, not a near-black navy)", () => {
+    const pageHex = css.match(/--wsp-page-bg:\s*(#[0-9a-fA-F]{6})/)[1];
+    expect(luminanceOf(pageHex)).toBeGreaterThan(500); // #101a30 (old dark value) sums to 26 — nowhere close
+  });
+
+  it("--wsp-page-bg is still darker than --wsp-card-bg — 'el fondo debe ser mas oscuro que las ventanas'", () => {
+    const pageHex = css.match(/--wsp-page-bg:\s*(#[0-9a-fA-F]{6})/)[1];
+    const cardHex = css.match(/--wsp-card-bg:\s*(#[0-9a-fA-F]{6})/)[1];
+    expect(luminanceOf(pageHex)).toBeLessThan(luminanceOf(cardHex));
+  });
+
+  it("page-level text (--wsp-text-strong, --wsp-text-soft — the h1 title, shop name, section labels) is now dark navy, matching a light page", () => {
+    const strongHex = css.match(/--wsp-text-strong:\s*(#[0-9a-fA-F]{6})/)[1];
+    const softHex = css.match(/--wsp-text-soft:\s*(#[0-9a-fA-F]{6})/)[1];
+    expect(luminanceOf(strongHex)).toBeLessThan(300); // dark navy, not the old near-white #f4f6ff (sum ~753)
+    expect(luminanceOf(softHex)).toBeLessThan(400);
+  });
+
+  it("--wsp-btn-text preserves the OLD light value, exclusively for buttons — they keep their unchanged dark gradient background", () => {
+    const btnTextHex = css.match(/--wsp-btn-text:\s*(#[0-9a-fA-F]{6})/)[1];
+    expect(luminanceOf(btnTextHex)).toBeGreaterThan(600); // near-white, readable on the button's own dark gradient
+    const ghostRule = css.match(/\.wsp-btn-ghost\s*\{[\s\S]*?\n\}/)[0];
+    expect(ghostRule).toContain("color: var(--wsp-btn-text)");
+    expect(ghostRule).not.toContain("var(--wsp-text-strong)");
+  });
+});
+
+describe("wholesalePortal.css: cards are white/ice-blue — lighter than the (now light-toned) PCB page background", () => {
   const css = read("src/styles/wholesalePortal.css");
 
   it("--wsp-card-bg is a light hex, distinct from and lighter than --wsp-page-bg/--wsp-surface", () => {
@@ -246,6 +307,37 @@ describe("wholesalePortal.css: cards are white/ice-blue — lighter than the dar
     };
     expect(luminanceOf(bgHex)).toBeGreaterThan(luminanceOf(pageHex));
     expect(luminanceOf(bgHex)).toBeGreaterThan(600); // genuinely light, not just "less dark"
+  });
+
+  it("the photo-less placeholder box (.wsp-card-photo / .wsp-category-photo) is light ice-blue, not the old dark navy gradient", () => {
+    const luminanceOf = (hex) => {
+      const n = parseInt(hex.slice(1), 16);
+      return ((n >> 16) & 255) + ((n >> 8) & 255) + (n & 255);
+    };
+    const startHex = css.match(/--wsp-placeholder-bg-start:\s*(#[0-9a-fA-F]{6})/)[1];
+    const endHex = css.match(/--wsp-placeholder-bg-end:\s*(#[0-9a-fA-F]{6})/)[1];
+    expect(luminanceOf(startHex)).toBeGreaterThan(600);
+    expect(luminanceOf(endHex)).toBeGreaterThan(600);
+    expect(css).toMatch(
+      /\.wsp-card-photo\s*\{[^}]*background:\s*linear-gradient\(135deg,\s*var\(--wsp-placeholder-bg-start\)/
+    );
+    expect(css).toMatch(
+      /\.wsp-category-photo\s*\{[^}]*background:\s*linear-gradient\(135deg,\s*var\(--wsp-placeholder-bg-start\)/
+    );
+    // never the old dark tokens for this specific background anymore
+    expect(css).not.toMatch(/\.wsp-card-photo\s*\{[^}]*var\(--wsp-blue-tint\)/);
+    expect(css).not.toMatch(/\.wsp-category-photo\s*\{[^}]*var\(--wsp-blue-tint\)/);
+  });
+
+  it("the placeholder icon (--wsp-icon) is a strong, clearly-visible blue against the now-light placeholder box — not the old pale blue tuned for a dark box", () => {
+    const iconHex = css.match(/--wsp-icon:\s*(#[0-9a-fA-F]{6})/)[1];
+    const bgHex = css.match(/--wsp-placeholder-bg-start:\s*(#[0-9a-fA-F]{6})/)[1];
+    const luminanceOf = (hex) => {
+      const n = parseInt(hex.slice(1), 16);
+      return ((n >> 16) & 255) + ((n >> 8) & 255) + (n & 255);
+    };
+    expect(iconHex).not.toBe("#7fb0ff"); // the old pale value, invisible on a light box
+    expect(luminanceOf(bgHex) - luminanceOf(iconHex)).toBeGreaterThan(250); // real, visible separation
   });
 
   it(".wsp-card sets its own dark-on-light text color — never inherits the page's light-on-dark --wsp-text-strong", () => {
@@ -269,6 +361,14 @@ describe("wholesalePortal.css: cards are white/ice-blue — lighter than the dar
     // the diagnostic-fee value's inline style must also point at the card token, not the page one
     expect(drilldown).toContain('style={{ color: "var(--wsp-card-text)" }}');
     expect(drilldown).not.toContain('style={{ color: "var(--wsp-text-strong)" }}');
+  });
+
+  it(".wsp-empty (Microsoldering's no-results state) is legible on the light theme — light card background, dark card-scoped text, never the old dark --wsp-surface2/--wsp-text-soft pair", () => {
+    const rule = css.match(/\.wsp-empty\s*\{[\s\S]*?\n\}/)[0];
+    expect(rule).toContain("background: var(--wsp-card-bg)");
+    expect(rule).toContain("color: var(--wsp-card-text-soft)");
+    expect(rule).not.toContain("var(--wsp-surface2)");
+    expect(rule).not.toContain("var(--wsp-text-soft)");
   });
 });
 

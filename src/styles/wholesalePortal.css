@@ -1,28 +1,44 @@
 /**
  * Wholesale Shops Portal — scoped, standalone visual theme (Fase 3B).
  *
- * Approved direction: strong blue-gray electronic background (a real PCB
- * close-up photo, not a flat color), Torays blue/red accents, large white/
- * ice-blue photo cards, dark readable text, XP-style gradient buttons and
- * card bezels — the SAME palette already approved and shipped in TORAYS
- * BOOST DESK's own Wholesale module (the `--ws-*` tokens there). Every
- * value below is copied from or derived from that already-approved dark
- * palette (prefixed `--wsp-` instead of `--ws-` to keep the two apps'
- * token namespaces independent — this is a separate repo, not a shared
- * import).
+ * Approved direction: medium-intensity blue-gray electronic background (a
+ * real PCB close-up photo showing clearly through a light translucent
+ * tint — never a dark-mode reading), Torays blue/red accents, large white/
+ * ice-blue photo "window" cards sitting visibly lighter than the page
+ * behind them, dark-navy readable text throughout, XP-style gradient
+ * buttons and card bezels. Buttons are the one deliberate exception: they
+ * keep their own dark gradient background (unchanged from the prior
+ * round) since they never sit on a light surface in this UI, so they read
+ * their text from a dedicated --wsp-btn-text token instead of the
+ * page/card text tokens below.
  *
  * Scoping: every rule lives under `.wsp-scope`, applied only to the
  * `/wholesale/prices` page wrapper (WholesaleLogin.jsx never uses this
  * class, so the PCB background/overlay never appears on the login screen).
  * This site has no light/dark toggle elsewhere (`torays-*` tokens,
- * Adenda 3's light/premium theme) — this section is intentionally
- * always-dark-background, a deliberately different visual identity for the
- * B2B shop audience. Nothing here touches a `torays-*` token or any
- * selector outside `.wsp-scope`.
+ * Adenda 3's light/premium theme) — this section has its own fixed visual
+ * identity for the B2B shop audience, independent of that toggle. Nothing
+ * here touches a `torays-*` token or any selector outside `.wsp-scope`.
+ * The lightening effect is achieved ONLY through the alpha of the
+ * background-image gradient layer (see .wsp-scope's background-image) —
+ * never the `opacity` CSS property on `.wsp-scope` or any of its content.
  */
 
 .wsp-scope {
-  --wsp-page-bg: #101a30;
+  /* Correction pass: the previous round's overlay (rgba(9,15,32,.82), a
+     near-opaque near-black navy) read as ~100% dark mode — the PCB was
+     barely visible and every token below it was tuned for light-on-dark.
+     This pass flips the whole page to a light blue-gray reading, while
+     keeping the PCB photo itself, the card bezel/shadow/red-accent/hover
+     treatment, and every button (which intentionally KEEPS its dark XP
+     gradient — buttons never sit on a light background in this UI, so
+     their own tokens are untouched below) exactly as approved. */
+  --wsp-page-bg: #d7e1f0;
+  /* RGB triplet of --wsp-page-bg, split out so the translucent overlay
+     below can reference it via rgba(var(--wsp-overlay-rgb), alpha) instead
+     of duplicating the literal numbers — keeps the two values impossible
+     to drift apart. */
+  --wsp-overlay-rgb: 215, 225, 240;
   --wsp-surface: #1e2c4e;
   --wsp-surface2: #16223d;
   --wsp-surface3: #2a3b66;
@@ -34,21 +50,41 @@
   --wsp-blue-tint-strong: #2e4785;
   --wsp-navy: #0b1730;
   --wsp-red: #f0525e;
-  --wsp-text-strong: #f4f6ff;
-  --wsp-text-soft: #9ba3b7;
-  --wsp-icon: #7fb0ff;
+  /* Page-level text (h1 title, shop name, section labels) — now dark navy,
+     since the page itself is light. Deliberately the SAME dark tone as the
+     card text tokens below (the whole surface is light now, on-page and
+     on-card text can converge). Never light-on-dark here anymore — that's
+     what --wsp-btn-text below is for, exclusively for buttons, which are
+     the one thing on this page that keeps a dark background. */
+  --wsp-text-strong: #10192f;
+  --wsp-text-soft: #48557a;
+  /* Buttons (.wsp-btn-ghost) keep their unchanged dark XP gradient
+     background — this is their own dedicated light text token, split out
+     from --wsp-text-strong now that the two have diverged. */
+  --wsp-btn-text: #f4f6ff;
+  /* Placeholder icon (no photo yet) now sits on a LIGHT ice-blue box (see
+     --wsp-placeholder-bg-* below), so it needs a strong, clearly-visible
+     blue instead of the old pale one that only worked on a dark box. */
+  --wsp-icon: #2f6fed;
 
-  /* Cards are white/ice-blue — deliberately LIGHTER than the dark PCB
-     background/page, per the approved direction — so their own text needs
-     its own dark-on-light pair, distinct from the page-level (light-on-dark)
-     --wsp-text-strong/--wsp-text-soft above. Never reuse those two inside
-     a card — see .wsp-card's own `color` rule and .wsp-card-text-soft. */
+  /* Cards are white/ice-blue — LIGHTER than the page itself, so they read
+     as clear "windows" sitting on top of the medium-tone PCB page. Their
+     text uses the same dark-navy pair as the page now (see above). */
   --wsp-card-bg: #eef3fc;
   --wsp-card-bg-hover: #f7faff;
   --wsp-card-border: #b7c9ea;
   --wsp-card-border-hover: var(--wsp-blue);
   --wsp-card-text: #10192f;
   --wsp-card-text-soft: #48557a;
+
+  /* The photo-less placeholder box inside a card — was a dark navy gradient
+     (matching the old dark theme's "recessed screen" look); now a light
+     ice-blue gradient so it reads as part of the light card, not a leftover
+     dark cutout. Dedicated tokens (not --wsp-blue-tint/--wsp-surface2,
+     which stay dark on purpose — they still back the unchanged button
+     gradients below). */
+  --wsp-placeholder-bg-start: #dce8fb;
+  --wsp-placeholder-bg-end: #eef3fc;
 
   --wsp-card-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 4px 12px rgba(8, 14, 30, 0.4);
   --wsp-card-shadow-hover: 0 1px 0 rgba(255, 255, 255, 0.65) inset, 0 16px 32px rgba(8, 14, 30, 0.5),
@@ -58,14 +94,19 @@
   color: var(--wsp-text-strong);
   font-family: "Inter", sans-serif;
 
-  /* PCB photo background with a translucent blue-gray tint layered on top
-     (same flat-color-both-stops linear-gradient trick used to add a solid
-     overlay as a second `background-image` layer, since `background-color`
-     is a single layer and can't stack with an image the way this needs
-     to) — keeps the busy circuit-board texture from fighting card/text
-     legibility. `cover`/`center`/`no-repeat` on both layers, one value per
-     layer since there are two backgrounds stacked here. */
-  background-image: linear-gradient(rgba(9, 15, 32, 0.82), rgba(9, 15, 32, 0.82)),
+  /* PCB photo background with a translucent LIGHT blue-gray tint layered on
+     top (same flat-color-both-stops linear-gradient trick as before, just
+     with a light color now — never the `opacity` CSS property on this
+     element or its content, only alpha within this background-image
+     layer). Composited over the (fairly dark/saturated) PCB photo, this
+     mid-alpha light tint produces a medium blue-gray page tone that reads
+     clearly as "not dark mode" while keeping the circuit board texture
+     visible — deliberately a shade darker than the white/ice-blue cards
+     sitting on top of it, and deliberately lighter than a page that would
+     force light-on-dark content. `cover`/`center`/`no-repeat` on both
+     layers, one value per layer since there are two backgrounds stacked
+     here. */
+  background-image: linear-gradient(rgba(var(--wsp-overlay-rgb), 0.62), rgba(var(--wsp-overlay-rgb), 0.62)),
     url("../assets/wholesale-pcb-background.webp");
   background-size: cover, cover;
   background-position: center, center;
@@ -93,9 +134,11 @@
   color: var(--wsp-text-soft);
 }
 
-/* Soft/secondary text INSIDE a light card (category notes, diagnostic fee,
-   table notes column) — never --wsp-text-soft in here, that token is for
-   text sitting directly on the dark page background. */
+/* Soft/secondary text INSIDE a card (category notes, diagnostic fee,
+   table notes column). Kept as its own class (not just reusing
+   --wsp-text-soft) even though the two tokens share the same dark-navy
+   value today — this is the one that's guaranteed to keep working if the
+   page-level and card-level palettes ever diverge again. */
 .wsp-card-text-soft {
   color: var(--wsp-card-text-soft);
 }
@@ -196,14 +239,14 @@
 
 /* Photo area: fixed aspect-ratio so the grid never shifts while images
    load or fail to sign — the icon fallback fills the exact same box.
-   Deliberately kept as a DARK "screen" cutout (its own gradient, not the
-   card's new light background) — the light icon already reads clearly
-   against it, and it reads as a proper XP-style recessed panel inside the
-   light card frame. */
+   Correction pass: was a dark navy "screen" cutout; now a light ice-blue
+   gradient (--wsp-placeholder-bg-*) so a photo-less card never shows a
+   leftover dark rectangle inside the now-light card — the strong-blue
+   --wsp-icon token below is what carries the contrast here instead. */
 .wsp-card-photo {
   width: 100%;
   aspect-ratio: 4 / 3;
-  background: linear-gradient(135deg, var(--wsp-blue-tint) 0%, var(--wsp-surface2) 100%);
+  background: linear-gradient(135deg, var(--wsp-placeholder-bg-start) 0%, var(--wsp-placeholder-bg-end) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -233,9 +276,10 @@
 
 /* ---------------------------------------------------------------------
    Buttons — XP-style glossy gradient, matching DESK's approved treatment.
-   These only ever sit directly on the dark PCB page background (never
-   inside a light .wsp-card in this UI), so they keep the light-on-dark
-   token pair.
+   Unchanged by this correction pass: they keep their own dark gradient
+   background regardless of the now-light page/card palette, so their text
+   reads from the dedicated --wsp-btn-text token (light), never from the
+   page/card text tokens (dark navy).
 --------------------------------------------------------------------- */
 .wsp-btn {
   font-family: "Inter", sans-serif;
@@ -269,7 +313,7 @@
 }
 
 .wsp-btn-ghost {
-  color: var(--wsp-text-strong);
+  color: var(--wsp-btn-text);
   background: linear-gradient(180deg, var(--wsp-blue-tint-strong) 0%, var(--wsp-surface3) 100%);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset;
 }
@@ -314,7 +358,7 @@
   min-width: 64px;
   border-radius: 10px;
   overflow: hidden;
-  background: linear-gradient(135deg, var(--wsp-blue-tint) 0%, var(--wsp-surface2) 100%);
+  background: linear-gradient(135deg, var(--wsp-placeholder-bg-start) 0%, var(--wsp-placeholder-bg-end) 100%);
   border: 1px solid var(--wsp-border);
   display: flex;
   align-items: center;
@@ -351,15 +395,16 @@
 
 /* ---------------------------------------------------------------------
    Empty state — Microsoldering with zero currently-tagged active
-   services: professional, no dead navigation implied. Stays on the
-   dark-page token pair (it's an inline notice sitting on the PCB
-   background, not one of the redesigned light photo cards).
+   services: professional, no dead navigation implied. Correction pass:
+   was a dark navy box (matched the old dark page); now uses the same
+   light card tokens as everything else, since --wsp-text-soft is dark
+   navy now and a dark background behind it would be illegible.
 --------------------------------------------------------------------- */
 .wsp-empty {
-  border: 1px dashed var(--wsp-border);
+  border: 1px dashed var(--wsp-card-border);
   border-radius: 14px;
   padding: 40px 24px;
   text-align: center;
-  color: var(--wsp-text-soft);
-  background: var(--wsp-surface2);
+  color: var(--wsp-card-text-soft);
+  background: var(--wsp-card-bg);
 }
