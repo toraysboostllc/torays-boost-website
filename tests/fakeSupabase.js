@@ -13,32 +13,91 @@ export function createFakeSupabase() {
     wholesale_access_log: [],
     wholesale_categories: [],
     wholesale_services: [],
+    wholesale_equipment_types: [],
+    wholesale_images: [],
+    wholesale_tags: [],
+    wholesale_service_tags: [],
     profiles: [],
   };
   const authUsers = {}; // token -> user object, for /auth/v1/user
+  // storage_path values in this Set fail to sign (simulates a deleted/
+  // unreachable Storage object) — tests add to it directly via
+  // fake.storagePathsThatFailToSign.add("some/path.webp").
+  const storagePathsThatFailToSign = new Set();
+  // When true, the WHOLE batch-sign call fails (network/Storage outage) —
+  // every image in the request degrades to null, not just one path.
+  let storageSignCallFails = false;
   let idCounter = 1;
   const nextId = () => `id-${idCounter++}`;
+
+  /** Splits on top-level commas only — commas inside a nested `in.(a,b,c)`
+   *  value list must NOT split the outer `or=(...)` clause list apart. */
+  function splitTopLevelCommas(s) {
+    const parts = [];
+    let depth = 0;
+    let start = 0;
+    for (let i = 0; i < s.length; i++) {
+      if (s[i] === "(") depth++;
+      else if (s[i] === ")") depth--;
+      else if (s[i] === "," && depth === 0) {
+        parts.push(s.slice(start, i));
+        start = i + 1;
+      }
+    }
+    parts.push(s.slice(start));
+    return parts;
+  }
+
+  /** Parses one `column.op.value` clause (the syntax used both as a plain
+   *  top-level filter after stripping `column=`, and inside an `or=(...)`
+   *  group where the column name is dot-joined instead of `=`-joined). */
+  function parseClause(key, opAndVal) {
+    const dot = opAndVal.indexOf(".");
+    return { key, op: opAndVal.slice(0, dot), val: opAndVal.slice(dot + 1) };
+  }
 
   function parseFilters(searchParams) {
     const filters = [];
     for (const [key, value] of searchParams.entries()) {
       if (key === "select" || key === "order" || key === "limit") continue;
+      if (key === "or") {
+        // value looks like "(col1.op1.val1,col2.op2.val2)" — PostgREST's
+        // `or=(...)` group syntax, used by listActiveImagesForOwners when
+        // both an equipment-type and a category id list are non-empty.
+        const inner = value.slice(1, -1);
+        const clauses = splitTopLevelCommas(inner).map((clause) => {
+          const firstDot = clause.indexOf(".");
+          return parseClause(clause.slice(0, firstDot), clause.slice(firstDot + 1));
+        });
+        filters.push({ or: clauses });
+        continue;
+      }
       const dot = value.indexOf(".");
       if (dot === -1) continue;
-      filters.push({ key, op: value.slice(0, dot), val: value.slice(dot + 1) });
+      filters.push(parseClause(key, value));
     }
     return filters;
   }
 
+  function matchesClause(row, { key, op, val }) {
+    const rowVal = row[key];
+    if (op === "eq") return String(rowVal) === val;
+    if (op === "is") return val === "null" ? rowVal == null : String(rowVal) === val;
+    if (op === "gt") return rowVal != null && new Date(rowVal) > new Date(val);
+    if (op === "lt") return rowVal != null && new Date(rowVal) < new Date(val);
+    if (op === "in") {
+      const list = val
+        .replace(/^\(/, "")
+        .replace(/\)$/, "")
+        .split(",")
+        .filter(Boolean);
+      return rowVal != null && list.includes(String(rowVal));
+    }
+    return true;
+  }
+
   function rowMatches(row, filters) {
-    return filters.every(({ key, op, val }) => {
-      const rowVal = row[key];
-      if (op === "eq") return String(rowVal) === val;
-      if (op === "is") return val === "null" ? rowVal == null : String(rowVal) === val;
-      if (op === "gt") return rowVal != null && new Date(rowVal) > new Date(val);
-      if (op === "lt") return rowVal != null && new Date(rowVal) < new Date(val);
-      return true;
-    });
+    return filters.every((f) => (f.or ? f.or.some((clause) => matchesClause(row, clause)) : matchesClause(row, f)));
   }
 
   function jsonResponse(status, body) {
@@ -76,6 +135,22 @@ export function createFakeSupabase() {
       const token = authHeader.replace("Bearer ", "");
       const user = authUsers[token];
       return user ? jsonResponse(200, user) : jsonResponse(401, { message: "invalid_token" });
+    }
+
+    // Supabase Storage's batch signed-URL endpoint — POST { expiresIn, paths }
+    // -> [{ error, path, signedURL }]. Mirrors the real API's per-path error
+    // shape so a caller (signImagePaths) can degrade one broken image to
+    // `image: null` without losing the rest of the batch.
+    if (u.pathname === "/storage/v1/object/sign/wholesale-images" && method === "POST") {
+      if (storageSignCallFails) return jsonResponse(500, { message: "storage_unavailable" });
+      const body = options.body ? JSON.parse(options.body) : {};
+      const paths = Array.isArray(body.paths) ? body.paths : [];
+      const results = paths.map((path) =>
+        storagePathsThatFailToSign.has(path)
+          ? { error: "Object not found", path, signedURL: null }
+          : { error: null, path, signedURL: `/object/sign/wholesale-images/${path}?token=fake-signed-token` }
+      );
+      return jsonResponse(200, results);
     }
 
     const m = u.pathname.match(/^\/rest\/v1\/(rpc\/)?([a-zA-Z_]+)$/);
@@ -165,6 +240,10 @@ export function createFakeSupabase() {
     nextId,
     addAuthUser(token, user) {
       authUsers[token] = user;
+    },
+    storagePathsThatFailToSign,
+    failStorageSignCompletely() {
+      storageSignCallFails = true;
     },
   };
 }

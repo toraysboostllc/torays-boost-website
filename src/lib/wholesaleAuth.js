@@ -30,7 +30,12 @@ export async function fetchWholesaleCatalog() {
   if (!res.ok) {
     return { ok: false, message: data.message || "Could not load prices." };
   }
-  return { ok: true, shopName: data.shopName, categories: data.categories || [] };
+  return {
+    ok: true,
+    shopName: data.shopName,
+    equipmentTypes: data.equipmentTypes || [],
+    microsoldering: data.microsoldering || null,
+  };
 }
 
 export async function wholesaleLogout() {

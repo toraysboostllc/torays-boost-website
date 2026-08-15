@@ -1,0 +1,242 @@
+/**
+ * Wholesale Shops Portal — scoped, standalone visual theme (Fase 3B).
+ *
+ * Approved direction: strong blue-gray electronic background, Torays
+ * blue/red accents, large photo cards, dark readable text, XP-style
+ * gradient buttons — the SAME palette already approved and shipped in
+ * TORAYS BOOST DESK's own Wholesale module (the `--ws-*` tokens there).
+ * Every value below is copied from that already-approved dark palette
+ * (prefixed `--wsp-` instead of `--ws-` to keep the two apps' token
+ * namespaces independent — this is a separate repo, not a shared import).
+ *
+ * Scoping: every rule lives under `.wsp-scope`, applied only to the
+ * `/wholesale/prices` page wrapper. This site has no light/dark toggle
+ * elsewhere (`torays-*` tokens, Adenda 3's light/premium theme) — this
+ * section is intentionally always-dark, a deliberately different visual
+ * identity for the B2B shop audience, matching what DESK's admins already
+ * see for the same data. Nothing here touches a `torays-*` token or any
+ * selector outside `.wsp-scope`.
+ */
+
+.wsp-scope {
+  --wsp-page-bg: #101a30;
+  --wsp-surface: #1e2c4e;
+  --wsp-surface2: #16223d;
+  --wsp-surface3: #2a3b66;
+  --wsp-border: #3e5688;
+  --wsp-border-strong: #4a6fd6;
+  --wsp-blue: #3b82f6;
+  --wsp-blue-light: #7fb0ff;
+  --wsp-blue-tint: #1b2745;
+  --wsp-blue-tint-strong: #2e4785;
+  --wsp-navy: #0b1730;
+  --wsp-red: #f0525e;
+  --wsp-text-strong: #f4f6ff;
+  --wsp-text-soft: #9ba3b7;
+  --wsp-icon: #7fb0ff;
+  --wsp-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 16px rgba(0, 0, 0, 0.28);
+  --wsp-card-shadow-hover: 0 2px 6px rgba(0, 0, 0, 0.4), 0 10px 22px rgba(0, 0, 0, 0.32);
+
+  min-height: 100vh;
+  background: var(--wsp-page-bg);
+  color: var(--wsp-text-strong);
+  font-family: "Inter", sans-serif;
+}
+
+.wsp-scope h1,
+.wsp-scope h2,
+.wsp-scope h3 {
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.wsp-text-soft {
+  color: var(--wsp-text-soft);
+}
+
+/* ---------------------------------------------------------------------
+   Cards — the big photo cards for Equipment Types / Microsoldering, and
+   the smaller category cards inside a drill-down.
+--------------------------------------------------------------------- */
+.wsp-card {
+  position: relative;
+  border-radius: 16px;
+  border: 1px solid var(--wsp-border);
+  background: var(--wsp-surface);
+  box-shadow: var(--wsp-card-shadow);
+  overflow: hidden;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.wsp-card-clickable {
+  cursor: pointer;
+}
+
+.wsp-card-clickable:hover,
+.wsp-card-clickable:focus-visible {
+  border-color: var(--wsp-blue-tint-strong);
+  box-shadow: var(--wsp-card-shadow-hover);
+  transform: translateY(-2px);
+}
+
+.wsp-card-clickable:focus-visible {
+  outline: none;
+  box-shadow: var(--wsp-card-shadow-hover), 0 0 0 3px rgba(240, 82, 94, 0.45);
+}
+
+/* Photo area: fixed aspect-ratio so the grid never shifts while images
+   load or fail to sign — the icon fallback fills the exact same box. */
+.wsp-card-photo {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: linear-gradient(135deg, var(--wsp-blue-tint) 0%, var(--wsp-surface2) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.wsp-card-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.wsp-card-photo-icon {
+  color: var(--wsp-icon);
+}
+
+.wsp-card-body {
+  padding: 14px 16px;
+}
+
+.wsp-card-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--wsp-text-strong);
+}
+
+/* ---------------------------------------------------------------------
+   Buttons — XP-style glossy gradient, matching DESK's approved treatment.
+--------------------------------------------------------------------- */
+.wsp-btn {
+  font-family: "Inter", sans-serif;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid var(--wsp-border-strong);
+  transition: filter 0.12s ease, box-shadow 0.12s ease, transform 0.05s ease;
+}
+
+.wsp-btn:active {
+  transform: translateY(1px);
+}
+
+.wsp-btn-primary {
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+  background: linear-gradient(180deg, var(--wsp-blue-light) 0%, var(--wsp-blue) 48%, var(--wsp-navy) 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 2px 5px rgba(15, 30, 70, 0.3);
+}
+
+.wsp-btn-primary:hover {
+  filter: brightness(1.08);
+}
+
+.wsp-btn-ghost {
+  color: var(--wsp-text-strong);
+  background: linear-gradient(180deg, var(--wsp-blue-tint-strong) 0%, var(--wsp-surface3) 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset;
+}
+
+.wsp-btn-ghost:hover {
+  background: linear-gradient(180deg, var(--wsp-blue-tint-strong) 0%, var(--wsp-blue-tint) 100%);
+}
+
+/* ---------------------------------------------------------------------
+   Grid — 1 column mobile, 2 columns tablet, 3 columns desktop. One card
+   per row on small screens per spec, never a cramped multi-column squeeze.
+--------------------------------------------------------------------- */
+.wsp-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+}
+
+@media (min-width: 640px) {
+  .wsp-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .wsp-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Category drill-down: smaller inline photo next to the category header,
+   never a full-width card photo (that treatment is reserved for the top
+   grid) — and the existing price table, restyled onto the dark surface.
+--------------------------------------------------------------------- */
+.wsp-category-photo {
+  width: 64px;
+  height: 64px;
+  min-width: 64px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--wsp-blue-tint) 0%, var(--wsp-surface2) 100%);
+  border: 1px solid var(--wsp-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wsp-category-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.wsp-table {
+  width: 100%;
+  text-align: left;
+  font-size: 13.5px;
+}
+
+.wsp-table th {
+  padding: 10px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--wsp-text-soft);
+}
+
+.wsp-table td {
+  padding: 10px 16px;
+  border-top: 1px solid var(--wsp-border);
+  color: var(--wsp-text-strong);
+}
+
+/* ---------------------------------------------------------------------
+   Empty state — Microsoldering with zero currently-tagged active
+   services: professional, no dead navigation implied.
+--------------------------------------------------------------------- */
+.wsp-empty {
+  border: 1px dashed var(--wsp-border);
+  border-radius: 14px;
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--wsp-text-soft);
+  background: var(--wsp-surface2);
+}

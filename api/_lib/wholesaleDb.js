@@ -158,7 +158,10 @@ export async function getDeviceById(env, id) {
   return rows[0] || null;
 }
 
-/** Active categories with their active services nested — what a logged-in shop sees. */
+/** Active categories with their active services nested — what a logged-in shop sees.
+ *  Kept for tests/wholesaleCatalogSeed.test.js, which verifies the seed data's
+ *  visibility independently of the equipment-type/image response shape below —
+ *  not used by wholesale-prices.js anymore (see buildWholesaleCatalog). */
 export async function listActiveCatalog(env) {
   const [categories, services] = await Promise.all([
     rest(env, `wholesale_categories?active=eq.true&select=*&order=sort_order.asc,name.asc`),
@@ -172,6 +175,220 @@ export async function listActiveCatalog(env) {
   return categories
     .map((c) => ({ ...c, services: byCategory.get(c.id) || [] }))
     .filter((c) => c.services.length > 0);
+}
+
+/* ===========================================================================
+ * Wholesale portal images — Fase 3B. Read-only: this repo never uploads or
+ * mutates wholesale_images (that stays DESK's job). Every read here goes
+ * through the SAME active-owner gating the rest of this file already
+ * establishes (active=eq.true at the query level, never fetch-then-filter),
+ * extended so a Hidden Equipment Type or Hidden category's photo can never
+ * even be looked up, let alone signed — its id simply never enters the
+ * `.in.()` filter below. See buildWholesaleCatalog(), the single entry point
+ * wholesale-prices.js calls.
+ * ========================================================================= */
+const WHOLESALE_IMAGES_BUCKET = "wholesale-images";
+const IMAGE_SIGN_TTL_SECONDS = 300; // 5 minutes, matches the approved plan exactly
+
+export async function listActiveEquipmentTypes(env) {
+  return rest(env, `wholesale_equipment_types?active=eq.true&select=*&order=sort_order.asc,name.asc`);
+}
+
+/** Fetches active `wholesale_images` rows owned by any of the given
+ *  (already active-filtered) equipment-type/category ids — never a broader
+ *  query filtered afterward in JS. Skips the request entirely when both id
+ *  lists are empty (nothing to look up), and builds a plain `column=in.()`
+ *  filter instead of an `or=(...)` wrapper when only one list is non-empty,
+ *  so an empty side of the pair never has to appear in the filter string at
+ *  all — there is no `in.()` with zero values sent to PostgREST here. */
+export async function listActiveImagesForOwners(env, equipmentTypeIds, categoryIds) {
+  const hasEquipmentTypes = equipmentTypeIds.length > 0;
+  const hasCategories = categoryIds.length > 0;
+  if (!hasEquipmentTypes && !hasCategories) return [];
+
+  let filter;
+  if (hasEquipmentTypes && hasCategories) {
+    filter = `or=(equipment_type_id.in.(${equipmentTypeIds.join(",")}),category_id.in.(${categoryIds.join(",")}))`;
+  } else if (hasEquipmentTypes) {
+    filter = `equipment_type_id=in.(${equipmentTypeIds.join(",")})`;
+  } else {
+    filter = `category_id=in.(${categoryIds.join(",")})`;
+  }
+  return rest(
+    env,
+    `wholesale_images?active=eq.true&${filter}&select=equipment_type_id,category_id,storage_path,alt_text`
+  );
+}
+
+/** ONE batch call to Supabase Storage's multi-path signing endpoint —
+ *  never one signing request per image. Returns a Map of storage_path ->
+ *  full signed URL; a path that errors or is simply absent from the
+ *  response is left out of the map (callers treat a missing entry as
+ *  `image: null`, never a broken/partial URL). Skips the Storage request
+ *  completely when there are zero paths to sign. */
+export async function signImagePaths(env, storagePaths) {
+  if (!storagePaths.length) return new Map();
+
+  const res = await fetch(`${env.SUPABASE_URL}/storage/v1/object/sign/${WHOLESALE_IMAGES_BUCKET}`, {
+    method: "POST",
+    headers: headers(env),
+    body: JSON.stringify({ expiresIn: IMAGE_SIGN_TTL_SECONDS, paths: storagePaths }),
+  }).catch(() => null);
+
+  const byPath = new Map();
+  if (!res || !res.ok) return byPath; // batch call itself failed — every image degrades to null, catalog still returns
+
+  const entries = await res.json().catch(() => null);
+  if (!Array.isArray(entries)) return byPath;
+  for (const entry of entries) {
+    if (entry && !entry.error && typeof entry.path === "string" && typeof entry.signedURL === "string") {
+      byPath.set(entry.path, `${env.SUPABASE_URL}/storage/v1${entry.signedURL}`);
+    }
+  }
+  return byPath;
+}
+
+export async function findMicrosolderingTagId(env) {
+  const tags = await rest(env, `wholesale_tags?slug=eq.microsoldering&select=id`);
+  return tags[0]?.id || null;
+}
+
+/** Which of the given (already active-filtered) service ids carry the
+ *  Microsoldering tag — restricted to those ids at the query level, never
+ *  the whole wholesale_service_tags table. Skips the request when there's
+ *  no tag row yet or no active service to check against. */
+export async function listMicrosolderingServiceIds(env, tagId, activeServiceIds) {
+  if (!tagId || !activeServiceIds.length) return new Set();
+  const rows = await rest(
+    env,
+    `wholesale_service_tags?tag_id=eq.${tagId}&service_id=in.(${activeServiceIds.join(",")})&select=service_id`
+  );
+  return new Set(rows.map((r) => r.service_id));
+}
+
+function toClientService(sv) {
+  return {
+    id: sv.id,
+    slug: sv.slug,
+    name: sv.name,
+    pricing_type: sv.pricing_type,
+    fixed_price: sv.fixed_price ?? null,
+    price_min: sv.price_min ?? null,
+    price_max: sv.price_max ?? null,
+    notes: sv.notes ?? null,
+    currency: sv.currency,
+  };
+}
+
+/** Builds the full portal response — equipment-type-grouped catalog plus the
+ *  Microsoldering lens — for a logged-in shop. Fixed query count regardless
+ *  of catalog size: 3 catalog fetches (equipment types, categories,
+ *  services) + 1 images fetch + 1 tag lookup + 1 service-tag fetch = 6
+ *  Postgres round-trips, plus at most ONE batch Storage signing call. Never
+ *  returns `storage_path` — only `{ url, alt_text }` per image, or `null`. */
+export async function buildWholesaleCatalog(env) {
+  const [equipmentTypes, categories, services] = await Promise.all([
+    listActiveEquipmentTypes(env),
+    rest(env, `wholesale_categories?active=eq.true&select=*&order=sort_order.asc,name.asc`),
+    rest(env, `wholesale_services?active=eq.true&select=*&order=sort_order.asc,name.asc`),
+  ]);
+
+  const realEquipmentTypes = equipmentTypes.filter((et) => !et.is_tag_lens);
+  const microsolderingType = equipmentTypes.find((et) => et.is_tag_lens) || null;
+
+  const categoriesByEquipmentType = new Map();
+  for (const cat of categories) {
+    // Defensive: a category with no equipment_type_id (should not happen —
+    // DESK requires it for every category it creates) can't be placed in
+    // the grouped hierarchy, so it's excluded rather than guessed at.
+    if (!cat.equipment_type_id) continue;
+    if (!categoriesByEquipmentType.has(cat.equipment_type_id)) categoriesByEquipmentType.set(cat.equipment_type_id, []);
+    categoriesByEquipmentType.get(cat.equipment_type_id).push(cat);
+  }
+
+  const servicesByCategory = new Map();
+  for (const sv of services) {
+    if (!servicesByCategory.has(sv.category_id)) servicesByCategory.set(sv.category_id, []);
+    servicesByCategory.get(sv.category_id).push(sv);
+  }
+
+  // -- images: one fetch for every active owner id, then one batch sign --
+  const equipmentTypeIds = realEquipmentTypes.map((et) => et.id);
+  if (microsolderingType) equipmentTypeIds.push(microsolderingType.id);
+  const categoryIds = categories.filter((c) => c.equipment_type_id).map((c) => c.id);
+
+  const imageRows = await listActiveImagesForOwners(env, equipmentTypeIds, categoryIds);
+  const signedByPath = await signImagePaths(env, imageRows.map((row) => row.storage_path));
+
+  const imageByEquipmentType = new Map();
+  const imageByCategory = new Map();
+  for (const row of imageRows) {
+    const url = signedByPath.get(row.storage_path) || null;
+    const image = url ? { url, alt_text: row.alt_text || null } : null;
+    if (row.equipment_type_id) imageByEquipmentType.set(row.equipment_type_id, image);
+    if (row.category_id) imageByCategory.set(row.category_id, image);
+  }
+
+  function toClientCategory(cat) {
+    return {
+      id: cat.id,
+      slug: cat.slug,
+      name: cat.name,
+      notes: cat.notes ?? null,
+      diagnostic_fee: cat.diagnostic_fee ?? null,
+      diagnostic_description: cat.diagnostic_description ?? null,
+      image: imageByCategory.get(cat.id) || null,
+      services: (servicesByCategory.get(cat.id) || []).map(toClientService),
+    };
+  }
+
+  const equipmentTypesOut = realEquipmentTypes
+    .map((et) => ({
+      id: et.id,
+      slug: et.slug,
+      name: et.name,
+      image: imageByEquipmentType.get(et.id) || null,
+      categories: (categoriesByEquipmentType.get(et.id) || [])
+        .map(toClientCategory)
+        .filter((cat) => cat.services.length > 0),
+    }))
+    .filter((et) => et.categories.length > 0);
+
+  // -- Microsoldering lens: reuses the SAME already-active data above, never
+  //    a separate/looser query — a Hidden equipment type/category/service can
+  //    never reach this view either. `microsoldering` stays null when the
+  //    Microsoldering equipment type itself is hidden or missing (no card at
+  //    all); it's an object (possibly with an empty equipmentTypes[]) whenever
+  //    that type is active, even if zero services are currently tagged. --
+  let microsoldering = null;
+  if (microsolderingType) {
+    const tagId = await findMicrosolderingTagId(env);
+    const activeServiceIds = services.map((s) => s.id);
+    const taggedServiceIds = await listMicrosolderingServiceIds(env, tagId, activeServiceIds);
+
+    const lensEquipmentTypes = realEquipmentTypes
+      .map((et) => ({
+        id: et.id,
+        name: et.name,
+        categories: (categoriesByEquipmentType.get(et.id) || [])
+          .map((cat) => ({
+            id: cat.id,
+            name: cat.name,
+            services: (servicesByCategory.get(cat.id) || [])
+              .filter((sv) => taggedServiceIds.has(sv.id))
+              .map(toClientService),
+          }))
+          .filter((cat) => cat.services.length > 0),
+      }))
+      .filter((et) => et.categories.length > 0);
+
+    microsoldering = {
+      image: imageByEquipmentType.get(microsolderingType.id) || null,
+      equipmentTypes: lensEquipmentTypes,
+    };
+  }
+
+  return { equipmentTypes: equipmentTypesOut, microsoldering };
 }
 
 export async function logEvent(env, { shopId, deviceId, event, ip, userAgent }) {

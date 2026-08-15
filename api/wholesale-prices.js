@@ -1,9 +1,17 @@
 /**
- * Vercel Function — returns the wholesale catalog (categories + services)
- * for a valid session. Session travels as the HttpOnly `ws_session` cookie
- * set by wholesale-login.js — never a header, never localStorage.
- * Re-checks shop status and device approval on every call (not just at
- * login) so a block/revoke from the admin module takes effect immediately.
+ * Vercel Function — returns the wholesale catalog (equipment types →
+ * categories → services, plus the Microsoldering lens) for a valid session.
+ * Session travels as the HttpOnly `ws_session` cookie set by
+ * wholesale-login.js — never a header, never localStorage. Re-checks shop
+ * status and device approval on every call (not just at login) so a
+ * block/revoke from the admin module takes effect immediately.
+ *
+ * Fase 3B: also resolves each active Equipment Type's/category's cover
+ * photo to a short-lived (5 minute) signed Storage URL — see
+ * buildWholesaleCatalog() in _lib/wholesaleDb.js for the query/signing
+ * detail. A Hidden Equipment Type, Hidden category, or Hidden image can
+ * never reach this response: buildWholesaleCatalog() only ever looks up
+ * images for owners it already fetched with active=eq.true.
  */
 import { parse } from "cookie";
 import {
@@ -14,7 +22,7 @@ import {
   getShopById,
   getDeviceById,
   updateDevice,
-  listActiveCatalog,
+  buildWholesaleCatalog,
   revokeSessionByTokenHash,
 } from "./_lib/wholesaleDb.js";
 
@@ -63,11 +71,11 @@ export default async function handler(req, res) {
 
   await updateDevice(env, device.id, { last_seen_at: new Date().toISOString() });
 
-  const categories = await listActiveCatalog(env).catch(() => null);
-  if (!categories) {
+  const catalog = await buildWholesaleCatalog(env).catch(() => null);
+  if (!catalog) {
     res.status(502).json({ error: "data_read_failed", message: "Could not load prices right now." });
     return;
   }
 
-  res.status(200).json({ shopName: shop.name, categories });
+  res.status(200).json({ shopName: shop.name, equipmentTypes: catalog.equipmentTypes, microsoldering: catalog.microsoldering });
 }

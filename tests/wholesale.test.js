@@ -214,7 +214,9 @@ describe("wholesale-prices: access gating", () => {
       expires_at: new Date(Date.now() + 29 * 24 * 60 * 60 * 1000).toISOString(),
       revoked_at: null,
     });
-    const category = { id: fake.nextId(), name: "iPhone", active: true, sort_order: 0 };
+    const equipmentType = { id: fake.nextId(), slug: "iphone", name: "iPhone", is_tag_lens: false, active: true, sort_order: 0 };
+    fake.db.wholesale_equipment_types.push(equipmentType);
+    const category = { id: fake.nextId(), name: "iPhone", active: true, sort_order: 0, equipment_type_id: equipmentType.id };
     fake.db.wholesale_categories.push(category);
     fake.db.wholesale_services.push({
       id: fake.nextId(),
@@ -231,8 +233,10 @@ describe("wholesale-prices: access gating", () => {
     await pricesHandler(req, res);
 
     expect(res.statusCode).toBe(200);
-    expect(res.body.categories).toHaveLength(1);
-    expect(res.body.categories[0].services[0].name).toBe("Screen Replacement");
+    expect(res.body.equipmentTypes).toHaveLength(1);
+    expect(res.body.equipmentTypes[0].categories[0].services[0].name).toBe("Screen Replacement");
+    expect(res.body.microsoldering).toBeNull();
+    expect(res.body.categories).toBeUndefined(); // old flat shape is fully replaced, not additive
   });
 });
 
