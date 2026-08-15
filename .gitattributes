@@ -1,0 +1,12 @@
+# Every .sql file in this repo is generated/authored as pure LF and is
+# expected to stay byte-for-byte identical regardless of which OS checks it
+# out — tests/wholesaleSeedSql.test.js (and the SQL migration test files
+# next to it) compare a committed .sql file's exact bytes against a
+# generator function's in-memory output, which always produces "\n" only.
+# Without this file, a Windows checkout with the machine-wide Git for
+# Windows default (core.autocrlf=true) silently rewrites every .sql file to
+# CRLF on disk, which fails that comparison — not because the SQL content
+# actually drifted, but because of a platform-specific checkout artifact.
+# `eol=lf` pins the checked-out line ending to LF on every platform,
+# independent of the developer's own core.autocrlf setting.
+*.sql text eol=lf
