@@ -15,7 +15,14 @@ import { dirname, join } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
-const read = (relPath) => readFileSync(join(root, relPath), "utf8");
+// Normalized immediately after readFileSync, before any assertion ever sees
+// the text — these tests validate the CSS/JSX's logical structure, never
+// its exact line-ending bytes or a line-ending policy, so CRLF vs LF must
+// never be what makes a regex match or not. Without this, a real `git
+// checkout` on Windows (core.autocrlf rewriting the working tree to CRLF)
+// can break any assertion whose pattern contains a literal `\n`, even
+// though the file's actual CSS/JSX content never changed.
+const read = (relPath) => readFileSync(join(root, relPath), "utf8").replace(/\r\n?/g, "\n");
 
 describe("EquipmentTypeCard: lazy loading, explicit dimensions, icon fallback", () => {
   const src = read("src/components/wholesale/EquipmentTypeCard.jsx");
