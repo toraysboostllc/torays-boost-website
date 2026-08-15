@@ -29,7 +29,7 @@ export function MicrosolderingLensView({ microsoldering, onBack }) {
           <h3 className="wsp-text-soft text-xs font-semibold uppercase tracking-wide">{equipmentType.name}</h3>
           {equipmentType.categories.map((category) => (
             <div key={category.id} className="wsp-card">
-              <div className="p-4" style={{ borderBottom: "1px solid var(--wsp-border)" }}>
+              <div className="p-4" style={{ borderBottom: "1px solid var(--wsp-card-border)" }}>
                 <h4 className="text-[14px] font-semibold">{category.name}</h4>
               </div>
               <div className="overflow-x-auto">
@@ -46,7 +46,7 @@ export function MicrosolderingLensView({ microsoldering, onBack }) {
                       <tr key={service.id}>
                         <td>{service.name}</td>
                         <td className="font-semibold">{formatWholesalePrice(service)}</td>
-                        <td className="wsp-text-soft">{service.notes || "—"}</td>
+                        <td className="wsp-card-text-soft">{service.notes || "—"}</td>
                       </tr>
                     ))}
                   </tbody>

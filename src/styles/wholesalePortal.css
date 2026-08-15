@@ -1,20 +1,23 @@
 /**
  * Wholesale Shops Portal — scoped, standalone visual theme (Fase 3B).
  *
- * Approved direction: strong blue-gray electronic background, Torays
- * blue/red accents, large photo cards, dark readable text, XP-style
- * gradient buttons — the SAME palette already approved and shipped in
- * TORAYS BOOST DESK's own Wholesale module (the `--ws-*` tokens there).
- * Every value below is copied from that already-approved dark palette
- * (prefixed `--wsp-` instead of `--ws-` to keep the two apps' token
- * namespaces independent — this is a separate repo, not a shared import).
+ * Approved direction: strong blue-gray electronic background (a real PCB
+ * close-up photo, not a flat color), Torays blue/red accents, large white/
+ * ice-blue photo cards, dark readable text, XP-style gradient buttons and
+ * card bezels — the SAME palette already approved and shipped in TORAYS
+ * BOOST DESK's own Wholesale module (the `--ws-*` tokens there). Every
+ * value below is copied from or derived from that already-approved dark
+ * palette (prefixed `--wsp-` instead of `--ws-` to keep the two apps'
+ * token namespaces independent — this is a separate repo, not a shared
+ * import).
  *
  * Scoping: every rule lives under `.wsp-scope`, applied only to the
- * `/wholesale/prices` page wrapper. This site has no light/dark toggle
- * elsewhere (`torays-*` tokens, Adenda 3's light/premium theme) — this
- * section is intentionally always-dark, a deliberately different visual
- * identity for the B2B shop audience, matching what DESK's admins already
- * see for the same data. Nothing here touches a `torays-*` token or any
+ * `/wholesale/prices` page wrapper (WholesaleLogin.jsx never uses this
+ * class, so the PCB background/overlay never appears on the login screen).
+ * This site has no light/dark toggle elsewhere (`torays-*` tokens,
+ * Adenda 3's light/premium theme) — this section is intentionally
+ * always-dark-background, a deliberately different visual identity for the
+ * B2B shop audience. Nothing here touches a `torays-*` token or any
  * selector outside `.wsp-scope`.
  */
 
@@ -34,13 +37,50 @@
   --wsp-text-strong: #f4f6ff;
   --wsp-text-soft: #9ba3b7;
   --wsp-icon: #7fb0ff;
-  --wsp-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 16px rgba(0, 0, 0, 0.28);
-  --wsp-card-shadow-hover: 0 2px 6px rgba(0, 0, 0, 0.4), 0 10px 22px rgba(0, 0, 0, 0.32);
+
+  /* Cards are white/ice-blue — deliberately LIGHTER than the dark PCB
+     background/page, per the approved direction — so their own text needs
+     its own dark-on-light pair, distinct from the page-level (light-on-dark)
+     --wsp-text-strong/--wsp-text-soft above. Never reuse those two inside
+     a card — see .wsp-card's own `color` rule and .wsp-card-text-soft. */
+  --wsp-card-bg: #eef3fc;
+  --wsp-card-bg-hover: #f7faff;
+  --wsp-card-border: #b7c9ea;
+  --wsp-card-border-hover: var(--wsp-blue);
+  --wsp-card-text: #10192f;
+  --wsp-card-text-soft: #48557a;
+
+  --wsp-card-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 4px 12px rgba(8, 14, 30, 0.4);
+  --wsp-card-shadow-hover: 0 1px 0 rgba(255, 255, 255, 0.65) inset, 0 16px 32px rgba(8, 14, 30, 0.5),
+    0 0 0 1px var(--wsp-blue-light);
 
   min-height: 100vh;
-  background: var(--wsp-page-bg);
   color: var(--wsp-text-strong);
   font-family: "Inter", sans-serif;
+
+  /* PCB photo background with a translucent blue-gray tint layered on top
+     (same flat-color-both-stops linear-gradient trick used to add a solid
+     overlay as a second `background-image` layer, since `background-color`
+     is a single layer and can't stack with an image the way this needs
+     to) — keeps the busy circuit-board texture from fighting card/text
+     legibility. `cover`/`center`/`no-repeat` on both layers, one value per
+     layer since there are two backgrounds stacked here. */
+  background-image: linear-gradient(rgba(9, 15, 32, 0.82), rgba(9, 15, 32, 0.82)),
+    url("../assets/wholesale-pcb-background.webp");
+  background-size: cover, cover;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
+  /* Mobile default: scroll (never `fixed` — repainting a fixed background on
+     every scroll frame is what jank/stutters on phones; matches the exact
+     same pattern already used for the main site's body background in
+     src/styles/index.css). Desktop/tablet opt back into `fixed` below. */
+  background-attachment: scroll, scroll;
+}
+
+@media (min-width: 768px) {
+  .wsp-scope {
+    background-attachment: fixed, fixed;
+  }
 }
 
 .wsp-scope h1,
@@ -53,38 +93,113 @@
   color: var(--wsp-text-soft);
 }
 
+/* Soft/secondary text INSIDE a light card (category notes, diagnostic fee,
+   table notes column) — never --wsp-text-soft in here, that token is for
+   text sitting directly on the dark page background. */
+.wsp-card-text-soft {
+  color: var(--wsp-card-text-soft);
+}
+
 /* ---------------------------------------------------------------------
    Cards — the big photo cards for Equipment Types / Microsoldering, and
-   the smaller category cards inside a drill-down.
+   the smaller category cards inside a drill-down. White/ice-blue, XP-style
+   beveled blue border + inner gloss highlight + drop shadow, small red
+   accent bar (same left-edge treatment DESK's own .ws-card uses).
 --------------------------------------------------------------------- */
 .wsp-card {
   position: relative;
   border-radius: 16px;
-  border: 1px solid var(--wsp-border);
-  background: var(--wsp-surface);
+  border: 1px solid var(--wsp-card-border);
+  background: var(--wsp-card-bg);
+  color: var(--wsp-card-text);
   box-shadow: var(--wsp-card-shadow);
   overflow: hidden;
-  transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
 }
 
 .wsp-card-clickable {
   cursor: pointer;
 }
 
-.wsp-card-clickable:hover,
-.wsp-card-clickable:focus-visible {
-  border-color: var(--wsp-blue-tint-strong);
-  box-shadow: var(--wsp-card-shadow-hover);
-  transform: translateY(-2px);
+/* Small red accent bar on the left edge — brightens on hover/focus, same
+   role as DESK's .ws-card::before. */
+.wsp-card-accent {
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: -1px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--wsp-red);
+  opacity: 0.5;
+  transition: opacity 0.2s ease;
 }
 
+.wsp-card-arrow {
+  color: var(--wsp-card-text-soft);
+  flex-shrink: 0;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+/* Mouse-driven hover only — gated behind (hover: hover) and (pointer: fine)
+   so a touch tap never leaves a "stuck" hover state on mobile (the classic
+   touch-UA quirk where :hover styles persist after tapping away). Touch
+   gets its own brief :active feedback below instead. */
+@media (hover: hover) and (pointer: fine) {
+  .wsp-card-clickable:hover {
+    transform: translateY(-8px) scale(1.015);
+    border-color: var(--wsp-card-border-hover);
+    background: var(--wsp-card-bg-hover);
+    box-shadow: var(--wsp-card-shadow-hover);
+  }
+  .wsp-card-clickable:hover .wsp-card-accent {
+    opacity: 0.95;
+  }
+  .wsp-card-clickable:hover .wsp-card-arrow {
+    color: var(--wsp-blue);
+    transform: translateX(4px);
+  }
+}
+
+/* Keyboard focus gets the exact same lift/glow as mouse hover, unconditionally
+   (never gated behind a pointer/hover media query) — plus a visible focus
+   ring, since :focus-visible must work identically on every input method. */
 .wsp-card-clickable:focus-visible {
   outline: none;
+  transform: translateY(-8px) scale(1.015);
+  border-color: var(--wsp-card-border-hover);
+  background: var(--wsp-card-bg-hover);
   box-shadow: var(--wsp-card-shadow-hover), 0 0 0 3px rgba(240, 82, 94, 0.45);
+}
+.wsp-card-clickable:focus-visible .wsp-card-accent {
+  opacity: 0.95;
+}
+.wsp-card-clickable:focus-visible .wsp-card-arrow {
+  color: var(--wsp-blue);
+  transform: translateX(4px);
+}
+
+/* Touch tap feedback — brief, works on every device (including a mouse
+   click's momentary active state), never relies on :hover sticking. */
+.wsp-card-clickable:active {
+  transform: translateY(-2px) scale(1.005);
+  border-color: var(--wsp-card-border-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wsp-card-clickable:hover,
+  .wsp-card-clickable:focus-visible,
+  .wsp-card-clickable:active {
+    transform: none;
+  }
 }
 
 /* Photo area: fixed aspect-ratio so the grid never shifts while images
-   load or fail to sign — the icon fallback fills the exact same box. */
+   load or fail to sign — the icon fallback fills the exact same box.
+   Deliberately kept as a DARK "screen" cutout (its own gradient, not the
+   card's new light background) — the light icon already reads clearly
+   against it, and it reads as a proper XP-style recessed panel inside the
+   light card frame. */
 .wsp-card-photo {
   width: 100%;
   aspect-ratio: 4 / 3;
@@ -113,11 +228,14 @@
 .wsp-card-title {
   font-weight: 700;
   font-size: 15px;
-  color: var(--wsp-text-strong);
+  color: var(--wsp-card-text);
 }
 
 /* ---------------------------------------------------------------------
    Buttons — XP-style glossy gradient, matching DESK's approved treatment.
+   These only ever sit directly on the dark PCB page background (never
+   inside a light .wsp-card in this UI), so they keep the light-on-dark
+   token pair.
 --------------------------------------------------------------------- */
 .wsp-btn {
   font-family: "Inter", sans-serif;
@@ -163,6 +281,9 @@
 /* ---------------------------------------------------------------------
    Grid — 1 column mobile, 2 columns tablet, 3 columns desktop. One card
    per row on small screens per spec, never a cramped multi-column squeeze.
+   The hover/focus lift (translateY/scale) never affects layout — transform
+   never participates in document flow or scrollWidth — so it can't itself
+   introduce horizontal overflow at any breakpoint.
 --------------------------------------------------------------------- */
 .wsp-grid {
   display: grid;
@@ -185,7 +306,7 @@
 /* ---------------------------------------------------------------------
    Category drill-down: smaller inline photo next to the category header,
    never a full-width card photo (that treatment is reserved for the top
-   grid) — and the existing price table, restyled onto the dark surface.
+   grid) — and the existing price table, restyled onto the light card.
 --------------------------------------------------------------------- */
 .wsp-category-photo {
   width: 64px;
@@ -219,18 +340,20 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--wsp-text-soft);
+  color: var(--wsp-card-text-soft);
 }
 
 .wsp-table td {
   padding: 10px 16px;
-  border-top: 1px solid var(--wsp-border);
-  color: var(--wsp-text-strong);
+  border-top: 1px solid var(--wsp-card-border);
+  color: var(--wsp-card-text);
 }
 
 /* ---------------------------------------------------------------------
    Empty state — Microsoldering with zero currently-tagged active
-   services: professional, no dead navigation implied.
+   services: professional, no dead navigation implied. Stays on the
+   dark-page token pair (it's an inline notice sitting on the PCB
+   background, not one of the redesigned light photo cards).
 --------------------------------------------------------------------- */
 .wsp-empty {
   border: 1px dashed var(--wsp-border);

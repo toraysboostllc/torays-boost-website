@@ -23,7 +23,7 @@ export function CategoryDrilldown({ equipmentType, onBack }) {
         const Icon = wholesaleEquipmentIcon(category);
         return (
           <div key={category.id} className="wsp-card">
-            <div className="flex items-center gap-3 p-4" style={{ borderBottom: "1px solid var(--wsp-border)" }}>
+            <div className="flex items-center gap-3 p-4" style={{ borderBottom: "1px solid var(--wsp-card-border)" }}>
               <div className="wsp-category-photo">
                 {category.image?.url ? (
                   <img
@@ -39,11 +39,11 @@ export function CategoryDrilldown({ equipmentType, onBack }) {
               </div>
               <div>
                 <h3 className="text-[15px] font-semibold">{category.name}</h3>
-                {category.notes && <p className="wsp-text-soft mt-0.5 text-xs italic">{category.notes}</p>}
+                {category.notes && <p className="wsp-card-text-soft mt-0.5 text-xs italic">{category.notes}</p>}
                 {category.diagnostic_fee != null && (
-                  <p className="wsp-text-soft mt-0.5 text-xs">
+                  <p className="wsp-card-text-soft mt-0.5 text-xs">
                     Diagnostic fee:{" "}
-                    <span style={{ color: "var(--wsp-text-strong)" }} className="font-semibold">
+                    <span style={{ color: "var(--wsp-card-text)" }} className="font-semibold">
                       ${Number(category.diagnostic_fee).toFixed(2)}
                     </span>
                     {category.diagnostic_description ? ` — ${category.diagnostic_description}` : ""}
@@ -65,7 +65,7 @@ export function CategoryDrilldown({ equipmentType, onBack }) {
                     <tr key={service.id}>
                       <td>{service.name}</td>
                       <td className="font-semibold">{formatWholesalePrice(service)}</td>
-                      <td className="wsp-text-soft">{service.notes || "—"}</td>
+                      <td className="wsp-card-text-soft">{service.notes || "—"}</td>
                     </tr>
                   ))}
                 </tbody>

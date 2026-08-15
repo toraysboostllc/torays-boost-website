@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 import { wholesaleEquipmentIcon } from "../../lib/wholesaleIcons.js";
 
 /**
@@ -11,6 +12,7 @@ export function EquipmentTypeCard({ entity, onClick }) {
   const Icon = wholesaleEquipmentIcon(entity);
   return (
     <button type="button" onClick={onClick} className="wsp-card wsp-card-clickable w-full text-left">
+      <span className="wsp-card-accent" aria-hidden="true" />
       <div className="wsp-card-photo">
         {entity.image?.url ? (
           <img
@@ -24,8 +26,9 @@ export function EquipmentTypeCard({ entity, onClick }) {
           <Icon size={48} className="wsp-card-photo-icon" />
         )}
       </div>
-      <div className="wsp-card-body">
+      <div className="wsp-card-body flex items-center justify-between gap-2">
         <span className="wsp-card-title">{entity.name}</span>
+        <ChevronRight size={18} className="wsp-card-arrow" aria-hidden="true" />
       </div>
     </button>
   );
