@@ -71,11 +71,16 @@ describe("WholesalePortalLink: destination, copy, and navigation mechanics", () 
     expect(linkSrc).toContain("focus-visible:ring-2");
   });
 
-  it("uses Torays blue (navy token) with a small red accent dot — visually distinct from the solid-red WhatsApp button", () => {
-    expect(linkSrc).toContain("text-torays-navy");
-    expect(linkSrc).toContain("bg-torays-navy");
-    expect(linkSrc).toContain("bg-torays-red"); // the small accent dot
+  it("uses a professional green XP-style gradient with white text and a small red Torays accent dot — visually distinct from the solid-red WhatsApp button", () => {
+    expect(linkSrc).toMatch(/bg-\[linear-gradient\(180deg,#[0-9a-f]+_0%,#[0-9a-f]+_48%,#[0-9a-f]+_100%\)\]/);
+    expect(linkSrc).toContain("text-white");
+    expect(linkSrc).toContain("bg-torays-red"); // the small Torays accent dot, kept
     expect(linkSrc).not.toMatch(/bg-torays-red\/\d+.*text-white|VARIANTS\.primary/); // never mimics the primary WhatsApp button styling
+  });
+
+  it("brightens on hover and gives tactile feedback on press — the XP relief idiom, not a color swap", () => {
+    expect(linkSrc).toContain("hover:brightness-110");
+    expect(linkSrc).toContain("active:translate-y-px");
   });
 
   it("uses the Store icon from the existing lucide-react icon system — no new icon library, no custom SVG", () => {
