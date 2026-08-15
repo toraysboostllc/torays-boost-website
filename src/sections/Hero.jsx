@@ -1,10 +1,8 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, MessageCircle, Microscope } from "lucide-react";
+import { ArrowRight, Microscope } from "lucide-react";
 import * as Icons from "lucide-react";
 import { Button } from "../components/ui/Button.jsx";
 import { CircuitBackground } from "../components/ui/CircuitBackground.jsx";
-import { WholesalePortalLink } from "../components/layout/WholesalePortalLink.jsx";
-import { buildContactLink } from "../lib/whatsapp.js";
 import { whyChooseUs } from "../config/features.config.js";
 
 const TRUST_BADGE_IDS = ["warranty", "turnaround", "pricing", "technicians"];
@@ -148,19 +146,7 @@ export function Hero() {
             <Button href="#quote-estimator" size="lg" icon={ArrowRight} iconPosition="right">
               Get Free Quote
             </Button>
-            <Button
-              href={buildContactLink()}
-              target="_blank"
-              rel="noreferrer"
-              variant="outline"
-              size="lg"
-              icon={MessageCircle}
-            >
-              WhatsApp
-            </Button>
           </div>
-
-          <WholesalePortalLink variant="hero" />
 
           <div className="mt-1 border-t border-torays-line pt-5">
             <TrustBadges />

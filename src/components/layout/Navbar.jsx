@@ -2,9 +2,8 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { Logo } from "../ui/Logo.jsx";
-import { Button } from "../ui/Button.jsx";
 import { WholesalePortalLink } from "./WholesalePortalLink.jsx";
-import { buildContactLink } from "../../lib/whatsapp.js";
+import { WhatsAppCta } from "./WhatsAppCta.jsx";
 
 const LINKS = [
   { href: "#services", label: "Services" },
@@ -49,9 +48,7 @@ export function Navbar() {
 
         <div className="hidden md:flex items-center gap-3">
           <WholesalePortalLink variant="header" />
-          <Button href={buildContactLink()} target="_blank" rel="noreferrer" size="md">
-            WhatsApp
-          </Button>
+          <WhatsAppCta variant="header" />
         </div>
 
         <button
@@ -96,15 +93,7 @@ export function Navbar() {
                 </a>
               ))}
               <WholesalePortalLink variant="mobile" className="mt-2" onClick={() => setOpen(false)} />
-              <Button
-                href={buildContactLink()}
-                target="_blank"
-                rel="noreferrer"
-                size="lg"
-                className="mt-2 w-full"
-              >
-                WhatsApp
-              </Button>
+              <WhatsAppCta variant="mobile" className="mt-2" onClick={() => setOpen(false)} />
             </div>
           </motion.div>
         )}
