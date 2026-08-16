@@ -215,15 +215,17 @@ describe("PromoCarousel.jsx: compact single-card layout — title/description/CT
   });
 });
 
-describe("Hero stability: the carousel redesign did not touch the pre-carousel text-column budget", () => {
-  it("Hero.jsx's MIN_H_CLASSES is byte-for-byte the same value locked in by the language-stability fix — the compact carousel adds only its own small height on top, nothing was taken from or added to this budget", () => {
+describe("Hero stability: the sm/lg text-column budget was re-tightened to remove legacy carousel-era slack, mobile untouched", () => {
+  it("Hero.jsx's MIN_H_CLASSES sm tier was re-measured down to the column's true zero-slack content height (633px), collapsing the old separate sm/lg tiers into one — mobile tiers (base/390) are untouched", () => {
     expect(heroSrc).toContain(
-      'const MIN_H_CLASSES = "min-h-[720px] min-[390px]:min-h-[686px] sm:min-h-[793px] lg:min-h-[857px]";'
+      'const MIN_H_CLASSES = "min-h-[720px] min-[390px]:min-h-[686px] sm:min-h-[633px]";'
     );
+    expect(heroSrc).not.toMatch(/lg:min-h-\[\d+px\]/);
   });
 
-  it("the text column's own classes (eyebrow, h1, description, CTA, trust badges) are untouched by this round — same MIN_H_CLASSES + justify-center composition as before", () => {
-    expect(heroSrc).toContain("justify-center gap-8 ${MIN_H_CLASSES}");
+  it("the text column is top-aligned (justify-start), not centered — so English's leftover slack lands below the trust badges instead of reopening a gap above the eyebrow", () => {
+    expect(heroSrc).toContain("justify-start gap-8 ${MIN_H_CLASSES}");
+    expect(heroSrc).not.toMatch(/justify-center gap-8 \$\{MIN_H_CLASSES\}/);
   });
 });
 

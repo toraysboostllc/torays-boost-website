@@ -12,8 +12,17 @@ import heroImage from "../assets/public-repair-hero.webp";
 // Spanish's own rendered height (the longer/tallest copy) at this
 // project's official responsive test widths — see the doc comment above
 // Hero() for why this keeps the bg-cover collage from re-cropping when
-// the language toggles.
-const MIN_H_CLASSES = "min-h-[720px] min-[390px]:min-h-[686px] sm:min-h-[793px] lg:min-h-[857px]";
+// the language toggles. The sm/lg tiers were re-measured for this round:
+// they used to carry the old tablet/desktop vertical-padding utilities'
+// breathing room baked in as permanent slack (leftover from before the
+// min-height mechanism existed) — with the promo carousel now sitting
+// above this column too, that legacy padding read as a big empty gap, so
+// it's been measured back down to the column's true zero-slack content
+// height. Mobile's tiers already had no such legacy padding, so they're
+// unchanged. Content height stops changing entirely past the sm
+// breakpoint (max-w-xl caps the column at 576px and text-6xl doesn't grow
+// again at lg), so sm: and lg: now share one value.
+const MIN_H_CLASSES = "min-h-[720px] min-[390px]:min-h-[686px] sm:min-h-[633px]";
 
 const TRUST_BADGE_IDS = ["warranty", "turnaround", "pricing", "technicians"];
 const TRUST_LABEL_KEYS = {
@@ -67,16 +76,19 @@ function TrustBadges() {
  *
  * Framing is language-independent by construction, not by accident: the
  * content column below carries a min-height per breakpoint tier (base,
- * 390px, sm, lg) measured directly from Spanish's own rendered height —
+ * 390px, sm) measured directly from Spanish's own rendered height —
  * Spanish's copy is longer/wraps more, so it already IS the tallest
  * variant at every tier. Because the min-height equals Spanish's natural
  * height, it's a no-op for Spanish (nothing to stretch); English, being
- * shorter, gets stretched up to the same box and its content is centered
- * (justify-center) so the extra room splits evenly instead of dumping a
- * gap below it. Since the sm:/lg:-tier image is a bg-cover layer sized to
- * this same section, an identical box height between languages is what
- * keeps its crop/zoom from shifting when the language toggles — see
- * MIN_H_CLASSES below for the exact measured pixel values.
+ * shorter, gets stretched up to the same box. The column is top-aligned
+ * (justify-start, not justify-center) so that slack — English's only —
+ * lands below the trust badges, never between the carousel and the
+ * eyebrow: the visible gap right under the carousel stays a fixed ~12px
+ * (the carousel's own mb-3) for both languages. Since the sm:-tier image
+ * is a bg-cover layer sized to this same section, an identical box height
+ * between languages is what keeps its crop/zoom from shifting when the
+ * language toggles — see MIN_H_CLASSES below for the exact measured pixel
+ * values.
  *
  * PromoCarousel sits above the text column, filling what used to be
  * blank space between the fixed navbar and the eyebrow. It has its own
@@ -107,7 +119,7 @@ export function Hero({ onOpenRepairRequest }) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
-          className={`flex max-w-xl flex-col items-start justify-center gap-8 ${MIN_H_CLASSES}`}
+          className={`flex max-w-xl flex-col items-start justify-start gap-8 ${MIN_H_CLASSES}`}
         >
           <span className="rounded-full border border-torays-red/30 bg-torays-red/10 px-4 py-1.5 text-xs font-heading font-semibold uppercase tracking-[0.2em] text-torays-red">
             {t("hero.eyebrow")}

@@ -138,15 +138,16 @@ describe("Hero framing: stable across languages (no re-crop/zoom on the collage 
     expect(constMatch[1]).not.toMatch(/\$\{|t\(|lang/);
   });
 
-  it("locks in the exact measured min-height per tier (base/390/sm/lg), each equal to Spanish's own natural height at that width", () => {
+  it("locks in the exact measured min-height per tier (base/390/sm), each equal to Spanish's own natural height at that width — sm and lg were later found identical (content height stops changing past sm) and collapsed into one tier", () => {
     expect(heroSrc).toContain("min-h-[720px]");
     expect(heroSrc).toContain("min-[390px]:min-h-[686px]");
-    expect(heroSrc).toContain("sm:min-h-[793px]");
-    expect(heroSrc).toContain("lg:min-h-[857px]");
+    expect(heroSrc).toContain("sm:min-h-[633px]");
+    expect(heroSrc).not.toMatch(/lg:min-h-\[\d+px\]/);
   });
 
-  it("the content column is vertically centered, so a shorter language distributes its extra room instead of dumping it below", () => {
-    expect(heroSrc).toContain("justify-center");
+  it("the content column is top-aligned, so a shorter language's leftover slack lands below the trust badges instead of reopening a gap above the eyebrow", () => {
+    expect(heroSrc).toContain("justify-start");
+    expect(heroSrc).not.toMatch(/justify-center gap-8 \$\{MIN_H_CLASSES\}/);
   });
 
   it("the old py-20/py-28 vertical-padding mechanism is gone — height now comes from MIN_H_CLASSES, not content-driven padding", () => {
