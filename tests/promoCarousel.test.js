@@ -50,7 +50,9 @@ describe("i18n: promoCarousel translations match the exact approved EN/ES copy",
   it("EN copy matches exactly what was approved", () => {
     const en = translations.en.promoCarousel;
     expect(en.cta).toBe("Request an Estimate");
-    expect(en.common).toBe("Professional service. Affordable repair options.");
+    // The shared "Professional service..." tagline row was removed — it
+    // was adding unwanted vertical space — so its key no longer exists.
+    expect(en.common).toBeUndefined();
     expect(en.slides["ps5-cleaning"]).toEqual({
       title: "PS5 Deep Cleaning + Liquid Metal",
       description: "Professional thermal maintenance for better cooling and performance.",
@@ -76,7 +78,7 @@ describe("i18n: promoCarousel translations match the exact approved EN/ES copy",
   it("ES copy matches exactly what was approved", () => {
     const es = translations.es.promoCarousel;
     expect(es.cta).toBe("Solicitar estimado");
-    expect(es.common).toBe("Servicio profesional. Opciones de reparación a su alcance.");
+    expect(es.common).toBeUndefined();
     expect(es.slides["ps5-cleaning"].description).toBe(
       "Mantenimiento térmico profesional para mejorar la refrigeración y el rendimiento."
     );
@@ -113,8 +115,8 @@ describe("i18n: promoCarousel translations match the exact approved EN/ES copy",
 });
 
 describe("PromoCarousel.jsx: auto-advance, pause, reduced motion, keyboard, swipe", () => {
-  it("auto-advances every 6000ms via a timer that depends on [index, paused, prefersReducedMotion]", () => {
-    expect(carouselSrc).toContain("const AUTO_ADVANCE_MS = 6000;");
+  it("auto-advances every 3000ms via a timer that depends on [index, paused, prefersReducedMotion]", () => {
+    expect(carouselSrc).toContain("const AUTO_ADVANCE_MS = 3000;");
     expect(carouselSrc).toMatch(/setTimeout\(\(\) => \{\s*setIndex/);
     expect(carouselSrc).toMatch(/\}, \[index, paused, prefersReducedMotion, total\]\);/);
   });
@@ -195,6 +197,36 @@ describe("PromoCarousel.jsx: CTA reuses the existing wizard, no duplicated modal
   });
 });
 
+describe("PromoCarousel.jsx: compact single-card layout — title/description/CTA all inside the card", () => {
+  it("the CTA button lives inside each slide's text zone, not in a separate row below the card", () => {
+    const slideBlock = carouselSrc.match(/{PROMO_SLIDES\.map\(\(slide, i\) => \([\s\S]*?\)\)}\s*<\/div>/)[0];
+    expect(slideBlock).toContain('onClick={onOpenRepairRequest}');
+    expect(slideBlock).toContain('{t("promoCarousel.cta")}');
+  });
+
+  it("the card carries only a small bottom margin (mb-3), not the old mb-8 spacer", () => {
+    expect(carouselSrc).toContain('className="relative mb-3 h-[150px] max-w-xl overflow-hidden rounded-2xl');
+    expect(carouselSrc).not.toContain("mb-8");
+  });
+
+  it("the text zone is capped to the left ~55-58% of the card, so it can never extend under the grouped arrows on the right", () => {
+    expect(carouselSrc).toContain('max-w-[58%]');
+    expect(carouselSrc).toContain('sm:max-w-[55%]');
+  });
+});
+
+describe("Hero stability: the carousel redesign did not touch the pre-carousel text-column budget", () => {
+  it("Hero.jsx's MIN_H_CLASSES is byte-for-byte the same value locked in by the language-stability fix — the compact carousel adds only its own small height on top, nothing was taken from or added to this budget", () => {
+    expect(heroSrc).toContain(
+      'const MIN_H_CLASSES = "min-h-[720px] min-[390px]:min-h-[686px] sm:min-h-[793px] lg:min-h-[857px]";'
+    );
+  });
+
+  it("the text column's own classes (eyebrow, h1, description, CTA, trust badges) are untouched by this round — same MIN_H_CLASSES + justify-center composition as before", () => {
+    expect(heroSrc).toContain("justify-center gap-8 ${MIN_H_CLASSES}");
+  });
+});
+
 describe("PromoCarousel.jsx: no price, first image eager / rest lazy, no remount on language change", () => {
   it("never renders a price, a range, or an ETA", () => {
     const stripComments = (src) => src.replace(/\/\*\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
@@ -219,17 +251,19 @@ describe("PromoCarousel.jsx: no price, first image eager / rest lazy, no remount
     expect(carouselSrc).not.toMatch(/useEffect\([^)]*\{\s*setIndex\(0\)/);
   });
 
-  it("track height is a fixed, language-independent class (h-40/48/56) — never derived from translated text length", () => {
-    expect(carouselSrc).toContain("h-40 overflow-hidden rounded-2xl");
-    expect(carouselSrc).toContain("sm:h-48 lg:h-56");
+  it("card height is a fixed, compact, language-independent size (150/160/170px) — never derived from translated text length", () => {
+    expect(carouselSrc).toContain("h-[150px]");
+    expect(carouselSrc).toContain("sm:h-[160px] lg:h-[170px]");
   });
 
-  it("uses line-clamp on both title and description so slide-to-slide text length differences never change the fixed-height box", () => {
-    expect(carouselSrc).toContain("line-clamp-2");
+  it("uses line-clamp on both title and description so slide-to-slide and EN/ES text length differences never change the fixed-height card", () => {
+    expect(carouselSrc).toContain("line-clamp-1"); // title: single line, space is tight
+    expect(carouselSrc).toContain("line-clamp-2"); // description: capped at 2 lines
   });
 
-  it("the shared tagline below the track reserves a fixed 2-line box (line-clamp-2 + min-h) — otherwise ES's longer wording wraps to 2 lines while EN's stays on 1, growing the carousel only in Spanish", () => {
-    expect(carouselSrc).toContain('className="line-clamp-2 min-h-8 text-xs text-torays-text-secondary sm:min-h-10 sm:text-sm"');
+  it("no separate tagline/CTA row exists below the card anymore — title, description, and CTA are all inside the single card", () => {
+    expect(carouselSrc).not.toMatch(/promoCarousel\.common/);
+    expect(carouselSrc).not.toMatch(/mt-2 flex flex-col items-center/); // the old separate footer row
   });
 });
 
@@ -239,13 +273,15 @@ describe("PromoCarousel.jsx: accessibility and touch targets", () => {
     expect(carouselSrc).toContain("focus-visible:ring-2");
   });
 
-  it("arrow buttons and dot buttons meet the 44px minimum touch target", () => {
-    expect(carouselSrc).toMatch(/flex h-11 w-11 -translate-y-1\/2/); // arrows
-    expect(carouselSrc).toContain("flex h-11 w-11 items-center justify-center"); // dots
+  it("arrow buttons meet the 44px minimum touch target, grouped together over the photo (right) side, never above the text zone", () => {
+    expect(carouselSrc).toMatch(/flex h-11 w-11 items-center justify-center rounded-full bg-white\/80/);
+    // Both arrows share one wrapper positioned top-right, over the photo —
+    // never left-aligned where the text zone (max-w-[58%]) lives.
+    expect(carouselSrc).toContain('<div className="absolute right-1.5 top-1.5 flex gap-1">');
   });
 
-  it("the CTA button explicitly enforces the 44px minimum on top of the shared Button component", () => {
-    expect(carouselSrc).toContain('className="min-h-11 min-w-11 shrink-0 self-center sm:self-auto"');
+  it("dot indicators sit inside the card's own bottom edge — no separate row, no added height", () => {
+    expect(carouselSrc).toContain('<div className="absolute inset-x-0 bottom-1 flex items-center justify-center gap-1">');
   });
 });
 

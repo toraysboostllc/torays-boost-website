@@ -73,7 +73,6 @@ export const translations = {
     },
     promoCarousel: {
       regionLabel: "Current promotions",
-      common: "Professional service. Affordable repair options.",
       cta: "Request an Estimate",
       prevLabel: "Previous promotion",
       nextLabel: "Next promotion",
@@ -246,7 +245,6 @@ export const translations = {
     },
     promoCarousel: {
       regionLabel: "Promociones actuales",
-      common: "Servicio profesional. Opciones de reparación a su alcance.",
       cta: "Solicitar estimado",
       prevLabel: "Promoción anterior",
       nextLabel: "Siguiente promoción",
