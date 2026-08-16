@@ -3,6 +3,7 @@ import { ArrowRight } from "lucide-react";
 import * as Icons from "lucide-react";
 import { Button } from "../components/ui/Button.jsx";
 import { CircuitBackground } from "../components/ui/CircuitBackground.jsx";
+import { PromoCarousel } from "../components/promo/PromoCarousel.jsx";
 import { whyChooseUs } from "../config/features.config.js";
 import { useLanguage } from "../i18n/LanguageContext.jsx";
 import heroImage from "../assets/public-repair-hero.webp";
@@ -76,6 +77,15 @@ function TrustBadges() {
  * this same section, an identical box height between languages is what
  * keeps its crop/zoom from shifting when the language toggles — see
  * MIN_H_CLASSES below for the exact measured pixel values.
+ *
+ * PromoCarousel sits above the text column, filling what used to be
+ * blank space between the fixed navbar and the eyebrow. It has its own
+ * fixed height per breakpoint (never content-driven), so composing it
+ * above the already-stable text column keeps the whole Hero's height
+ * language-independent by construction — no change to MIN_H_CLASSES
+ * itself was needed, only new content added on top of it. This does grow
+ * the Hero's total height versus before (real content needs real room),
+ * but by the same fixed amount for both languages.
  */
 export function Hero({ onOpenRepairRequest }) {
   const { t } = useLanguage();
@@ -91,6 +101,8 @@ export function Hero({ onOpenRepairRequest }) {
       <CircuitBackground opacity={0.55} className="sm:hidden" />
 
       <div className="relative mx-auto max-w-6xl px-5 sm:px-8">
+        <PromoCarousel onOpenRepairRequest={onOpenRepairRequest} />
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

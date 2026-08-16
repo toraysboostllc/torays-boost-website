@@ -17,6 +17,7 @@
  */
 import { DEVICE_CATEGORIES, PROBLEMS_BY_GROUP, SMART_QUESTIONS_BY_GROUP } from "../config/repairRequest.config.js";
 import { services } from "../config/services.config.js";
+import { PROMO_SLIDES } from "../config/promoCarousel.config.js";
 
 function idLabelMap(list) {
   return Object.fromEntries(list.map((item) => [item.id, item.label]));
@@ -36,6 +37,9 @@ const enQuestions = Object.fromEntries(
   ])
 );
 const enServices = Object.fromEntries(services.map((s) => [s.id, { title: s.title, description: s.description }]));
+const enPromoSlides = Object.fromEntries(
+  PROMO_SLIDES.map((s) => [s.id, { title: s.title, description: s.description }])
+);
 
 export const translations = {
   en: {
@@ -66,6 +70,15 @@ export const translations = {
       trustTurnaround: "Fast Turnaround",
       trustPricing: "Honest Pricing",
       trustTechnicians: "Experienced Technicians",
+    },
+    promoCarousel: {
+      regionLabel: "Current promotions",
+      common: "Professional service. Affordable repair options.",
+      cta: "Request an Estimate",
+      prevLabel: "Previous promotion",
+      nextLabel: "Next promotion",
+      goToLabel: "Go to promotion {number}",
+      slides: enPromoSlides,
     },
     services: {
       eyebrow: "Services",
@@ -230,6 +243,36 @@ export const translations = {
       trustTurnaround: "Entrega Rápida",
       trustPricing: "Precios Honestos",
       trustTechnicians: "Técnicos Experimentados",
+    },
+    promoCarousel: {
+      regionLabel: "Promociones actuales",
+      common: "Servicio profesional. Opciones de reparación a su alcance.",
+      cta: "Solicitar estimado",
+      prevLabel: "Promoción anterior",
+      nextLabel: "Siguiente promoción",
+      goToLabel: "Ir a la promoción {number}",
+      slides: {
+        "ps5-cleaning": {
+          title: "PS5 Deep Cleaning + Liquid Metal",
+          description: "Mantenimiento térmico profesional para mejorar la refrigeración y el rendimiento.",
+        },
+        "ps5-hdmi": {
+          title: "PS5 HDMI / No Image Repair",
+          description: "Microsoldadura profesional para problemas de HDMI y falta de imagen.",
+        },
+        "screen-battery": {
+          title: "Screen & Battery Repair",
+          description: "Reemplazo de pantallas y baterías para teléfonos y tablets.",
+        },
+        "controller-tmr": {
+          title: "Controller Drift & TMR Upgrade",
+          description: "Reparación precisa de drift y actualización de joysticks TMR.",
+        },
+        "laptop-data-recovery": {
+          title: "Laptop Repair & Data Recovery",
+          description: "Reparación de placas y opciones profesionales de recuperación de datos.",
+        },
+      },
     },
     services: {
       eyebrow: "Servicios",
