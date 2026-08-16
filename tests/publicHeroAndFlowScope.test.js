@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { translations } from "../src/i18n/translations.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
@@ -34,12 +35,17 @@ describe("Hero: real asset, public-only, no price, no old placeholder", () => {
     expect(heroSrc).not.toMatch(/"PS5", "iPhone", "MacBook"/);
   });
 
-  it("has the approved headline, description, and CTA copy", () => {
-    expect(heroSrc).toContain("Expert Repair for Phones, Consoles &amp; Computers");
-    expect(heroSrc).toContain(
+  it("renders the headline/description/CTA through translations, and the EN copy is the approved copy", () => {
+    expect(heroSrc).toContain('t("hero.titlePrefix")');
+    expect(heroSrc).toContain('t("hero.titleHighlight")');
+    expect(heroSrc).toContain('t("hero.description")');
+    expect(heroSrc).toContain('t("hero.cta")');
+    expect(translations.en.hero.titlePrefix).toBe("Expert Repair for");
+    expect(translations.en.hero.titleHighlight).toBe("Phones, Consoles & Computers");
+    expect(translations.en.hero.description).toContain(
       "Professional diagnostics and electronics repair for iPhone, iPad, smartphones, PS5, Xbox, MacBook,"
     );
-    expect(heroSrc).toContain("Start Your Repair Request");
+    expect(translations.en.hero.cta).toBe("Start Your Repair Request");
   });
 
   it("the CTA opens the wizard directly — no price, no anchor to a removed section", () => {
@@ -61,6 +67,60 @@ describe("Hero: real asset, public-only, no price, no old placeholder", () => {
   it("never shows a price anywhere in the Hero", () => {
     expect(heroSrc).not.toMatch(/\$\d/);
     expect(heroSrc).not.toMatch(/starting at/i);
+  });
+});
+
+describe("Hero typography: navy + vivid-blue headline, discrete red accent, never solid black/bold-only text", () => {
+  function srgbToLinear(c) {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  }
+  function relativeLuminance(hex) {
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    return 0.2126 * srgbToLinear(r) + 0.7152 * srgbToLinear(g) + 0.0722 * srgbToLinear(b);
+  }
+  function contrastRatio(hexA, hexB) {
+    const lA = relativeLuminance(hexA);
+    const lB = relativeLuminance(hexB);
+    const [lighter, darker] = lA > lB ? [lA, lB] : [lB, lA];
+    return (lighter + 0.05) / (darker + 0.05);
+  }
+
+  it("headline is Torays navy, product-line half is a vivid blue — never a fully red headline", () => {
+    expect(heroSrc).toContain("text-[#0B2F6B]");
+    expect(heroSrc).toContain("text-[#1464D2]");
+    // The <h1> itself carries no red text class — red is limited to the
+    // small accent bar and the (unrelated) eyebrow pill above it.
+    const h1Block = heroSrc.match(/<h1[\s\S]*?<\/h1>/)[0];
+    expect(h1Block).not.toMatch(/text-torays-red|text-red|#[Ee]3[12][0-9A-Fa-f]{4}/);
+  });
+
+  it("both headline colors pass WCAG AA (>=4.5:1) against a white page background", () => {
+    expect(contrastRatio("0B2F6B", "FFFFFF")).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio("1464D2", "FFFFFF")).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("headline weight is semibold, not bold — a lighter touch than the old treatment", () => {
+    expect(heroSrc).toContain("font-semibold");
+    const h1Block = heroSrc.match(/<h1[\s\S]*?<\/h1>/)[0];
+    expect(h1Block).not.toMatch(/font-bold|font-extrabold|font-black/);
+  });
+
+  it("carries a short red accent bar next to the headline, not a red headline", () => {
+    expect(heroSrc).toMatch(/h-1 w-12 rounded-full bg-torays-red/);
+  });
+
+  it("the paragraph is a dark blue-gray, never black or near-black", () => {
+    expect(heroSrc).toContain("text-[#3D4A66]");
+    expect(heroSrc).not.toMatch(/text-black\b/);
+    expect(heroSrc).not.toMatch(/#000000|#000\b/i);
+  });
+
+  it("keeps the red 'Start Your Repair Request' button untouched by the typography change", () => {
+    expect(heroSrc).toContain("onClick={onOpenRepairRequest}");
+    expect(heroSrc).toContain('t("hero.cta")');
   });
 });
 

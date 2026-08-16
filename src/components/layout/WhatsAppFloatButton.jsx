@@ -1,13 +1,15 @@
 import { motion } from "framer-motion";
 import { MessageCircle } from "lucide-react";
 import { hasWhatsApp, buildWhatsAppLink } from "../../lib/whatsapp.js";
+import { useLanguage } from "../../i18n/LanguageContext.jsx";
 
 export function WhatsAppFloatButton() {
+  const { t } = useLanguage();
   if (!hasWhatsApp) return null;
 
   return (
     <motion.a
-      href={buildWhatsAppLink()}
+      href={buildWhatsAppLink(t("common.whatsappDefaultMessage"))}
       target="_blank"
       rel="noreferrer"
       aria-label="Chat on WhatsApp"

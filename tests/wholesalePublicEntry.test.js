@@ -49,7 +49,7 @@ function extractTextColor(src, varName) {
 describe("WhatsAppCta: destination, mechanics, and green XP style", () => {
   it("keeps the existing wa.me destination — built from buildContactLink(), same as before this restyle", () => {
     expect(whatsappSrc).toContain('import { buildContactLink } from "../../lib/whatsapp.js"');
-    expect(whatsappSrc).toContain("href={buildContactLink()}");
+    expect(whatsappSrc).toContain("href={buildContactLink(t(\"common.whatsappDefaultMessage\"))}");
   });
 
   it("opens in a new tab via a plain <a> — correct for an external link, unlike the internal /wholesale Link", () => {
@@ -198,14 +198,14 @@ describe("Navbar: exactly one WhatsApp CTA and one Torays Boost Pro CTA per cont
   });
 
   it("does not change the existing #anchor nav links", () => {
-    expect(navbarSrc).toContain('{ href: "#services", label: "Services" }');
+    expect(navbarSrc).toContain('"#services"');
   });
 });
 
 describe("Hero: only the primary repair-request CTA remains", () => {
-  it("keeps 'Start Your Repair Request' as the sole button in the Hero", () => {
+  it("keeps the repair-request CTA as the sole button in the Hero", () => {
     expect(heroSrc).toContain("onClick={onOpenRepairRequest}");
-    expect(heroSrc).toContain("Start Your Repair Request");
+    expect(heroSrc).toContain('t("hero.cta")');
     expect((heroSrc.match(/<Button/g) || []).length).toBe(1);
   });
 

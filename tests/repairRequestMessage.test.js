@@ -7,8 +7,23 @@ import {
 } from "../src/lib/repairRequestMessage.js";
 import { getCategoryById, PROBLEMS_BY_GROUP, SMART_QUESTIONS_BY_GROUP } from "../src/config/repairRequest.config.js";
 import { siteConfig } from "../src/config/site.config.js";
+import { translations, formatTranslation } from "../src/i18n/translations.js";
 
-function buildState(overrides = {}) {
+function lookup(dict, key) {
+  return key.split(".").reduce((node, part) => (node == null ? undefined : node[part]), dict);
+}
+
+// Mirrors LanguageContext.jsx's t() exactly (dot-path lookup, EN fallback,
+// {var} interpolation) so these tests exercise the real translation data
+// instead of re-typing expected strings.
+function makeT(lang) {
+  return function t(key, vars) {
+    const value = lookup(translations[lang], key) ?? lookup(translations.en, key) ?? key;
+    return typeof value === "string" && vars ? formatTranslation(value, vars) : value;
+  };
+}
+
+function buildState(overrides = {}, lang = "en") {
   const category = getCategoryById(overrides.categoryId || "smartphones-other");
   const problem = PROBLEMS_BY_GROUP[category.group][0];
   const smartQuestions = SMART_QUESTIONS_BY_GROUP[category.group];
@@ -33,6 +48,8 @@ function buildState(overrides = {}) {
     brand: overrides.brand === undefined ? brand : overrides.brand,
     problem,
     smartQuestions,
+    group: category.group,
+    t: makeT(lang),
   };
 }
 
@@ -126,5 +143,42 @@ describe("buildRepairRequestEmailSubject / buildRepairRequestMailtoLink", () => 
     const body = params.get("body");
     expect(body).toContain("Jane Doe");
     expect(body).not.toMatch(/\$\d/);
+  });
+});
+
+describe("Spanish (es): the same builders produce fully Spanish, price-free output", () => {
+  it("summary uses Spanish labels and the Spanish smart-question text", () => {
+    const state = buildState({}, "es");
+    const summary = buildRepairRequestSummary(state);
+    expect(summary).toContain("Nombre: Jane Doe");
+    expect(summary).toContain("Teléfono: 3055551234");
+    expect(summary).toContain("Correo: jane@example.com");
+    expect(summary).toContain(`Dispositivo: ${translations.es.wizard.categories[state.category.id]}`);
+    expect(summary).toContain(`Marca: ${translations.es.wizard.brands[state.brand.id]}`);
+    expect(summary).toContain(`Problema: ${translations.es.wizard.problems[state.problem.id]}`);
+    state.smartQuestions.forEach((q) =>
+      expect(summary).toContain(translations.es.wizard.questions[state.group][q.id])
+    );
+    expect(summary).toContain("Sí");
+    expect(summary).toContain("No estoy seguro");
+    expect(summary).toContain("Detalles adicionales: Screen flickers sometimes");
+    expect(summary).not.toMatch(/\$\d/);
+  });
+
+  it("WhatsApp link opens with the Spanish greeting and no price", () => {
+    const link = buildRepairRequestWhatsAppLink(buildState({}, "es"));
+    const text = decodeURIComponent(link.split("?text=")[1]);
+    expect(text).toContain(translations.es.wizard.summary.whatsappGreeting);
+    expect(text).not.toMatch(/\$\d/);
+  });
+
+  it("email subject uses the Spanish prefix and device name", () => {
+    const state = buildState({ categoryId: "iphone", brand: null, answers: { model: "14 Pro" } }, "es");
+    expect(buildRepairRequestEmailSubject(state)).toBe("Solicitud de Reparación — iPhone 14 Pro");
+  });
+
+  it("falls back to the Spanish 'not sure' phrase in the subject when no model was given", () => {
+    const state = buildState({ categoryId: "ps5", brand: null, answers: { model: "", modelNotSure: true } }, "es");
+    expect(buildRepairRequestEmailSubject(state)).toBe("Solicitud de Reparación — PlayStation / PS5 No estoy seguro");
   });
 });

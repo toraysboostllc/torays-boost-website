@@ -1,12 +1,15 @@
 import { motion } from "framer-motion";
 import { SectionHeading } from "../components/ui/SectionHeading.jsx";
 import { processSteps } from "../config/features.config.js";
+import { useLanguage } from "../i18n/LanguageContext.jsx";
 
 export function HowItWorks() {
+  const { t } = useLanguage();
+
   return (
     <section id="how-it-works" className="py-20 sm:py-28">
       <div className="mx-auto max-w-6xl px-5 sm:px-8">
-        <SectionHeading eyebrow="Process" title="How It Works" />
+        <SectionHeading eyebrow={t("howItWorks.eyebrow")} title={t("howItWorks.title")} />
 
         <div className="relative mt-14">
           {/* Fixed pre-existing overflow bug: `left-1/2` + `w-full` together
@@ -29,8 +32,12 @@ export function HowItWorks() {
                   {step.id}
                 </div>
                 <div>
-                  <h3 className="font-heading text-base font-semibold text-torays-text">{step.title}</h3>
-                  <p className="mt-1 text-sm text-torays-text-secondary">{step.description}</p>
+                  <h3 className="font-heading text-base font-semibold text-torays-text">
+                    {t(`howItWorks.steps.${step.id}.title`)}
+                  </h3>
+                  <p className="mt-1 text-sm text-torays-text-secondary">
+                    {t(`howItWorks.steps.${step.id}.description`)}
+                  </p>
                 </div>
               </motion.div>
             ))}

@@ -5,8 +5,17 @@ import { Card } from "../components/ui/Card.jsx";
 import { Button } from "../components/ui/Button.jsx";
 import { siteConfig } from "../config/site.config.js";
 import { hasWhatsApp, buildWhatsAppLink, buildMailtoLink } from "../lib/whatsapp.js";
+import { useLanguage } from "../i18n/LanguageContext.jsx";
+
+// site.config.js's hours entries are stored in English (days/time) since
+// that file is the single business-data source, not display copy — this
+// maps each known value to its translation key so Contact can show them in
+// the selected language without restructuring site.config.js.
+const HOURS_DAY_KEYS = { "Monday – Friday": "contact.hoursMonFri", Saturday: "contact.hoursSat", Sunday: "contact.hoursSun" };
+const HOURS_TIME_KEYS = { TBD: "contact.hoursTbd", Closed: "contact.hoursClosed" };
 
 function ContactForm() {
+  const { t } = useLanguage();
   const [form, setForm] = useState({ name: "", email: "", message: "" });
 
   function handleSubmit(e) {
@@ -20,7 +29,7 @@ function ContactForm() {
       <input
         required
         type="text"
-        placeholder="Your name"
+        placeholder={t("contact.namePlaceholder")}
         value={form.name}
         onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
         className="rounded-xl border border-torays-line bg-torays-surface-alt px-4 py-3 text-torays-text placeholder:text-torays-text-muted focus:outline-none focus:ring-2 focus:ring-torays-red/50"
@@ -28,7 +37,7 @@ function ContactForm() {
       <input
         required
         type="email"
-        placeholder="Your email"
+        placeholder={t("contact.emailPlaceholder")}
         value={form.email}
         onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
         className="rounded-xl border border-torays-line bg-torays-surface-alt px-4 py-3 text-torays-text placeholder:text-torays-text-muted focus:outline-none focus:ring-2 focus:ring-torays-red/50"
@@ -36,33 +45,34 @@ function ContactForm() {
       <textarea
         required
         rows={4}
-        placeholder="How can we help?"
+        placeholder={t("contact.messagePlaceholder")}
         value={form.message}
         onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
         className="resize-none rounded-xl border border-torays-line bg-torays-surface-alt px-4 py-3 text-torays-text placeholder:text-torays-text-muted focus:outline-none focus:ring-2 focus:ring-torays-red/50"
       />
       <Button type="submit" icon={Send} className="self-start">
-        Send Message
+        {t("contact.sendMessage")}
       </Button>
     </form>
   );
 }
 
 export function Contact() {
+  const { t } = useLanguage();
   const { address, hours, email } = siteConfig;
   const hasAddress = Boolean(address.line1);
 
   return (
     <section id="contact" className="py-20 sm:py-28">
       <div className="mx-auto max-w-6xl px-5 sm:px-8">
-        <SectionHeading eyebrow="Contact" title="Get In Touch" />
+        <SectionHeading eyebrow={t("contact.eyebrow")} title={t("contact.title")} />
 
         <div className="mt-12 grid grid-cols-1 gap-8 lg:grid-cols-2">
           <div className="flex flex-col gap-5">
             <Card className="flex items-start gap-4">
               <Mail size={20} className="mt-0.5 shrink-0 text-torays-red" />
               <div>
-                <p className="text-sm font-medium text-torays-text">Email</p>
+                <p className="text-sm font-medium text-torays-text">{t("contact.email")}</p>
                 <a href={`mailto:${email}`} className="text-sm text-torays-text-secondary hover:text-torays-text">
                   {email}
                 </a>
@@ -73,9 +83,9 @@ export function Contact() {
               <Card className="flex items-start gap-4">
                 <MessageCircle size={20} className="mt-0.5 shrink-0 text-torays-red" />
                 <div>
-                  <p className="text-sm font-medium text-torays-text">WhatsApp</p>
+                  <p className="text-sm font-medium text-torays-text">{t("contact.whatsapp")}</p>
                   <a
-                    href={buildWhatsAppLink()}
+                    href={buildWhatsAppLink(t("common.whatsappDefaultMessage"))}
                     target="_blank"
                     rel="noreferrer"
                     className="text-sm text-torays-text-secondary hover:text-torays-text"
@@ -89,11 +99,9 @@ export function Contact() {
             <Card className="flex items-start gap-4">
               <MapPin size={20} className="mt-0.5 shrink-0 text-torays-red" />
               <div>
-                <p className="text-sm font-medium text-torays-text">Address</p>
+                <p className="text-sm font-medium text-torays-text">{t("contact.address")}</p>
                 <p className="text-sm text-torays-text-secondary">
-                  {hasAddress
-                    ? `${address.line1}, ${address.city}, ${address.state} ${address.zip}`
-                    : "Address coming soon — contact us for directions."}
+                  {hasAddress ? `${address.line1}, ${address.city}, ${address.state} ${address.zip}` : t("contact.addressPlaceholder")}
                 </p>
               </div>
             </Card>
@@ -101,11 +109,12 @@ export function Contact() {
             <Card className="flex items-start gap-4">
               <Clock size={20} className="mt-0.5 shrink-0 text-torays-red" />
               <div>
-                <p className="text-sm font-medium text-torays-text">Hours</p>
+                <p className="text-sm font-medium text-torays-text">{t("contact.hours")}</p>
                 <ul className="mt-1 space-y-0.5 text-sm text-torays-text-secondary">
                   {hours.map((h) => (
                     <li key={h.days}>
-                      {h.days}: {h.time}
+                      {HOURS_DAY_KEYS[h.days] ? t(HOURS_DAY_KEYS[h.days]) : h.days}:{" "}
+                      {HOURS_TIME_KEYS[h.time] ? t(HOURS_TIME_KEYS[h.time]) : h.time}
                     </li>
                   ))}
                 </ul>
@@ -115,7 +124,7 @@ export function Contact() {
 
           <div className="flex flex-col gap-5">
             <Card>
-              <h3 className="mb-4 font-heading text-lg font-semibold text-torays-text">Send us a message</h3>
+              <h3 className="mb-4 font-heading text-lg font-semibold text-torays-text">{t("contact.formTitle")}</h3>
               <ContactForm />
             </Card>
 
@@ -131,7 +140,7 @@ export function Contact() {
               </div>
             ) : (
               <div className="flex h-40 items-center justify-center rounded-2xl border border-dashed border-torays-line text-sm text-torays-text-muted">
-                Map will appear once the shop address is added to site.config.js
+                {t("contact.mapPlaceholder")}
               </div>
             )}
           </div>

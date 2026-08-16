@@ -1,38 +1,43 @@
 import { buildWhatsAppLink, buildMailtoLink } from "./whatsapp.js";
-import { ANSWER_OPTIONS } from "../config/repairRequest.config.js";
-
-const ANSWER_LABEL = Object.fromEntries(ANSWER_OPTIONS.map((a) => [a.id, a.label]));
 
 /**
  * Builds the plain-text summary shared by both the WhatsApp message and
- * the email body. Deliberately has no price/ETA field to omit — the
- * wizard's state never collects one, so there is nothing here that could
- * leak a number even by accident.
+ * the email body, in whichever language `t` resolves (the caller passes
+ * the current useLanguage().t — these are plain functions, not hooks, so
+ * they can't call useLanguage() themselves). Deliberately has no
+ * price/ETA field to omit — the wizard's state never collects one, so
+ * there is nothing here that could leak a number even by accident.
  */
-export function buildRepairRequestSummary({ answers, category, brand, problem, smartQuestions }) {
+export function buildRepairRequestSummary({ answers, category, brand, problem, smartQuestions, group, t }) {
   const lines = [];
-  lines.push(`Name: ${answers.name.trim()}`);
-  lines.push(`Phone: ${answers.phone.trim()}`);
-  if (answers.email.trim()) lines.push(`Email: ${answers.email.trim()}`);
-  lines.push(`Device: ${category?.label || ""}`);
-  if (brand) lines.push(`Brand: ${brand.label}`);
-  lines.push(`Model: ${!answers.modelNotSure && answers.model.trim() ? answers.model.trim() : "Not sure"}`);
-  lines.push(`Problem: ${problem?.label || ""}`);
+  lines.push(`${t("wizard.summary.name")}: ${answers.name.trim()}`);
+  lines.push(`${t("wizard.summary.phone")}: ${answers.phone.trim()}`);
+  if (answers.email.trim()) lines.push(`${t("wizard.summary.email")}: ${answers.email.trim()}`);
+  lines.push(`${t("wizard.summary.device")}: ${category ? t(`wizard.categories.${category.id}`) : ""}`);
+  if (brand) lines.push(`${t("wizard.summary.brand")}: ${t(`wizard.brands.${brand.id}`)}`);
+  const modelText = !answers.modelNotSure && answers.model.trim() ? answers.model.trim() : t("wizard.summary.notSureModel");
+  lines.push(`${t("wizard.summary.model")}: ${modelText}`);
+  lines.push(`${t("wizard.summary.problem")}: ${problem ? t(`wizard.problems.${problem.id}`) : ""}`);
   smartQuestions.forEach((q) => {
-    lines.push(`${q.text} ${ANSWER_LABEL[answers.smartAnswers[q.id]] || "Not sure"}`);
+    const questionText = t(`wizard.questions.${group}.${q.id}`);
+    const answerId = answers.smartAnswers[q.id];
+    const answerText = answerId ? t(`wizard.answers.${answerId}`) : t("wizard.answers.not-sure");
+    lines.push(`${questionText} ${answerText}`);
   });
-  if (answers.details.trim()) lines.push(`Additional details: ${answers.details.trim()}`);
+  if (answers.details.trim()) lines.push(`${t("wizard.summary.additionalDetails")}: ${answers.details.trim()}`);
   return lines.join("\n");
 }
 
 export function buildRepairRequestWhatsAppLink(state) {
+  const { t } = state;
   const summary = buildRepairRequestSummary(state);
-  return buildWhatsAppLink(`Hi! I'd like to request a repair:\n\n${summary}`);
+  return buildWhatsAppLink(`${t("wizard.summary.whatsappGreeting")}\n\n${summary}`);
 }
 
-export function buildRepairRequestEmailSubject({ category, answers }) {
-  const modelPart = !answers.modelNotSure && answers.model.trim() ? answers.model.trim() : "Not sure";
-  return `Repair Request — ${category?.label || ""} ${modelPart}`;
+export function buildRepairRequestEmailSubject({ category, answers, t }) {
+  const modelPart = !answers.modelNotSure && answers.model.trim() ? answers.model.trim() : t("wizard.summary.notSureModel");
+  const device = category ? t(`wizard.categories.${category.id}`) : "";
+  return `${t("wizard.summary.emailSubjectPrefix")} — ${device} ${modelPart}`;
 }
 
 export function buildRepairRequestMailtoLink(state) {

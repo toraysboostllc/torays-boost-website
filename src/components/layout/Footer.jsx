@@ -2,17 +2,15 @@ import { Link } from "react-router-dom";
 import { Instagram, Facebook } from "lucide-react";
 import { Logo } from "../ui/Logo.jsx";
 import { siteConfig } from "../../config/site.config.js";
+import { useLanguage } from "../../i18n/LanguageContext.jsx";
 
-const LINKS = [
-  { href: "#services", label: "Services" },
-  { href: "#about", label: "About" },
-  { href: "#how-it-works", label: "How It Works" },
-  { href: "#faq", label: "FAQ" },
-  { href: "#contact", label: "Contact" },
-];
+const LINK_HREFS = ["#services", "#about", "#how-it-works", "#faq", "#contact"];
+const LINK_KEYS = ["nav.services", "nav.about", "nav.howItWorks", "nav.faq", "nav.contact"];
 
 export function Footer() {
+  const { t } = useLanguage();
   const year = new Date().getFullYear();
+  const links = LINK_HREFS.map((href, i) => ({ href, label: t(LINK_KEYS[i]) }));
 
   return (
     <footer className="border-t border-torays-line bg-torays-surface">
@@ -20,13 +18,11 @@ export function Footer() {
         <div className="flex flex-col items-start justify-between gap-8 md:flex-row">
           <div className="flex flex-col gap-3">
             <Logo />
-            <p className="max-w-xs text-sm text-torays-text-secondary">
-              Professional microsoldering and board-level electronics repair.
-            </p>
+            <p className="max-w-xs text-sm text-torays-text-secondary">{t("footer.tagline")}</p>
           </div>
 
           <div className="flex flex-wrap gap-x-10 gap-y-3">
-            {LINKS.map((link) => (
+            {links.map((link) => (
               <a
                 key={link.href}
                 href={link.href}
@@ -55,14 +51,14 @@ export function Footer() {
 
         <div className="flex flex-col-reverse items-start justify-between gap-4 border-t border-torays-line pt-6 sm:flex-row sm:items-center">
           <p className="text-xs text-torays-text-muted">
-            © {year} {siteConfig.businessName}. All rights reserved.
+            © {year} {siteConfig.businessName}. {t("footer.allRightsReserved")}
           </p>
           <div className="flex items-center gap-x-5 gap-y-2 flex-wrap">
             <Link to="/privacy" className="text-xs text-torays-text-muted transition-colors hover:text-torays-text">
-              Privacy Policy
+              {t("footer.privacyPolicy")}
             </Link>
             <Link to="/terms" className="text-xs text-torays-text-muted transition-colors hover:text-torays-text">
-              Terms &amp; Conditions
+              {t("footer.termsConditions")}
             </Link>
             <p className="text-xs text-torays-text-muted">{siteConfig.domain}</p>
           </div>

@@ -1,5 +1,6 @@
 import { MessageCircle } from "lucide-react";
 import { buildContactLink } from "../../lib/whatsapp.js";
+import { useLanguage } from "../../i18n/LanguageContext.jsx";
 
 /**
  * Header/mobile-drawer WhatsApp entry point — light green XP-style relief.
@@ -21,11 +22,12 @@ const VARIANT_CLASSES = {
 const FOCUS_RING = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-torays-red/60 focus-visible:ring-offset-2 focus-visible:ring-offset-torays-bg";
 
 export function WhatsAppCta({ variant = "header", onClick, className = "" }) {
+  const { t } = useLanguage();
   const iconSize = variant === "mobile" ? 18 : 15;
 
   return (
     <a
-      href={buildContactLink()}
+      href={buildContactLink(t("common.whatsappDefaultMessage"))}
       target="_blank"
       rel="noreferrer"
       onClick={onClick}

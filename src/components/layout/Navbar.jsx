@@ -4,18 +4,17 @@ import { Menu, X } from "lucide-react";
 import { Logo } from "../ui/Logo.jsx";
 import { WholesalePortalLink } from "./WholesalePortalLink.jsx";
 import { WhatsAppCta } from "./WhatsAppCta.jsx";
+import { LanguageSwitcher } from "./LanguageSwitcher.jsx";
+import { useLanguage } from "../../i18n/LanguageContext.jsx";
 
-const LINKS = [
-  { href: "#services", label: "Services" },
-  { href: "#about", label: "About" },
-  { href: "#how-it-works", label: "How It Works" },
-  { href: "#faq", label: "FAQ" },
-  { href: "#contact", label: "Contact" },
-];
+const LINK_HREFS = ["#services", "#about", "#how-it-works", "#faq", "#contact"];
+const LINK_KEYS = ["nav.services", "nav.about", "nav.howItWorks", "nav.faq", "nav.contact"];
 
 export function Navbar() {
+  const { t } = useLanguage();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const links = LINK_HREFS.map((href, i) => ({ href, label: t(LINK_KEYS[i]) }));
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -30,12 +29,12 @@ export function Navbar() {
       }`}
     >
       <nav className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3 sm:px-8">
-        <a href="#top" aria-label="Torays Boost home">
+        <a href="#top" aria-label={t("nav.home")}>
           <Logo size="lg" />
         </a>
 
         <div className="hidden md:flex items-center gap-8">
-          {LINKS.map((link) => (
+          {links.map((link) => (
             <a
               key={link.href}
               href={link.href}
@@ -47,6 +46,7 @@ export function Navbar() {
         </div>
 
         <div className="hidden md:flex items-center gap-3">
+          <LanguageSwitcher variant="header" />
           <WholesalePortalLink variant="header" />
           <WhatsAppCta variant="header" />
         </div>
@@ -55,7 +55,7 @@ export function Navbar() {
           type="button"
           onClick={() => setOpen(true)}
           className="md:hidden text-torays-text"
-          aria-label="Open menu"
+          aria-label={t("nav.openMenu")}
         >
           <Menu size={26} />
         </button>
@@ -76,13 +76,13 @@ export function Navbar() {
                 type="button"
                 onClick={() => setOpen(false)}
                 className="text-torays-text"
-                aria-label="Close menu"
+                aria-label={t("nav.closeMenu")}
               >
                 <X size={26} />
               </button>
             </div>
             <div className="flex flex-col gap-6 px-8 py-10">
-              {LINKS.map((link) => (
+              {links.map((link) => (
                 <a
                   key={link.href}
                   href={link.href}
@@ -92,8 +92,9 @@ export function Navbar() {
                   {link.label}
                 </a>
               ))}
-              <WholesalePortalLink variant="mobile" className="mt-2" onClick={() => setOpen(false)} />
-              <WhatsAppCta variant="mobile" className="mt-2" onClick={() => setOpen(false)} />
+              <LanguageSwitcher variant="mobile" className="mt-2" />
+              <WholesalePortalLink variant="mobile" onClick={() => setOpen(false)} />
+              <WhatsAppCta variant="mobile" onClick={() => setOpen(false)} />
             </div>
           </motion.div>
         )}

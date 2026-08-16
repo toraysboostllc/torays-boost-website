@@ -4,12 +4,21 @@ import * as Icons from "lucide-react";
 import { Button } from "../components/ui/Button.jsx";
 import { CircuitBackground } from "../components/ui/CircuitBackground.jsx";
 import { whyChooseUs } from "../config/features.config.js";
+import { useLanguage } from "../i18n/LanguageContext.jsx";
 import heroImage from "../assets/public-repair-hero.webp";
 
 const TRUST_BADGE_IDS = ["warranty", "turnaround", "pricing", "technicians"];
-const trustBadges = TRUST_BADGE_IDS.map((id) => whyChooseUs.find((item) => item.id === id)).filter(Boolean);
+const TRUST_LABEL_KEYS = {
+  warranty: "hero.trustWarranty",
+  turnaround: "hero.trustTurnaround",
+  pricing: "hero.trustPricing",
+  technicians: "hero.trustTechnicians",
+};
 
 function TrustBadges() {
+  const { t } = useLanguage();
+  const trustBadges = TRUST_BADGE_IDS.map((id) => whyChooseUs.find((item) => item.id === id)).filter(Boolean);
+
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5 sm:gap-x-6">
       {trustBadges.map((badge) => {
@@ -19,7 +28,7 @@ function TrustBadges() {
             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-torays-navy/10 text-torays-navy">
               {Icon && <Icon size={13} />}
             </span>
-            <span className="text-xs font-medium text-torays-text-secondary">{badge.label}</span>
+            <span className="text-xs font-medium text-torays-text-secondary">{t(TRUST_LABEL_KEYS[badge.id])}</span>
           </div>
         );
       })}
@@ -42,8 +51,15 @@ function TrustBadges() {
  *    as its own contained, non-deformed image block under the copy
  *    instead — same "hidden sm:.../ sm:hidden" split already established
  *    elsewhere in this codebase for desktop-vs-mobile visual treatments.
+ *
+ * Typography: navy (#0B2F6B) body of the headline, a vivid blue
+ * (#1464D2) highlight on the product-line half, and a short red accent
+ * bar — never a fully red headline. Both blues verified >=4.5:1 (WCAG AA)
+ * against the page/scrim background (11.36:1 and 4.90:1 respectively).
  */
 export function Hero({ onOpenRepairRequest }) {
+  const { t } = useLanguage();
+
   return (
     <section id="top" className="relative overflow-hidden pt-32 pb-16 sm:pb-0">
       <div
@@ -62,20 +78,20 @@ export function Hero({ onOpenRepairRequest }) {
           className="flex max-w-xl flex-col items-start gap-8 sm:py-20 lg:py-28"
         >
           <span className="rounded-full border border-torays-red/30 bg-torays-red/10 px-4 py-1.5 text-xs font-heading font-semibold uppercase tracking-[0.2em] text-torays-red">
-            Torays Boost LLC
+            {t("hero.eyebrow")}
           </span>
 
-          <h1 className="text-5xl font-heading font-bold leading-[1.08] text-torays-text sm:text-6xl">
-            Expert Repair for Phones, Consoles &amp; Computers
-          </h1>
+          <div className="flex flex-col gap-3">
+            <div className="h-1 w-12 rounded-full bg-torays-red" aria-hidden="true" />
+            <h1 className="text-5xl font-heading font-semibold leading-[1.08] text-[#0B2F6B] sm:text-6xl">
+              {t("hero.titlePrefix")} <span className="text-[#1464D2]">{t("hero.titleHighlight")}</span>
+            </h1>
+          </div>
 
-          <p className="text-lg leading-relaxed text-torays-text-secondary sm:text-xl">
-            Professional diagnostics and electronics repair for iPhone, iPad, smartphones, PS5, Xbox, MacBook,
-            laptops and board-level problems.
-          </p>
+          <p className="text-lg leading-relaxed text-[#3D4A66] sm:text-xl">{t("hero.description")}</p>
 
           <Button type="button" onClick={onOpenRepairRequest} size="lg" icon={ArrowRight} iconPosition="right">
-            Start Your Repair Request
+            {t("hero.cta")}
           </Button>
 
           <div className="mt-1 border-t border-torays-line pt-5">
@@ -86,7 +102,7 @@ export function Hero({ onOpenRepairRequest }) {
 
       <img
         src={heroImage}
-        alt="Torays Boost repair bench: PS5, Xbox, controllers, phones, a tablet, and a MacBook under microscope repair"
+        alt={t("hero.imageAlt")}
         className="mt-10 h-56 w-full object-cover sm:hidden"
       />
     </section>
