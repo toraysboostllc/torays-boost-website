@@ -124,6 +124,65 @@ describe("Hero typography: navy + vivid-blue headline, discrete red accent, neve
   });
 });
 
+describe("Hero framing: stable across languages (no re-crop/zoom on the collage when toggling)", () => {
+  it("MIN_H_CLASSES is a plain module-level string constant — declared before useLanguage() even runs, so it structurally cannot depend on `t` or `lang`", () => {
+    const constMatch = heroSrc.match(/const MIN_H_CLASSES = "([^"]+)";/);
+    expect(constMatch).toBeTruthy();
+    const declarationIndex = heroSrc.indexOf("const MIN_H_CLASSES");
+    const useLanguageIndex = heroSrc.indexOf("useLanguage()");
+    expect(declarationIndex).toBeGreaterThan(-1);
+    expect(useLanguageIndex).toBeGreaterThan(-1);
+    expect(declarationIndex).toBeLessThan(useLanguageIndex);
+    // The constant string itself is static — no template interpolation,
+    // no reference to t(...) or lang.
+    expect(constMatch[1]).not.toMatch(/\$\{|t\(|lang/);
+  });
+
+  it("locks in the exact measured min-height per tier (base/390/sm/lg), each equal to Spanish's own natural height at that width", () => {
+    expect(heroSrc).toContain("min-h-[720px]");
+    expect(heroSrc).toContain("min-[390px]:min-h-[686px]");
+    expect(heroSrc).toContain("sm:min-h-[793px]");
+    expect(heroSrc).toContain("lg:min-h-[857px]");
+  });
+
+  it("the content column is vertically centered, so a shorter language distributes its extra room instead of dumping it below", () => {
+    expect(heroSrc).toContain("justify-center");
+  });
+
+  it("the old py-20/py-28 vertical-padding mechanism is gone — height now comes from MIN_H_CLASSES, not content-driven padding", () => {
+    expect(heroSrc).not.toMatch(/sm:py-20|lg:py-28/);
+  });
+
+  it("the motion.div applies MIN_H_CLASSES directly, not conditionally by language", () => {
+    const classNameMatch = heroSrc.match(/className=\{`([^`]*)\$\{MIN_H_CLASSES\}`\}/);
+    expect(classNameMatch).toBeTruthy();
+    expect(classNameMatch[1]).not.toMatch(/\$\{t\(|\$\{lang/);
+  });
+
+  it("neither the bg-cover image layer nor the mobile <img> is keyed by language — same element, same src, never remounted on toggle", () => {
+    expect(heroSrc).not.toMatch(/key=\{lang\}/);
+    expect(heroSrc).not.toMatch(/key=\{t\(/);
+    // Only `alt` (translated copy) may vary by language on the <img>; src
+    // itself is the static imported asset.
+    const imgBlock = heroSrc.match(/<img[\s\S]*?\/>/)[0];
+    expect(imgBlock).toContain("src={heroImage}");
+    expect(imgBlock).not.toMatch(/src=\{.*t\(/);
+  });
+
+  it("the bg-cover size/position/no-repeat classes are unconditional — never swapped per language", () => {
+    const bgLayerMatch = heroSrc.match(/<div\s+className="([^"]*bg-cover[^"]*)"/);
+    expect(bgLayerMatch).toBeTruthy();
+    expect(bgLayerMatch[1]).toContain("bg-cover");
+    expect(bgLayerMatch[1]).toContain("bg-right");
+    expect(bgLayerMatch[1]).toContain("bg-no-repeat");
+    expect(bgLayerMatch[1]).not.toMatch(/\$\{|t\(/);
+  });
+
+  it("public-repair-hero.webp itself is never touched by this fix (only layout classes changed)", () => {
+    expect(heroSrc).toContain('import heroImage from "../assets/public-repair-hero.webp"');
+  });
+});
+
 describe("Home.jsx: mounts the wizard modal only while open, old QuoteEstimator gone", () => {
   it("no longer imports or renders QuoteEstimator", () => {
     expect(homeSrc).not.toMatch(/QuoteEstimator/);

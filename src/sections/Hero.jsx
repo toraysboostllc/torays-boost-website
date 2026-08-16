@@ -7,6 +7,13 @@ import { whyChooseUs } from "../config/features.config.js";
 import { useLanguage } from "../i18n/LanguageContext.jsx";
 import heroImage from "../assets/public-repair-hero.webp";
 
+// Content-column min-height per breakpoint tier, measured directly from
+// Spanish's own rendered height (the longer/tallest copy) at this
+// project's official responsive test widths — see the doc comment above
+// Hero() for why this keeps the bg-cover collage from re-cropping when
+// the language toggles.
+const MIN_H_CLASSES = "min-h-[720px] min-[390px]:min-h-[686px] sm:min-h-[793px] lg:min-h-[857px]";
+
 const TRUST_BADGE_IDS = ["warranty", "turnaround", "pricing", "technicians"];
 const TRUST_LABEL_KEYS = {
   warranty: "hero.trustWarranty",
@@ -56,6 +63,19 @@ function TrustBadges() {
  * (#1464D2) highlight on the product-line half, and a short red accent
  * bar — never a fully red headline. Both blues verified >=4.5:1 (WCAG AA)
  * against the page/scrim background (11.36:1 and 4.90:1 respectively).
+ *
+ * Framing is language-independent by construction, not by accident: the
+ * content column below carries a min-height per breakpoint tier (base,
+ * 390px, sm, lg) measured directly from Spanish's own rendered height —
+ * Spanish's copy is longer/wraps more, so it already IS the tallest
+ * variant at every tier. Because the min-height equals Spanish's natural
+ * height, it's a no-op for Spanish (nothing to stretch); English, being
+ * shorter, gets stretched up to the same box and its content is centered
+ * (justify-center) so the extra room splits evenly instead of dumping a
+ * gap below it. Since the sm:/lg:-tier image is a bg-cover layer sized to
+ * this same section, an identical box height between languages is what
+ * keeps its crop/zoom from shifting when the language toggles — see
+ * MIN_H_CLASSES below for the exact measured pixel values.
  */
 export function Hero({ onOpenRepairRequest }) {
   const { t } = useLanguage();
@@ -75,7 +95,7 @@ export function Hero({ onOpenRepairRequest }) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
-          className="flex max-w-xl flex-col items-start gap-8 sm:py-20 lg:py-28"
+          className={`flex max-w-xl flex-col items-start justify-center gap-8 ${MIN_H_CLASSES}`}
         >
           <span className="rounded-full border border-torays-red/30 bg-torays-red/10 px-4 py-1.5 text-xs font-heading font-semibold uppercase tracking-[0.2em] text-torays-red">
             {t("hero.eyebrow")}
