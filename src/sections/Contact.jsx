@@ -80,7 +80,7 @@ export function Contact() {
                     rel="noreferrer"
                     className="text-sm text-torays-text-secondary hover:text-torays-text"
                   >
-                    Chat with us
+                    {siteConfig.whatsapp.displayNumber || "Chat with us"}
                   </a>
                 </div>
               </Card>

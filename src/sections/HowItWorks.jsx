@@ -9,9 +9,13 @@ export function HowItWorks() {
         <SectionHeading eyebrow="Process" title="How It Works" />
 
         <div className="relative mt-14">
-          <div className="absolute left-5 top-0 h-full w-px bg-torays-line sm:left-1/2 sm:top-5 sm:h-px sm:w-full" />
+          {/* Fixed pre-existing overflow bug: `left-1/2` + `w-full` together
+              span from 50% to 150% of the container, causing horizontal
+              overflow at every breakpoint >=640px. `inset-x-0` spans
+              exactly the container's width with no offset. */}
+          <div className="absolute left-5 top-0 h-full w-px bg-torays-line sm:inset-x-0 sm:top-5 sm:h-px sm:w-auto" />
 
-          <div className="relative grid grid-cols-1 gap-10 sm:grid-cols-5 sm:gap-6">
+          <div className="relative grid grid-cols-1 gap-10 sm:grid-cols-3 sm:gap-6">
             {processSteps.map((step, i) => (
               <motion.div
                 key={step.id}

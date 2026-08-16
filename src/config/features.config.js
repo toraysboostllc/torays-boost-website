@@ -12,9 +12,7 @@ export const whyChooseUs = [
 
 /** "How it works" step-by-step process. */
 export const processSteps = [
-  { id: 1, title: "Request a Quote", description: "Use the smart estimator or message us your device and issue." },
-  { id: 2, title: "Receive an Estimate", description: "Get an instant price range and turnaround time." },
-  { id: 3, title: "Bring or Ship Your Device", description: "Drop it off in-store or ship it in securely." },
-  { id: 4, title: "We Repair It", description: "Board-level diagnostics and repair under the microscope." },
-  { id: 5, title: "Pick Up or Receive It", description: "Collect in-store or get it shipped back, fully tested." },
+  { id: 1, title: "Select Your Device", description: "Tell us what you have and what's wrong with it." },
+  { id: 2, title: "Answer Three Quick Questions", description: "A few smart questions help us understand the issue." },
+  { id: 3, title: "Send Your Request", description: "Send it to Torays Boost via WhatsApp or email — no pricing bots, a real person replies." },
 ];

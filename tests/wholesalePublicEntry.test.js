@@ -202,12 +202,11 @@ describe("Navbar: exactly one WhatsApp CTA and one Torays Boost Pro CTA per cont
   });
 });
 
-describe("Hero: only the primary 'Get Free Quote' CTA remains", () => {
-  it("keeps 'Get Free Quote' as the sole button in the CTA row", () => {
-    expect(heroSrc).toContain('href="#quote-estimator"');
-    expect(heroSrc).toContain("Get Free Quote");
-    const ctaRow = heroSrc.match(/<div className="flex flex-col gap-4 sm:flex-row">[\s\S]*?<\/div>/)[0];
-    expect((ctaRow.match(/<Button/g) || []).length).toBe(1);
+describe("Hero: only the primary repair-request CTA remains", () => {
+  it("keeps 'Start Your Repair Request' as the sole button in the Hero", () => {
+    expect(heroSrc).toContain("onClick={onOpenRepairRequest}");
+    expect(heroSrc).toContain("Start Your Repair Request");
+    expect((heroSrc.match(/<Button/g) || []).length).toBe(1);
   });
 
   it("no longer renders a WhatsApp CTA or imports MessageCircle/buildContactLink", () => {

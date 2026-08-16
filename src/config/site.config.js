@@ -8,12 +8,14 @@ export const siteConfig = {
   shortName: "Torays Boost",
   domain: "toraysboost.com",
   url: "https://toraysboost.com",
-  email: "toraysboostllc@gmail.com",
+  // Confirmed public contact — payments@toraysboost.com is billing-only,
+  // never used as a public contact address.
+  email: "toraysboost@gmail.com",
 
-  // TODO: fill in the real WhatsApp number in E.164 format without "+"
-  // (e.g. "18095551234"). Leave empty to hide WhatsApp CTAs from render.
+  // E.164 format without "+", per buildWhatsAppLink()'s wa.me URL format.
   whatsapp: {
-    number: "",
+    number: "13053011152",
+    displayNumber: "(305) 301-1152",
     defaultMessage: "Hi! I'd like a quote for a repair.",
   },
 

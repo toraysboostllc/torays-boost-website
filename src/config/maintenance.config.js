@@ -10,4 +10,8 @@
  * MaintenancePage (along with its noindex meta tag) stops rendering
  * anywhere.
  */
-export const SITE_MAINTENANCE_MODE = true;
+// Preview-only: temporarily off on feat/public-smart-repair-request so the
+// new Hero/wizard can be reviewed. main stays `true` — do not merge this
+// flip; the merge/publish step for this feature must restore `true` unless
+// production launch is explicitly authorized at that time.
+export const SITE_MAINTENANCE_MODE = false;
