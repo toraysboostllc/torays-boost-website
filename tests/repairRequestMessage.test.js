@@ -146,6 +146,89 @@ describe("buildRepairRequestEmailSubject / buildRepairRequestMailtoLink", () => 
   });
 });
 
+describe("Other Brands fix: brand and exact model are always both collected and shown separately", () => {
+  it("Samsung + 'Galaxy S24 Ultra' — brand and model appear as two distinct lines", () => {
+    const state = buildState({
+      categoryId: "smartphones-other",
+      answers: { model: "Galaxy S24 Ultra" },
+    });
+    expect(state.brand.id).toBe("samsung");
+    const summary = buildRepairRequestSummary(state);
+    expect(summary).toContain("Brand: Samsung");
+    expect(summary).toContain("Model: Galaxy S24 Ultra");
+  });
+
+  it("Dell + 'Inspiron 15 3520' — brand and model appear as two distinct lines", () => {
+    const state = buildState({
+      categoryId: "laptops-other",
+      brand: { id: "dell", label: "Dell" },
+      answers: { model: "Inspiron 15 3520" },
+    });
+    const summary = buildRepairRequestSummary(state);
+    expect(summary).toContain("Brand: Dell");
+    expect(summary).toContain("Model: Inspiron 15 3520");
+  });
+
+  it("Other + custom brand + custom model — the typed brand name replaces the generic 'Other' label", () => {
+    const state = buildState({
+      categoryId: "smartphones-other",
+      brand: { id: "other", label: "Other" },
+      answers: { model: "Redmi Note 13", customBrandName: "Xiaomi" },
+    });
+    const summary = buildRepairRequestSummary(state);
+    expect(summary).toContain("Brand: Xiaomi");
+    expect(summary).toContain("Model: Redmi Note 13");
+    expect(summary).not.toContain("Brand: Other");
+  });
+
+  it("Other + custom brand — Spanish output also shows the typed brand name, not 'Otro'", () => {
+    const state = buildState(
+      {
+        categoryId: "laptops-other",
+        brand: { id: "other", label: "Other" },
+        answers: { model: "Inspiron 15 3520", customBrandName: "Toshiba" },
+      },
+      "es"
+    );
+    const summary = buildRepairRequestSummary(state);
+    expect(summary).toContain("Marca: Toshiba");
+    expect(summary).toContain("Modelo: Inspiron 15 3520");
+    expect(summary).not.toContain("Marca: Otro");
+  });
+
+  it("never shows the brand alone as if it were the model — a brand line always has its own separate model line", () => {
+    const state = buildState({ categoryId: "smartphones-other", answers: { model: "Galaxy S24 Ultra" } });
+    const summary = buildRepairRequestSummary(state);
+    const lines = summary.split("\n");
+    const brandLine = lines.find((l) => l.startsWith("Brand:"));
+    const modelLine = lines.find((l) => l.startsWith("Model:"));
+    expect(brandLine).toBeTruthy();
+    expect(modelLine).toBeTruthy();
+    expect(brandLine).not.toBe(modelLine);
+    expect(modelLine).not.toContain("Samsung");
+  });
+
+  it("WhatsApp message for Other + custom brand contains both the custom brand and the model, decoded", () => {
+    const state = buildState({
+      categoryId: "smartphones-other",
+      brand: { id: "other", label: "Other" },
+      answers: { model: "Redmi Note 13", customBrandName: "Xiaomi" },
+    });
+    const link = buildRepairRequestWhatsAppLink(state);
+    const text = decodeURIComponent(link.split("?text=")[1]);
+    expect(text).toContain("Brand: Xiaomi");
+    expect(text).toContain("Model: Redmi Note 13");
+  });
+
+  it("email body for Samsung + model contains both brand and model lines", () => {
+    const state = buildState({ categoryId: "smartphones-other", answers: { model: "Galaxy S24 Ultra" } });
+    const link = buildRepairRequestMailtoLink(state);
+    const body = new URLSearchParams(link.split("?")[1]).get("body");
+    expect(body).toContain("Brand: Samsung");
+    expect(body).toContain("Model: Galaxy S24 Ultra");
+  });
+});
+
 describe("Spanish (es): the same builders produce fully Spanish, price-free output", () => {
   it("summary uses Spanish labels and the Spanish smart-question text", () => {
     const state = buildState({}, "es");

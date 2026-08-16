@@ -14,7 +14,13 @@ export function buildRepairRequestSummary({ answers, category, brand, problem, s
   lines.push(`${t("wizard.summary.phone")}: ${answers.phone.trim()}`);
   if (answers.email.trim()) lines.push(`${t("wizard.summary.email")}: ${answers.email.trim()}`);
   lines.push(`${t("wizard.summary.device")}: ${category ? t(`wizard.categories.${category.id}`) : ""}`);
-  if (brand) lines.push(`${t("wizard.summary.brand")}: ${t(`wizard.brands.${brand.id}`)}`);
+  if (brand) {
+    const brandLabel =
+      brand.id === "other" && answers.customBrandName?.trim()
+        ? answers.customBrandName.trim()
+        : t(`wizard.brands.${brand.id}`);
+    lines.push(`${t("wizard.summary.brand")}: ${brandLabel}`);
+  }
   const modelText = !answers.modelNotSure && answers.model.trim() ? answers.model.trim() : t("wizard.summary.notSureModel");
   lines.push(`${t("wizard.summary.model")}: ${modelText}`);
   lines.push(`${t("wizard.summary.problem")}: ${problem ? t(`wizard.problems.${problem.id}`) : ""}`);

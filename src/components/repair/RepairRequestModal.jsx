@@ -60,21 +60,71 @@ function DeviceStep({ estimator, onAdvance, t }) {
   );
 }
 
-function ModelStep({ estimator, onAdvance, onContinue, t }) {
-  const { brands, answers } = estimator;
+function ModelStep({ estimator, onContinue, t }) {
+  const { brands, answers, group } = estimator;
+
+  // Pressing Enter in either text field submits Continue as soon as the
+  // form is valid — same affordance a <form onSubmit> would give, without
+  // needing a real <form> wrapper around a single wizard step.
+  function onFieldKeyDown(e) {
+    if (e.key === "Enter" && estimator.canGoNext) {
+      e.preventDefault();
+      onContinue();
+    }
+  }
 
   if (brands) {
+    const isOther = answers.brandId === "other";
+    const modelPlaceholder =
+      group === "laptop" ? t("wizard.fields.modelPlaceholderLaptop") : t("wizard.fields.modelPlaceholderPhone");
+
     return (
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {brands.map((b) => (
-          <TileButton
-            key={b.id}
-            selected={answers.brandId === b.id}
-            onClick={() => onAdvance(() => estimator.selectBrand(b.id))}
-          >
-            {t(`wizard.brands.${b.id}`)}
-          </TileButton>
-        ))}
+      <div className="flex flex-col gap-5">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {brands.map((b) => (
+            <TileButton key={b.id} selected={answers.brandId === b.id} onClick={() => estimator.selectBrand(b.id)}>
+              {t(`wizard.brands.${b.id}`)}
+            </TileButton>
+          ))}
+        </div>
+
+        {answers.brandId && (
+          <div className="flex flex-col gap-4">
+            {isOther && (
+              <label className="flex flex-col gap-2">
+                <span className="text-xs font-heading font-semibold uppercase tracking-wide text-torays-text-secondary">
+                  {t("wizard.fields.customBrand")}
+                </span>
+                <input
+                  type="text"
+                  required
+                  maxLength={100}
+                  value={answers.customBrandName}
+                  onChange={(e) => estimator.setCustomBrandName(e.target.value)}
+                  onKeyDown={onFieldKeyDown}
+                  placeholder={t("wizard.fields.customBrandPlaceholder")}
+                  className={INPUT_CLASS}
+                />
+              </label>
+            )}
+            <label className="flex flex-col gap-2">
+              <span className="text-xs font-heading font-semibold uppercase tracking-wide text-torays-text-secondary">
+                {isOther ? t("wizard.fields.exactModel") : t("wizard.fields.enterExactModel")}
+              </span>
+              <input
+                type="text"
+                required
+                maxLength={100}
+                value={answers.model}
+                onChange={(e) => estimator.setModel(e.target.value)}
+                onKeyDown={onFieldKeyDown}
+                placeholder={modelPlaceholder}
+                className={INPUT_CLASS}
+              />
+            </label>
+            <ContinueButton disabled={!estimator.canGoNext} onClick={onContinue} label={t("wizard.continueLabel")} />
+          </div>
+        )}
       </div>
     );
   }
@@ -256,13 +306,18 @@ function ReviewStep({ estimator, t }) {
   const { answers, category, brand, problem, smartQuestions, group, STEP } = estimator;
   const email = answers.email.trim();
   const modelValue = !answers.modelNotSure && answers.model.trim() ? answers.model.trim() : t("wizard.summary.notSureModel");
+  const brandValue = brand
+    ? brand.id === "other" && answers.customBrandName.trim()
+      ? answers.customBrandName.trim()
+      : t(`wizard.brands.${brand.id}`)
+    : null;
   const messageState = { answers, category, brand, problem, smartQuestions, group, t };
 
   return (
     <div className="flex flex-col gap-5">
       <div className="rounded-xl border border-[#D8E1F2] bg-white px-4">
         <SummaryRow label={t("wizard.summary.device")} value={category ? t(`wizard.categories.${category.id}`) : ""} onEdit={() => estimator.editStep(STEP.DEVICE)} t={t} />
-        {brand && <SummaryRow label={t("wizard.summary.brand")} value={t(`wizard.brands.${brand.id}`)} onEdit={() => estimator.editStep(STEP.MODEL)} t={t} />}
+        {brand && <SummaryRow label={t("wizard.summary.brand")} value={brandValue} onEdit={() => estimator.editStep(STEP.MODEL)} t={t} />}
         <SummaryRow label={t("wizard.summary.model")} value={modelValue} onEdit={() => estimator.editStep(STEP.MODEL)} t={t} />
         <SummaryRow label={t("wizard.summary.problem")} value={problem ? t(`wizard.problems.${problem.id}`) : ""} onEdit={() => estimator.editStep(STEP.PROBLEM)} t={t} />
         {smartQuestions.map((q, i) => (
@@ -439,9 +494,7 @@ export function RepairRequestModal({ onClose }) {
 
         <div className="flex-1 overflow-y-auto px-6 py-6 sm:px-8">
           {step === STEP.DEVICE && <DeviceStep estimator={estimator} onAdvance={advance} t={t} />}
-          {step === STEP.MODEL && (
-            <ModelStep estimator={estimator} onAdvance={advance} onContinue={() => advance(() => {})} t={t} />
-          )}
+          {step === STEP.MODEL && <ModelStep estimator={estimator} onContinue={() => advance(() => {})} t={t} />}
           {step === STEP.PROBLEM && <ProblemStep estimator={estimator} onAdvance={advance} t={t} />}
           {(step === STEP.SMART_1 || step === STEP.SMART_2 || step === STEP.SMART_3) && (
             <SmartQuestionStep estimator={estimator} step={step} onAdvance={advance} t={t} />

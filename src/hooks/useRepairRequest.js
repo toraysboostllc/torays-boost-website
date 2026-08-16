@@ -16,6 +16,7 @@ const STEP = {
 const initialAnswers = {
   categoryId: "",
   brandId: "",
+  customBrandName: "",
   model: "",
   modelNotSure: false,
   problemId: "",
@@ -56,14 +57,26 @@ export function useRepairRequest() {
         // answers tied to the old group's option lists — reset only those,
         // never the contact fields (name/phone/email/details persist).
         ...(groupChanged
-          ? { brandId: "", model: "", modelNotSure: false, problemId: "", smartAnswers: {} }
+          ? { brandId: "", customBrandName: "", model: "", modelNotSure: false, problemId: "", smartAnswers: {} }
           : {}),
       };
     });
   }
 
   function selectBrand(brandId) {
-    setAnswers((prev) => ({ ...prev, brandId }));
+    setAnswers((prev) => ({
+      ...prev,
+      brandId,
+      // Only "Other" needs a custom brand name — switching away from it
+      // clears that field since it's no longer shown; the typed exact
+      // model is kept (the visitor may just be correcting a mis-click,
+      // not starting the model over).
+      ...(prev.brandId === "other" && brandId !== "other" ? { customBrandName: "" } : {}),
+    }));
+  }
+
+  function setCustomBrandName(customBrandName) {
+    setAnswers((prev) => ({ ...prev, customBrandName }));
   }
 
   function setModel(model) {
@@ -108,7 +121,13 @@ export function useRepairRequest() {
   const canGoNext = (() => {
     if (step === STEP.DEVICE) return Boolean(answers.categoryId);
     if (step === STEP.MODEL) {
-      if (brands) return Boolean(answers.brandId);
+      if (brands) {
+        if (!answers.brandId) return false;
+        if (answers.brandId === "other") {
+          return Boolean(answers.customBrandName.trim()) && Boolean(answers.model.trim());
+        }
+        return Boolean(answers.model.trim());
+      }
       return Boolean(answers.model.trim()) || answers.modelNotSure;
     }
     if (step === STEP.PROBLEM) return Boolean(answers.problemId);
@@ -136,6 +155,7 @@ export function useRepairRequest() {
     canGoNext,
     selectCategory,
     selectBrand,
+    setCustomBrandName,
     setModel,
     setModelNotSure,
     selectProblem,

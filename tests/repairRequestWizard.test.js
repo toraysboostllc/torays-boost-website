@@ -67,8 +67,26 @@ describe("useRepairRequest: step bounds, validation, state preservation", () => 
   });
 
   it("selecting a brand, model, or problem never touches the name/phone/email/details fields", () => {
-    expect(hookSrc).toContain('setAnswers((prev) => ({ ...prev, brandId }));');
+    // strip // comments first — this function's own doc comment mentions
+    // "brand name" in prose, which shouldn't trip the check on itself.
+    const selectBrandBody = hookSrc
+      .match(/function selectBrand\(brandId\) \{([\s\S]*?)\n  \}/)[1]
+      .replace(/^\s*\/\/.*$/gm, "");
+    expect(selectBrandBody).not.toMatch(/\bname\b|\bphone\b|\bemail\b|\bdetails\b/);
     expect(hookSrc).toContain("setAnswers((prev) => ({ ...prev, problemId }));");
+  });
+
+  it("STEP.MODEL for a branded category requires a typed exact model, never just a brand tap", () => {
+    expect(hookSrc).toContain('if (answers.brandId === "other") {');
+    expect(hookSrc).toContain("return Boolean(answers.customBrandName.trim()) && Boolean(answers.model.trim());");
+    expect(hookSrc).toContain("return Boolean(answers.model.trim());");
+  });
+
+  it("switching away from the 'Other' brand clears the custom brand name but keeps the typed model", () => {
+    const selectBrandBody = hookSrc.match(/function selectBrand\(brandId\) \{([\s\S]*?)\n  \}/)[1];
+    expect(selectBrandBody).toContain('prev.brandId === "other" && brandId !== "other"');
+    expect(selectBrandBody).toContain("customBrandName: \"\"");
+    expect(selectBrandBody).not.toMatch(/model:\s*""|model:\s*prev\.model\s*===/); // model is never cleared here
   });
 });
 
@@ -201,9 +219,10 @@ describe("RepairRequestModal: auto-advance mechanism", () => {
     expect(modalSrc).toContain("setLocked(true);");
     expect(modalSrc).toContain("estimator.goNext();");
     expect(modalSrc).toMatch(/setTimeout\(\(\) => setLocked\(false\), \d+\)/);
-    // DeviceStep/ProblemStep/SmartQuestionStep tiles and the branded
-    // ModelStep brand tiles all route through onAdvance, never call
-    // goNext directly themselves.
+    // DeviceStep/ProblemStep/SmartQuestionStep tiles all route through
+    // onAdvance, never call goNext directly themselves. The branded
+    // ModelStep's brand tiles are the deliberate exception — see the
+    // "Other Brands" describe block below.
     expect(modalSrc).not.toMatch(/\bonClick=\{estimator\.goNext\}/);
   });
 
@@ -215,6 +234,66 @@ describe("RepairRequestModal: auto-advance mechanism", () => {
   it("the model and contact steps keep an explicit Continue/Review button instead of auto-advancing on keystroke", () => {
     expect(modalSrc).toContain('label={t("wizard.continueLabel")}');
     expect(modalSrc).toContain('label={t("wizard.reviewRequest")}');
+  });
+});
+
+describe("Other Brands (Smartphones/Laptops): collects both brand AND exact model, deliberate auto-advance exception", () => {
+  it("brand tiles select only — they do NOT auto-advance, unlike every other selection tile", () => {
+    const modelStepBody = modalSrc.match(/function ModelStep\(\{[^}]*\}\) \{([\s\S]*?)\n  return \(\n    <div className="flex flex-col gap-5">\n      <label/)[1];
+    expect(modelStepBody).toContain("onClick={() => estimator.selectBrand(b.id)}");
+    expect(modelStepBody).not.toContain("onAdvance");
+  });
+
+  it("reveals the exact-model field only after a brand is picked, gated on answers.brandId", () => {
+    expect(modalSrc).toContain("{answers.brandId && (");
+  });
+
+  it("selecting 'Other' reveals a second field for the custom brand name", () => {
+    expect(modalSrc).toContain('const isOther = answers.brandId === "other";');
+    expect(modalSrc).toContain("{isOther && (");
+    expect(modalSrc).toContain('{t("wizard.fields.customBrand")}');
+    expect(modalSrc).toContain("value={answers.customBrandName}");
+    expect(modalSrc).toContain("onChange={(e) => estimator.setCustomBrandName(e.target.value)}");
+  });
+
+  it("uses the exact copy requested: 'Enter the exact model' for a normal brand, 'Exact model' for Other", () => {
+    expect(translations.en.wizard.fields.enterExactModel).toBe("Enter the exact model");
+    expect(translations.es.wizard.fields.enterExactModel).toBe("Escribe el modelo exacto");
+    expect(translations.en.wizard.fields.customBrand).toBe("Brand name");
+    expect(translations.es.wizard.fields.customBrand).toBe("Nombre de la marca");
+    expect(modalSrc).toContain('{isOther ? t("wizard.fields.exactModel") : t("wizard.fields.enterExactModel")}');
+  });
+
+  it("uses the exact placeholders requested, chosen by device group (phone vs laptop)", () => {
+    expect(translations.en.wizard.fields.modelPlaceholderPhone).toBe("e.g. Galaxy S24 Ultra");
+    expect(translations.en.wizard.fields.modelPlaceholderLaptop).toBe("e.g. Inspiron 15 3520");
+    expect(modalSrc).toContain('group === "laptop" ? t("wizard.fields.modelPlaceholderLaptop") : t("wizard.fields.modelPlaceholderPhone")');
+  });
+
+  it("Continue only appears/enables once brand + model (+ custom brand name for Other) are filled — gated on estimator.canGoNext", () => {
+    expect(modalSrc).toContain('disabled={!estimator.canGoNext} onClick={onContinue} label={t("wizard.continueLabel")}');
+  });
+
+  it("Enter key in either text field triggers Continue once the step is valid, without a <form> wrapper", () => {
+    expect(modalSrc).toContain("function onFieldKeyDown(e) {");
+    expect(modalSrc).toContain('if (e.key === "Enter" && estimator.canGoNext) {');
+    expect(modalSrc).toContain("onKeyDown={onFieldKeyDown}");
+  });
+
+  it("both fields are proper <label>-wrapped inputs — implicit label association, not just visual proximity", () => {
+    const modelStepSrc = modalSrc.slice(modalSrc.indexOf("function ModelStep"), modalSrc.indexOf("\n  return (\n    <div className=\"flex flex-col gap-5\">\n      <label\n"));
+    const labelCount = (modelStepSrc.match(/<label className="flex flex-col gap-2">/g) || []).length;
+    expect(labelCount).toBeGreaterThanOrEqual(2); // custom brand name + exact model
+  });
+
+  it("inputs keep the shared 44px-tall, focus-visible INPUT_CLASS — no bespoke unstyled inputs", () => {
+    const modelStepBody = modalSrc.slice(modalSrc.indexOf("function ModelStep"), modalSrc.indexOf("function ProblemStep"));
+    expect((modelStepBody.match(/className=\{INPUT_CLASS\}/g) || []).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("the review summary shows the typed custom brand name instead of the generic 'Other' label", () => {
+    expect(modalSrc).toContain('brand.id === "other" && answers.customBrandName.trim()');
+    expect(modalSrc).toContain("answers.customBrandName.trim()\n      : t(`wizard.brands.${brand.id}`)");
   });
 });
 
