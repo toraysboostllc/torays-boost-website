@@ -6,6 +6,7 @@ import { Card } from "../components/ui/Card.jsx";
 import { Button } from "../components/ui/Button.jsx";
 import { useSEO } from "../lib/seo.js";
 import { wholesaleLogin } from "../lib/wholesaleAuth.js";
+import loginCollageBg from "../assets/wholesale-login-collage.webp";
 
 /**
  * Not linked from the public Navbar/Footer on purpose — shop partners get
@@ -41,7 +42,10 @@ export function WholesaleLogin() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-8 px-5 py-16">
+    <div
+      className="flex min-h-screen flex-col items-center justify-center gap-8 bg-torays-navy bg-cover bg-center bg-no-repeat px-5 py-16"
+      style={{ backgroundImage: `url(${loginCollageBg})` }}
+    >
       <Logo size="lg" />
 
       <Card className="w-full max-w-sm">
