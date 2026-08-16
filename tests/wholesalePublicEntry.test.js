@@ -177,7 +177,7 @@ describe("Navbar: exactly one WhatsApp CTA and one Torays Boost Pro CTA per cont
   it("desktop header group renders exactly one WholesalePortalLink and one WhatsAppCta, both variant=\"header\"", () => {
     expect(navbarSrc).toContain('import { WholesalePortalLink } from "./WholesalePortalLink.jsx"');
     expect(navbarSrc).toContain('import { WhatsAppCta } from "./WhatsAppCta.jsx"');
-    const desktopGroup = navbarSrc.match(/<div className="hidden md:flex items-center gap-3">[\s\S]*?<\/div>/)[0];
+    const desktopGroup = navbarSrc.match(/<div className="hidden xl:flex items-center gap-3">[\s\S]*?<\/div>/)[0];
     expect((desktopGroup.match(/<WholesalePortalLink/g) || []).length).toBe(1);
     expect((desktopGroup.match(/<WhatsAppCta/g) || []).length).toBe(1);
     expect(desktopGroup).toContain('<WholesalePortalLink variant="header" />');

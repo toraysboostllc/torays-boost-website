@@ -6,15 +6,27 @@ import { WholesalePortalLink } from "./WholesalePortalLink.jsx";
 import { WhatsAppCta } from "./WhatsAppCta.jsx";
 import { LanguageSwitcher } from "./LanguageSwitcher.jsx";
 import { useLanguage } from "../../i18n/LanguageContext.jsx";
+import { translations } from "../../i18n/translations.js";
 
 const LINK_HREFS = ["#services", "#about", "#how-it-works", "#faq", "#contact"];
 const LINK_KEYS = ["nav.services", "nav.about", "nav.howItWorks", "nav.faq", "nav.contact"];
+const LINK_SUBKEYS = ["services", "about", "howItWorks", "faq", "contact"];
 
 export function Navbar() {
   const { t } = useLanguage();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
-  const links = LINK_HREFS.map((href, i) => ({ href, label: t(LINK_KEYS[i]) }));
+  const links = LINK_HREFS.map((href, i) => ({
+    href,
+    label: t(LINK_KEYS[i]),
+    // Both language variants of this link's text, so the desktop nav can
+    // reserve a column width equal to whichever is actually wider (see
+    // the stacked-grid render below) — the link never resizes when the
+    // language toggles, so the rest of the bar (logo, right-side buttons)
+    // never shifts position.
+    enLabel: translations.en.nav[LINK_SUBKEYS[i]],
+    esLabel: translations.es.nav[LINK_SUBKEYS[i]],
+  }));
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -33,19 +45,29 @@ export function Navbar() {
           <Logo size="lg" />
         </a>
 
-        <div className="hidden md:flex items-center gap-8">
+        <div className="hidden xl:flex items-center gap-5 2xl:gap-7">
           {links.map((link) => (
             <a
               key={link.href}
               href={link.href}
-              className="text-sm font-medium text-torays-text-secondary transition-colors hover:text-torays-text"
+              className="relative grid text-sm font-medium text-torays-text-secondary transition-colors hover:text-torays-text"
             >
-              {link.label}
+              {/* Both language variants render invisibly, stacked in the
+                  same grid cell as the visible label, so this link's
+                  column is always as wide as the wider of the two — no
+                  width jump when the language toggles. */}
+              <span className="invisible col-start-1 row-start-1 whitespace-nowrap" aria-hidden="true">
+                {link.enLabel}
+              </span>
+              <span className="invisible col-start-1 row-start-1 whitespace-nowrap" aria-hidden="true">
+                {link.esLabel}
+              </span>
+              <span className="col-start-1 row-start-1 whitespace-nowrap">{link.label}</span>
             </a>
           ))}
         </div>
 
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden xl:flex items-center gap-3">
           <LanguageSwitcher variant="header" />
           <WholesalePortalLink variant="header" />
           <WhatsAppCta variant="header" />
@@ -54,7 +76,7 @@ export function Navbar() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="md:hidden text-torays-text"
+          className="xl:hidden text-torays-text"
           aria-label={t("nav.openMenu")}
         >
           <Menu size={26} />
@@ -68,7 +90,7 @@ export function Navbar() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 bg-torays-bg md:hidden"
+            className="fixed inset-0 z-50 bg-torays-bg xl:hidden"
           >
             <div className="flex items-center justify-between px-5 py-4">
               <Logo size="lg" />
@@ -87,7 +109,7 @@ export function Navbar() {
                   key={link.href}
                   href={link.href}
                   onClick={() => setOpen(false)}
-                  className="text-2xl font-heading font-medium text-torays-text"
+                  className="whitespace-nowrap text-2xl font-heading font-medium text-torays-text"
                 >
                   {link.label}
                 </a>
