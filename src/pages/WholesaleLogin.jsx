@@ -46,7 +46,9 @@ export function WholesaleLogin() {
       className="flex min-h-screen flex-col items-center justify-center gap-8 bg-torays-navy bg-cover bg-center bg-no-repeat px-5 py-16"
       style={{ backgroundImage: `url(${loginCollageBg})` }}
     >
-      <Logo size="lg" />
+      <div className="rounded-2xl bg-white/90 p-3 shadow-[0_4px_16px_rgba(8,14,30,0.25)] backdrop-blur-sm">
+        <Logo size="lg" />
+      </div>
 
       <Card className="w-full max-w-sm">
         <div className="mb-6 flex items-center gap-2">

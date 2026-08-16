@@ -67,3 +67,33 @@ describe("WholesaleLogin: repair collage background", () => {
     expect(loginSrc).toContain('<Card className="w-full max-w-sm">');
   });
 });
+
+describe("WholesaleLogin: logo contrast plate", () => {
+  it("wraps the unmodified Logo in a compact white/translucent glass plate, not the Logo component itself", () => {
+    expect(loginSrc).toContain('<Logo size="lg" />');
+    const plateMatch = loginSrc.match(/<div className="([^"]*)">\s*<Logo size="lg" \/>\s*<\/div>/);
+    expect(plateMatch).not.toBeNull();
+    const plateClasses = plateMatch[1];
+    expect(plateClasses).toMatch(/\bbg-white\/\d+\b/); // white/translucent, not a solid brand color
+    expect(plateClasses).toMatch(/\brounded-(xl|2xl|3xl|full)\b/); // rounded corners
+    expect(plateClasses).toMatch(/\bshadow-\[/); // soft custom shadow, not a heavy default
+    expect(plateClasses).toMatch(/\bp-([1-4])\b/); // small padding only (not p-5+, keeps the plate tight to the logo)
+  });
+
+  it("does not resize the plate to a large fixed box — no explicit width/height forcing it beyond the logo's own size", () => {
+    const plateMatch = loginSrc.match(/<div className="([^"]*)">\s*<Logo size="lg" \/>\s*<\/div>/);
+    const plateClasses = plateMatch[1];
+    expect(plateClasses).not.toMatch(/\bw-(\d+|full|screen)\b/);
+    expect(plateClasses).not.toMatch(/\bh-(\d+|full|screen)\b/);
+  });
+
+  it("does not modify Logo.jsx or the logo asset — same official file, same colors", () => {
+    const logoComponentSrc = read("src/components/ui/Logo.jsx");
+    expect(logoComponentSrc).toContain('import logoSrc from "../../assets/torays-boost-logo.png"');
+    expect(logoComponentSrc).toContain("do not redraw or recolor");
+  });
+
+  it("does not change the flex gap or overall centering of the page — the plate is just a new wrapper, not a layout rework", () => {
+    expect(loginSrc).toMatch(/className="flex min-h-screen flex-col items-center justify-center gap-8 bg-torays-navy bg-cover bg-center bg-no-repeat px-5 py-16"/);
+  });
+});
