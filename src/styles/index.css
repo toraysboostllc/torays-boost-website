@@ -86,6 +86,53 @@
   }
 }
 
+/*
+ * iPhone Safari safe-area handling for the two full-screen overlays
+ * (Smart Repair Request wizard, general WhatsApp gate) and the two
+ * fixed elements a `viewport-fit=cover` viewport would otherwise put at
+ * risk of sitting under the notch/status bar or the home-indicator
+ * area. `max()` keeps today's existing padding/offset as a floor, so
+ * on desktop and on any device where the inset is 0 nothing changes —
+ * these rules only grow past that floor when a real inset is reported.
+ */
+.repair-wizard-overlay,
+.whatsapp-gate-overlay {
+  padding-top: max(1rem, env(safe-area-inset-top));
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+@media (min-width: 640px) {
+  .repair-wizard-overlay {
+    padding-top: max(1.5rem, env(safe-area-inset-top));
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+    padding-left: max(1.5rem, env(safe-area-inset-left));
+    padding-right: max(1.5rem, env(safe-area-inset-right));
+  }
+}
+
+/*
+ * `dvh` tracks Safari's real visible viewport (shrinks when the address
+ * bar is showing); `vh` uses the "largest" viewport as if the browser
+ * chrome were always collapsed, which can size this panel taller than
+ * what's actually visible and push Back/Continue off-screen. Declaring
+ * the property twice is the standard fallback pattern — a browser that
+ * doesn't understand `dvh` ignores that line and keeps the `vh` value
+ * above it; one that does understand it overrides with the correct one.
+ */
+.repair-wizard-panel {
+  max-height: 90vh;
+  max-height: 90dvh;
+}
+
+.whatsapp-float-button {
+  bottom: max(1.5rem, calc(env(safe-area-inset-bottom) + 0.5rem));
+}
+
+header.site-navbar {
+  padding-top: env(safe-area-inset-top);
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

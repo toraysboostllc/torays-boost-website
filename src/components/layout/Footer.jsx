@@ -53,16 +53,22 @@ export function Footer() {
           <p className="text-xs text-torays-text-muted">
             © {year} {siteConfig.businessName}. {t("footer.allRightsReserved")}
           </p>
-          <div className="flex items-center gap-x-5 gap-y-2 flex-wrap">
-            <Link to="/privacy" className="text-xs text-torays-text-muted transition-colors hover:text-torays-text">
+          <div className="flex items-center gap-x-5 gap-y-3 flex-wrap">
+            <Link
+              to="/privacy"
+              className="relative text-xs text-torays-text-muted transition-colors before:absolute before:-inset-y-2 before:inset-x-0 before:content-[''] hover:text-torays-text"
+            >
               {t("footer.privacyPolicy")}
             </Link>
-            <Link to="/terms" className="text-xs text-torays-text-muted transition-colors hover:text-torays-text">
+            <Link
+              to="/terms"
+              className="relative text-xs text-torays-text-muted transition-colors before:absolute before:-inset-y-2 before:inset-x-0 before:content-[''] hover:text-torays-text"
+            >
               {t("footer.termsConditions")}
             </Link>
             <Link
               to="/image-credits"
-              className="text-xs text-torays-text-muted transition-colors hover:text-torays-text"
+              className="relative text-xs text-torays-text-muted transition-colors before:absolute before:-inset-y-2 before:inset-x-0 before:content-[''] hover:text-torays-text"
             >
               {t("footer.imageCredits")}
             </Link>

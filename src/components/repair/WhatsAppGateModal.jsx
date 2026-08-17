@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { MessageCircle, X } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext.jsx";
+import { useScrollLock } from "../../hooks/useScrollLock.js";
+import { useInertSiblings } from "../../hooks/useInertSiblings.js";
 
 const FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -20,8 +22,11 @@ const FOCUS_RING =
  */
 export function WhatsAppGateModal({ onClose, onStart }) {
   const { t } = useLanguage();
+  const overlayRef = useRef(null);
   const panelRef = useRef(null);
   const titleRef = useRef(null);
+  useScrollLock();
+  useInertSiblings(overlayRef);
 
   // Tab-trap + Escape-to-close + focus restoration, same pattern as
   // RepairRequestModal's own dialog.
@@ -62,7 +67,8 @@ export function WhatsAppGateModal({ onClose, onStart }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.30)] p-4"
+      ref={overlayRef}
+      className="whatsapp-gate-overlay fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.30)] p-4"
       onClick={onClose}
     >
       <div
@@ -77,7 +83,7 @@ export function WhatsAppGateModal({ onClose, onStart }) {
           type="button"
           onClick={onClose}
           aria-label={t("whatsappGate.close")}
-          className={`absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-full text-[color:var(--wgp-close)] transition-colors hover:bg-black/5 ${FOCUS_RING}`}
+          className={`absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-full text-[color:var(--wgp-close)] transition-colors before:absolute before:-inset-2 before:content-[''] hover:bg-black/5 ${FOCUS_RING}`}
         >
           <X size={15} />
         </button>

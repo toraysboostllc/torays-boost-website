@@ -1,8 +1,8 @@
-import * as Icons from "lucide-react";
 import { motion } from "framer-motion";
 import { SectionHeading } from "../components/ui/SectionHeading.jsx";
 import { Card } from "../components/ui/Card.jsx";
 import { aboutConfig } from "../config/about.config.js";
+import { ICONS } from "../lib/iconRegistry.js";
 
 export function AboutUs() {
   return (
@@ -31,7 +31,7 @@ export function AboutUs() {
 
           <div className="flex flex-col gap-4">
             {aboutConfig.values.map((value) => {
-              const Icon = Icons[value.icon];
+              const Icon = ICONS[value.icon];
               return (
                 <Card key={value.id} className="flex flex-row items-start gap-4 p-5">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-torays-red/10 text-torays-red">

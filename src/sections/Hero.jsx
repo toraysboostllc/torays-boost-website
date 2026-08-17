@@ -1,10 +1,10 @@
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
-import * as Icons from "lucide-react";
 import { Button } from "../components/ui/Button.jsx";
 import { CircuitBackground } from "../components/ui/CircuitBackground.jsx";
 import { PromoCarousel } from "../components/promo/PromoCarousel.jsx";
 import { whyChooseUs } from "../config/features.config.js";
+import { ICONS } from "../lib/iconRegistry.js";
 import { useLanguage } from "../i18n/LanguageContext.jsx";
 import heroImage from "../assets/public-repair-hero.webp";
 
@@ -39,7 +39,7 @@ function TrustBadges() {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5 sm:gap-x-6">
       {trustBadges.map((badge) => {
-        const Icon = Icons[badge.icon];
+        const Icon = ICONS[badge.icon];
         return (
           <div key={badge.id} className="flex items-center gap-2">
             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-torays-navy/10 text-torays-navy">

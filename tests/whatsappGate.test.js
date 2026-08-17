@@ -86,7 +86,7 @@ describe("WhatsAppGateModal: accessibility", () => {
   });
 
   it("backdrop click closes the same as Not Now (onClose), never triggers onStart", () => {
-    expect(gateModalSrc).toMatch(/className="fixed inset-0[\s\S]*?onClick=\{onClose\}/);
+    expect(gateModalSrc).toMatch(/className="whatsapp-gate-overlay fixed inset-0[\s\S]*?onClick=\{onClose\}/);
   });
 
   it("has a small X close button that also calls onClose", () => {

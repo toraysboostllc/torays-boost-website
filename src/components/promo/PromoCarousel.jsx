@@ -112,7 +112,7 @@ export function PromoCarousel({ onOpenRepairRequest }) {
               <button
                 type="button"
                 onClick={onOpenRepairRequest}
-                className={`mt-1 inline-flex w-fit items-center rounded-full bg-torays-red px-3 py-1.5 text-[11px] font-heading font-medium text-white transition-colors hover:bg-torays-red-light sm:text-xs ${FOCUS_RING}`}
+                className={`relative mt-1 inline-flex w-fit items-center rounded-full bg-torays-red px-3 py-1.5 text-[11px] font-heading font-medium text-white transition-colors before:absolute before:-inset-y-2 before:inset-x-0 before:content-[''] hover:bg-torays-red-light sm:text-xs ${FOCUS_RING}`}
               >
                 {t("promoCarousel.cta")}
               </button>

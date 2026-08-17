@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { buildContactLink, hasWhatsApp } from "../src/lib/whatsapp.js";
+import { siteConfig } from "../src/config/site.config.js";
 
 /**
  * Structural checks for the temporary full-site maintenance lock — same
@@ -121,5 +123,12 @@ describe("MaintenancePage: copy, WhatsApp CTA, and identity", () => {
 
   it("has no date or countdown of any kind", () => {
     expect(maintenancePageSrc).not.toMatch(/countdown|Date\.now|new Date|setInterval|setTimeout/);
+  });
+
+  it("the 'Contact Us on WhatsApp' button resolves to a real wa.me/17867937665 link on this branch, never a mailto fallback — confirms the mailto/WhatsApp mismatch seen on current production (main still has an empty whatsapp.number) is already fixed here, so relaunching from this branch's config will not repeat it", () => {
+    expect(siteConfig.whatsapp.number).toBe("17867937665");
+    expect(hasWhatsApp).toBe(true);
+    expect(buildContactLink()).toMatch(/^https:\/\/wa\.me\/17867937665\?text=/);
+    expect(buildContactLink()).not.toMatch(/^mailto:/);
   });
 });

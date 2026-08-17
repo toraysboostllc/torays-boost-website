@@ -1,7 +1,7 @@
-import * as Icons from "lucide-react";
 import { motion } from "framer-motion";
 import { SectionHeading } from "../components/ui/SectionHeading.jsx";
 import { whyChooseUs } from "../config/features.config.js";
+import { ICONS } from "../lib/iconRegistry.js";
 
 export function WhyChooseUs() {
   return (
@@ -15,7 +15,7 @@ export function WhyChooseUs() {
 
         <div className="mt-12 grid grid-cols-2 gap-5 sm:grid-cols-4">
           {whyChooseUs.map((item, i) => {
-            const Icon = Icons[item.icon];
+            const Icon = ICONS[item.icon];
             return (
               <motion.div
                 key={item.id}

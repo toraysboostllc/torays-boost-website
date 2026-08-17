@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { X, ChevronLeft, MessageCircle, Mail, Pencil } from "lucide-react";
 import { useRepairRequest } from "../../hooks/useRepairRequest.js";
+import { useScrollLock } from "../../hooks/useScrollLock.js";
+import { useInertSiblings } from "../../hooks/useInertSiblings.js";
 import { ANSWER_OPTIONS } from "../../config/repairRequest.config.js";
 import { buildRepairRequestWhatsAppLink, buildRepairRequestMailtoLink } from "../../lib/repairRequestMessage.js";
 import { useLanguage } from "../../i18n/LanguageContext.jsx";
@@ -26,6 +28,16 @@ const GREEN_XP =
 
 const INPUT_CLASS =
   "w-full rounded-xl border border-[#9FB3D6] bg-white px-4 py-3 text-torays-text placeholder:text-torays-text-muted focus:outline-none focus:ring-2 focus:ring-torays-red/50";
+
+// A short delay lets the iOS keyboard finish animating in before the
+// scroll runs — scrolling immediately measures the pre-keyboard layout
+// and can land short of where the focused field actually ends up once
+// the visual viewport has shrunk.
+function scrollFieldIntoView(el) {
+  window.setTimeout(() => {
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, 300);
+}
 
 function TileButton({ selected, onClick, children, className = "" }) {
   return (
@@ -214,8 +226,11 @@ function ContactStep({ estimator, onContinue, t }) {
           type="text"
           required
           maxLength={100}
+          autoComplete="name"
+          enterKeyHint="next"
           value={answers.name}
           onChange={(e) => estimator.setField("name", e.target.value)}
+          onFocus={(e) => scrollFieldIntoView(e.target)}
           className={INPUT_CLASS}
         />
       </label>
@@ -227,8 +242,12 @@ function ContactStep({ estimator, onContinue, t }) {
           type="tel"
           required
           maxLength={30}
+          inputMode="tel"
+          autoComplete="tel"
+          enterKeyHint="next"
           value={answers.phone}
           onChange={(e) => estimator.setField("phone", e.target.value)}
+          onFocus={(e) => scrollFieldIntoView(e.target)}
           className={INPUT_CLASS}
         />
       </label>
@@ -239,8 +258,12 @@ function ContactStep({ estimator, onContinue, t }) {
         <input
           type="email"
           maxLength={200}
+          inputMode="email"
+          autoComplete="email"
+          enterKeyHint="next"
           value={answers.email}
           onChange={(e) => estimator.setField("email", e.target.value)}
+          onFocus={(e) => scrollFieldIntoView(e.target)}
           className={INPUT_CLASS}
         />
       </label>
@@ -251,8 +274,10 @@ function ContactStep({ estimator, onContinue, t }) {
         <textarea
           rows={3}
           maxLength={1000}
+          enterKeyHint="done"
           value={answers.details}
           onChange={(e) => estimator.setField("details", e.target.value)}
+          onFocus={(e) => scrollFieldIntoView(e.target)}
           className={`${INPUT_CLASS} resize-none`}
         />
       </label>
@@ -386,7 +411,7 @@ function ReviewStep({ estimator, t }) {
                 href="/terms"
                 target="_blank"
                 rel="noreferrer"
-                className="text-torays-navy underline decoration-torays-line hover:text-torays-red"
+                className="relative text-torays-navy underline decoration-torays-line before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-[''] hover:text-torays-red"
               >
                 {t("wizard.policyConsent.termsLabel")}
               </a>
@@ -395,7 +420,7 @@ function ReviewStep({ estimator, t }) {
                 href="/privacy"
                 target="_blank"
                 rel="noreferrer"
-                className="text-torays-navy underline decoration-torays-line hover:text-torays-red"
+                className="relative text-torays-navy underline decoration-torays-line before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-[''] hover:text-torays-red"
               >
                 {t("wizard.policyConsent.privacyLabel")}
               </a>
@@ -461,9 +486,12 @@ export function RepairRequestModal({ onClose }) {
   const { t } = useLanguage();
   const estimator = useRepairRequest();
   const { step, STEP } = estimator;
+  const overlayRef = useRef(null);
   const panelRef = useRef(null);
   const titleRef = useRef(null);
   const [locked, setLocked] = useState(false);
+  useScrollLock();
+  useInertSiblings(overlayRef);
 
   // Tab-trap + Escape-to-close + focus restoration — set up once, torn
   // down on unmount (i.e. when the modal fully closes).
@@ -531,14 +559,18 @@ export function RepairRequestModal({ onClose }) {
   const title = t(`wizard.titles.${stepTitleKey}`);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-torays-text/50 p-4 sm:p-6" onClick={onClose}>
+    <div
+      ref={overlayRef}
+      className="repair-wizard-overlay fixed inset-0 z-50 flex items-center justify-center bg-torays-text/50 p-4 sm:p-6"
+      onClick={onClose}
+    >
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="repair-wizard-title"
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-[#F3F7FF] shadow-2xl"
+        className="repair-wizard-panel flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-[#F3F7FF] shadow-2xl"
       >
         <div
           className={`flex items-center justify-between px-6 py-4 text-white shadow-[0_1px_0_rgba(255,255,255,0.4)_inset] ${BLUE_XP_STATIC}`}

@@ -36,7 +36,7 @@ export function Navbar({ onWhatsAppClick }) {
 
   return (
     <header
-      className={`fixed inset-x-0 top-0 z-50 transition-colors duration-300 ${
+      className={`site-navbar fixed inset-x-0 top-0 z-50 transition-colors duration-300 ${
         scrolled ? "bg-torays-bg/90 backdrop-blur border-b border-torays-line" : "bg-transparent"
       }`}
     >
