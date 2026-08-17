@@ -7,6 +7,7 @@ export const services = [
     id: "ps5",
     title: "PS5 Repair",
     description: "HDMI ports, power issues, disc drive faults, and full board-level diagnostics.",
+    localPagePath: "/ps5-repair-miami",
   },
   {
     id: "hdmi",
@@ -22,6 +23,7 @@ export const services = [
     id: "iphone",
     title: "iPhone",
     description: "Screens, batteries, charging ports, and board-level repair for every iPhone generation.",
+    localPagePath: "/phone-repair-miami",
   },
   {
     id: "ipad",

@@ -482,9 +482,9 @@ function ReviewStep({ estimator, t }) {
  * (see Home.jsx), so all wizard state resets cleanly every time it's
  * reopened.
  */
-export function RepairRequestModal({ onClose }) {
+export function RepairRequestModal({ onClose, initialSelection }) {
   const { t } = useLanguage();
-  const estimator = useRepairRequest();
+  const estimator = useRepairRequest(initialSelection);
   const { step, STEP } = estimator;
   const overlayRef = useRef(null);
   const panelRef = useRef(null);

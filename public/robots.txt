@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /wholesale
 
-Sitemap: https://toraysboost.com/sitemap.xml
+Sitemap: https://www.toraysboost.com/sitemap.xml

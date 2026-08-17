@@ -32,15 +32,43 @@ const initialAnswers = {
 };
 
 /**
+ * Validates an optional `{ categoryId, problemId }` preselection (used by
+ * the local SEO landing pages to open the wizard with a device already
+ * picked) against the real catalog, so a stale/typo'd id can never render
+ * a broken step instead of silently falling back to the normal blank
+ * start. `problemId` only survives if it belongs to the resolved
+ * category's own device group — e.g. passing a controller problem with a
+ * phone category id drops the problem, not the category.
+ */
+export function buildInitialAnswers(initialSelection) {
+  if (!initialSelection) return initialAnswers;
+  const category = initialSelection.categoryId ? getCategoryById(initialSelection.categoryId) : null;
+  const categoryId = category ? category.id : "";
+  const groupProblems = category ? PROBLEMS_BY_GROUP[category.group] || [] : [];
+  const problemId =
+    categoryId && initialSelection.problemId && groupProblems.some((p) => p.id === initialSelection.problemId)
+      ? initialSelection.problemId
+      : "";
+  return { ...initialAnswers, categoryId, problemId };
+}
+
+/**
  * Drives the 8-step public Smart Repair Request wizard. No price, no ETA
  * anywhere in this state or its derived data — see repairRequest.config.js.
  * Step index and answers are two separate pieces of state on purpose:
  * navigating Back/Next never clears anything the visitor already typed
  * ("estado preservado al regresar").
+ *
+ * `initialSelection` (optional) pre-fills the device/problem answers — the
+ * wizard still opens on Step 1 (Device) so the visitor sees what's already
+ * selected and can change it normally, rather than jumping ahead. Since
+ * RepairRequestModal only ever mounts while open (see Home.jsx and the
+ * local SEO pages), this `useState` initializer runs fresh on every open —
+ * no selection from a previous request can ever leak into the next one.
  */
-export function useRepairRequest() {
+export function useRepairRequest(initialSelection) {
   const [step, setStep] = useState(STEP.DEVICE);
-  const [answers, setAnswers] = useState(initialAnswers);
+  const [answers, setAnswers] = useState(() => buildInitialAnswers(initialSelection));
 
   const category = useMemo(() => getCategoryById(answers.categoryId), [answers.categoryId]);
   const group = category?.group || null;

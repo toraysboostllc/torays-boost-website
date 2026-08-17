@@ -7,10 +7,21 @@ import { useLanguage } from "../../i18n/LanguageContext.jsx";
 const LINK_HREFS = ["#services", "#about", "#how-it-works", "#faq", "#contact"];
 const LINK_KEYS = ["nav.services", "nav.about", "nav.howItWorks", "nav.faq", "nav.contact"];
 
+// Descriptive-text internal links to the 3 local SEO landing pages — kept
+// as a small, separate footer column rather than folded into LINK_HREFS
+// (those are same-page anchors; these are real routes).
+const LOCAL_PAGE_PATHS = ["/phone-repair-miami", "/ps5-repair-miami", "/ps5-controller-repair-miami"];
+const LOCAL_PAGE_LABEL_KEYS = [
+  "footer.localPages.phoneRepair",
+  "footer.localPages.ps5Repair",
+  "footer.localPages.ps5ControllerRepair",
+];
+
 export function Footer() {
   const { t } = useLanguage();
   const year = new Date().getFullYear();
   const links = LINK_HREFS.map((href, i) => ({ href, label: t(LINK_KEYS[i]) }));
+  const localPageLinks = LOCAL_PAGE_PATHS.map((path, i) => ({ path, label: t(LOCAL_PAGE_LABEL_KEYS[i]) }));
 
   return (
     <footer className="border-t border-torays-line bg-torays-surface">
@@ -30,6 +41,21 @@ export function Footer() {
               >
                 {link.label}
               </a>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-2.5">
+            <span className="text-xs font-heading font-semibold uppercase tracking-wide text-torays-text-muted">
+              {t("footer.localPages.heading")}
+            </span>
+            {localPageLinks.map((link) => (
+              <Link
+                key={link.path}
+                to={link.path}
+                className="text-sm text-torays-text-secondary transition-colors hover:text-torays-text"
+              >
+                {link.label}
+              </Link>
             ))}
           </div>
 

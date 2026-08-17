@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { SectionHeading } from "../components/ui/SectionHeading.jsx";
 import { Card } from "../components/ui/Card.jsx";
 import { services } from "../config/services.config.js";
@@ -67,6 +68,17 @@ export function Services() {
                 <p className="mt-2 line-clamp-4 min-h-[5rem] text-sm text-torays-text-secondary">
                   {t(`services.items.${service.id}.description`)}
                 </p>
+                {service.localPagePath && (
+                  <Link
+                    to={service.localPagePath}
+                    className="group/link relative mt-3 inline-flex w-fit items-center gap-1.5 text-sm font-medium text-torays-red before:absolute before:-inset-2 before:content-['']"
+                  >
+                    {t(`services.localLinkLabels.${service.id}`)}
+                    <span aria-hidden="true" className="transition-transform group-hover/link:translate-x-0.5">
+                      →
+                    </span>
+                  </Link>
+                )}
               </div>
             </Card>
           ))}

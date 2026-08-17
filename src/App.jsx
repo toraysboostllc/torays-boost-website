@@ -5,6 +5,9 @@ import { NotFound } from "./pages/NotFound.jsx";
 import { MaintenancePage } from "./pages/MaintenancePage.jsx";
 import { SITE_MAINTENANCE_MODE } from "./config/maintenance.config.js";
 import { useLanguage } from "./i18n/LanguageContext.jsx";
+import { PhoneRepairMiami } from "./pages/PhoneRepairMiami.jsx";
+import { Ps5RepairMiami } from "./pages/Ps5RepairMiami.jsx";
+import { Ps5ControllerRepairMiami } from "./pages/Ps5ControllerRepairMiami.jsx";
 
 // Not needed to land on Home or start a repair quote — split into their
 // own chunks so visiting "/" never downloads the Wholesale portal or the
@@ -20,6 +23,17 @@ const WholesaleLogin = lazy(() =>
 const WholesalePrices = lazy(() =>
   import("./pages/WholesalePrices.jsx").then((m) => ({ default: m.WholesalePrices }))
 );
+
+// The 3 local SEO landing pages are deliberately NOT lazy, unlike Privacy/
+// Terms/etc above — they're organic-search entry points, so a visitor
+// lands directly on one of these paths with nothing else competing for
+// bandwidth first. A lazy route pays for its own chunk with an extra
+// network round-trip that lands squarely inside that first paint; measured
+// under devtools throttling (RTT 150ms, 1.6Mbps, CPU 4x) that cost pushed
+// their LCP to ~2.9s against a 2.5s target, even after eagerly kicking off
+// the chunk's import() from main.jsx. Bundling them into the main chunk
+// instead removes that round-trip entirely, at the cost of ~9KB gzip on
+// every visit (including Home's) — an explicit, approved trade-off.
 
 // Deliberately not a spinner: a single centered line of text, same
 // background token as the rest of the site, `min-h-screen` so the
@@ -53,6 +67,9 @@ export default function App() {
         <Route path="/image-credits" element={<ImageCredits />} />
         <Route path="/wholesale" element={<WholesaleLogin />} />
         <Route path="/wholesale/prices" element={<WholesalePrices />} />
+        <Route path="/phone-repair-miami" element={<PhoneRepairMiami />} />
+        <Route path="/ps5-repair-miami" element={<Ps5RepairMiami />} />
+        <Route path="/ps5-controller-repair-miami" element={<Ps5ControllerRepairMiami />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>

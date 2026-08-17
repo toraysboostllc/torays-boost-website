@@ -101,6 +101,14 @@ export const translations = {
       title: "What We Repair",
       subtitle: "Board-level and component-level repair across the devices you rely on most.",
       items: enServices,
+      // Descriptive link text for the 2 cards (iPhone, PS5) that point to
+      // their own local SEO landing page — keyed by service id so it's
+      // only ever rendered where services.config.js actually sets
+      // localPagePath, never a generic "click here".
+      localLinkLabels: {
+        iphone: "Phone repair in Miami",
+        ps5: "PS5 repair in Miami",
+      },
     },
     howItWorks: {
       eyebrow: "Process",
@@ -182,6 +190,12 @@ export const translations = {
       termsConditions: "Terms & Conditions",
       imageCredits: "Image Credits",
       allRightsReserved: "All rights reserved.",
+      localPages: {
+        heading: "Miami Repair Guides",
+        phoneRepair: "Phone repair in Miami",
+        ps5Repair: "PS5 repair in Miami",
+        ps5ControllerRepair: "PS5 controller repair in Miami",
+      },
     },
     wizard: {
       stepOf: "Step {current} of {total}",
@@ -332,6 +346,10 @@ export const translations = {
         switch: { title: "Nintendo Switch", description: "Joy-Con drift, puerto de carga, pantalla y reparación a nivel de placa para todos los modelos de Switch.", imageAlt: "Consola Nintendo Switch en su base, junto a los controles Joy-Con azul y rojo." },
         "data-recovery": { title: "Recuperación de Datos", description: "Recuperamos datos de dispositivos y discos dañados, expuestos a líquido o que no encienden.", imageAlt: "Laptop abierta mostrando su placa madre interna y unidad de almacenamiento durante un trabajo de recuperación de datos." },
       },
+      localLinkLabels: {
+        iphone: "Reparación de teléfonos en Miami",
+        ps5: "Reparación de PS5 en Miami",
+      },
     },
     howItWorks: {
       eyebrow: "Proceso",
@@ -413,6 +431,12 @@ export const translations = {
       termsConditions: "Términos y Condiciones",
       imageCredits: "Créditos de imágenes",
       allRightsReserved: "Todos los derechos reservados.",
+      localPages: {
+        heading: "Guías de Reparación en Miami",
+        phoneRepair: "Reparación de teléfonos en Miami",
+        ps5Repair: "Reparación de PS5 en Miami",
+        ps5ControllerRepair: "Reparación de control de PS5 en Miami",
+      },
     },
     wizard: {
       stepOf: "Paso {current} de {total}",
