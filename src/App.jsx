@@ -8,6 +8,9 @@ import { useLanguage } from "./i18n/LanguageContext.jsx";
 import { PhoneRepairMiami } from "./pages/PhoneRepairMiami.jsx";
 import { Ps5RepairMiami } from "./pages/Ps5RepairMiami.jsx";
 import { Ps5ControllerRepairMiami } from "./pages/Ps5ControllerRepairMiami.jsx";
+import { IphoneRepairMiami } from "./pages/IphoneRepairMiami.jsx";
+import { IpadRepairMiami } from "./pages/IpadRepairMiami.jsx";
+import { XboxRepairMiami } from "./pages/XboxRepairMiami.jsx";
 
 // Not needed to land on Home or start a repair quote — split into their
 // own chunks so visiting "/" never downloads the Wholesale portal or the
@@ -24,7 +27,7 @@ const WholesalePrices = lazy(() =>
   import("./pages/WholesalePrices.jsx").then((m) => ({ default: m.WholesalePrices }))
 );
 
-// The 3 local SEO landing pages are deliberately NOT lazy, unlike Privacy/
+// The local SEO landing pages are deliberately NOT lazy, unlike Privacy/
 // Terms/etc above — they're organic-search entry points, so a visitor
 // lands directly on one of these paths with nothing else competing for
 // bandwidth first. A lazy route pays for its own chunk with an extra
@@ -32,8 +35,9 @@ const WholesalePrices = lazy(() =>
 // under devtools throttling (RTT 150ms, 1.6Mbps, CPU 4x) that cost pushed
 // their LCP to ~2.9s against a 2.5s target, even after eagerly kicking off
 // the chunk's import() from main.jsx. Bundling them into the main chunk
-// instead removes that round-trip entirely, at the cost of ~9KB gzip on
-// every visit (including Home's) — an explicit, approved trade-off.
+// instead removes that round-trip entirely, at the cost of extra gzip
+// weight on every visit (including Home's) — an explicit, approved
+// trade-off, kept for these 3 new pages too rather than reopening it.
 
 // Deliberately not a spinner: a single centered line of text, same
 // background token as the rest of the site, `min-h-screen` so the
@@ -70,6 +74,9 @@ export default function App() {
         <Route path="/phone-repair-miami" element={<PhoneRepairMiami />} />
         <Route path="/ps5-repair-miami" element={<Ps5RepairMiami />} />
         <Route path="/ps5-controller-repair-miami" element={<Ps5ControllerRepairMiami />} />
+        <Route path="/iphone-repair-miami" element={<IphoneRepairMiami />} />
+        <Route path="/ipad-repair-miami" element={<IpadRepairMiami />} />
+        <Route path="/xbox-repair-miami" element={<XboxRepairMiami />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>

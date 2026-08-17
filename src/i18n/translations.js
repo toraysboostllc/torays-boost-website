@@ -108,6 +108,8 @@ export const translations = {
       localLinkLabels: {
         iphone: "Phone repair in Miami",
         ps5: "PS5 repair in Miami",
+        ipad: "iPad repair in Miami",
+        xbox: "Xbox repair in Miami",
       },
     },
     howItWorks: {
@@ -193,8 +195,11 @@ export const translations = {
       localPages: {
         heading: "Miami Repair Guides",
         phoneRepair: "Phone repair in Miami",
+        iphoneRepair: "iPhone repair in Miami",
+        ipadRepair: "iPad repair in Miami",
         ps5Repair: "PS5 repair in Miami",
         ps5ControllerRepair: "PS5 controller repair in Miami",
+        xboxRepair: "Xbox repair in Miami",
       },
     },
     wizard: {
@@ -349,6 +354,8 @@ export const translations = {
       localLinkLabels: {
         iphone: "Reparación de teléfonos en Miami",
         ps5: "Reparación de PS5 en Miami",
+        ipad: "Reparación de iPad en Miami",
+        xbox: "Reparación de Xbox en Miami",
       },
     },
     howItWorks: {
@@ -434,8 +441,11 @@ export const translations = {
       localPages: {
         heading: "Guías de Reparación en Miami",
         phoneRepair: "Reparación de teléfonos en Miami",
+        iphoneRepair: "Reparación de iPhone en Miami",
+        ipadRepair: "Reparación de iPad en Miami",
         ps5Repair: "Reparación de PS5 en Miami",
         ps5ControllerRepair: "Reparación de control de PS5 en Miami",
+        xboxRepair: "Reparación de Xbox en Miami",
       },
     },
     wizard: {

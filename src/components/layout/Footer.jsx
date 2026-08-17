@@ -7,14 +7,25 @@ import { useLanguage } from "../../i18n/LanguageContext.jsx";
 const LINK_HREFS = ["#services", "#about", "#how-it-works", "#faq", "#contact"];
 const LINK_KEYS = ["nav.services", "nav.about", "nav.howItWorks", "nav.faq", "nav.contact"];
 
-// Descriptive-text internal links to the 3 local SEO landing pages — kept
+// Descriptive-text internal links to the local SEO landing pages — kept
 // as a small, separate footer column rather than folded into LINK_HREFS
-// (those are same-page anchors; these are real routes).
-const LOCAL_PAGE_PATHS = ["/phone-repair-miami", "/ps5-repair-miami", "/ps5-controller-repair-miami"];
+// (those are same-page anchors; these are real routes). Ordered by device
+// family (phones, then consoles) so related pages sit next to each other.
+const LOCAL_PAGE_PATHS = [
+  "/phone-repair-miami",
+  "/iphone-repair-miami",
+  "/ipad-repair-miami",
+  "/ps5-repair-miami",
+  "/ps5-controller-repair-miami",
+  "/xbox-repair-miami",
+];
 const LOCAL_PAGE_LABEL_KEYS = [
   "footer.localPages.phoneRepair",
+  "footer.localPages.iphoneRepair",
+  "footer.localPages.ipadRepair",
   "footer.localPages.ps5Repair",
   "footer.localPages.ps5ControllerRepair",
+  "footer.localPages.xboxRepair",
 ];
 
 export function Footer() {

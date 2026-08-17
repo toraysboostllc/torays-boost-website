@@ -29,6 +29,7 @@ export const services = [
     id: "ipad",
     title: "iPad",
     description: "Display, digitizer, battery, and logic board repair across the full iPad lineup.",
+    localPagePath: "/ipad-repair-miami",
   },
   {
     id: "macbook",
@@ -44,6 +45,7 @@ export const services = [
     id: "xbox",
     title: "Xbox",
     description: "HDMI, power, and overheating repairs with full diagnostic testing before return.",
+    localPagePath: "/xbox-repair-miami",
   },
   {
     id: "switch",

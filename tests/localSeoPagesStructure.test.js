@@ -217,8 +217,8 @@ describe("robots.txt: allows the 3 new pages, still blocks /wholesale, points at
   });
 });
 
-describe("sitemap.xml: includes Home + the 3 new pages + Privacy/Terms, all on www, nothing private", () => {
-  it("includes exactly the expected 6 URLs", () => {
+describe("sitemap.xml: includes Home + all 6 local SEO pages + Privacy/Terms, all on www, nothing private", () => {
+  it("includes exactly the expected 9 URLs", () => {
     const locs = [...sitemapSrc.matchAll(/<loc>(.*?)<\/loc>/g)].map((m) => m[1]);
     expect(locs.sort()).toEqual(
       [
@@ -226,6 +226,9 @@ describe("sitemap.xml: includes Home + the 3 new pages + Privacy/Terms, all on w
         "https://www.toraysboost.com/phone-repair-miami",
         "https://www.toraysboost.com/ps5-repair-miami",
         "https://www.toraysboost.com/ps5-controller-repair-miami",
+        "https://www.toraysboost.com/iphone-repair-miami",
+        "https://www.toraysboost.com/ipad-repair-miami",
+        "https://www.toraysboost.com/xbox-repair-miami",
         "https://www.toraysboost.com/privacy",
         "https://www.toraysboost.com/terms",
       ].sort()

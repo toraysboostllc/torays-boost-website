@@ -16,6 +16,9 @@ import {
   RotateCcw,
   ScanSearch,
   Smartphone,
+  SunDim,
+  Tablet,
+  TabletSmartphone,
   Thermometer,
   ToggleLeft,
   Tv,
@@ -25,12 +28,11 @@ import {
 
 /**
  * Icon allow-list for the local SEO pages' service/issue grids
- * (localSeo.config.js), kept separate from src/lib/iconRegistry.js on
- * purpose — that registry is imported eagerly by Home's Hero/WhyChooseUs,
- * so adding these icons there would pull them into the main/initial
- * bundle even though only these lazy pages use them. This file is only
- * imported by IconInfoGrid.jsx, so it rides along in the local SEO pages'
- * own lazy chunk instead.
+ * (localSeo.config.js), kept separate from src/lib/iconRegistry.js —
+ * that registry is imported by Home's Hero/WhyChooseUs, so keeping this
+ * set separate avoids growing an unrelated import list. The local SEO
+ * pages are eager (bundled into the main chunk, not lazy — see App.jsx's
+ * comment for why), so this file rides along in that same main chunk.
  */
 export const LOCAL_SEO_ICONS = {
   Battery,
@@ -50,6 +52,9 @@ export const LOCAL_SEO_ICONS = {
   RotateCcw,
   ScanSearch,
   Smartphone,
+  SunDim,
+  Tablet,
+  TabletSmartphone,
   Thermometer,
   ToggleLeft,
   Tv,

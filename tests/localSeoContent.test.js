@@ -11,6 +11,9 @@ const TPREFIX_BY_PAGE = {
   phoneRepairMiami: "phoneRepairPage",
   ps5RepairMiami: "ps5RepairPage",
   ps5ControllerRepairMiami: "ps5ControllerRepairPage",
+  iphoneRepairMiami: "iphoneRepairPage",
+  ipadRepairMiami: "ipadRepairPage",
+  xboxRepairMiami: "xboxRepairPage",
 };
 
 function lookup(dict, key) {
