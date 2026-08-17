@@ -25,6 +25,10 @@ const initialAnswers = {
   phone: "",
   email: "",
   details: "",
+  // Policy-consent checkbox on the Review step — always starts unchecked,
+  // persists across Back/Next like every other answer, and resets to
+  // false whenever the wizard is reopened fresh (see `reset` below).
+  policyAccepted: false,
 };
 
 /**

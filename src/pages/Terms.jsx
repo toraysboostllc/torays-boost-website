@@ -4,7 +4,7 @@ import { Navbar } from "../components/layout/Navbar.jsx";
 import { Footer } from "../components/layout/Footer.jsx";
 import { siteConfig } from "../config/site.config.js";
 
-const LAST_UPDATED = "August 7, 2026";
+const LAST_UPDATED = "August 17, 2026";
 
 function Section({ title, children }) {
   return (
@@ -20,7 +20,7 @@ function Section({ title, children }) {
 export function Terms() {
   useSEO({
     title: "Terms & Conditions",
-    description: `Terms of use for ${siteConfig.domain}, including SMS text message terms.`,
+    description: `Terms of use for ${siteConfig.domain}, including the repair request form's WhatsApp authorization.`,
   });
 
   return (
@@ -47,55 +47,67 @@ export function Terms() {
 
           <Section title="Use of the Website">
             <p>
-              Our website is provided to share information about our repair services, provide an estimate tool,
-              and let you contact us. You agree to use it only for lawful purposes and not to misuse or attempt
-              to disrupt the site.
+              Our website is provided to share information about our repair services, provide a repair request
+              form, and let you contact us. You agree to use it only for lawful purposes and not to misuse or
+              attempt to disrupt the site.
             </p>
           </Section>
 
           <Section title="Our Services">
             <p>
               We provide electronics repair services, including board-level repair, microsoldering, and related
-              diagnostics. Estimates provided through our website or in person are estimates only; final pricing
-              is confirmed after diagnostics.
+              diagnostics. Quotes provided through our website or in person are estimates only; final pricing is
+              confirmed after diagnostics and before any work begins.
             </p>
           </Section>
 
-          <Section title="SMS Terms">
+          <Section title="Estimates & Repair Authorization">
             <p>
-              By providing your mobile phone number and verbally agreeing at the time you request service, you
-              consent to receive transactional and customer-care text messages from {siteConfig.businessName}{" "}
-              related to the service(s) you requested, including:
+              Submitting our repair request form only asks us for a no-obligation estimate — it does not authorize
+              any repair, and it does not authorize any charge.
             </p>
             <ul className="list-disc space-y-1 pl-5">
-              <li>Repair received / status updates</li>
-              <li>Repair ready notifications</li>
-              <li>Invoice ready notifications</li>
-              <li>Payment reminders and payment received confirmations</li>
-              <li>Related customer service follow-up</li>
+              <li>You are never obligated to accept an estimate we provide.</li>
+              <li>
+                Only after you expressly approve an estimate do we create the corresponding repair in our
+                management system.
+              </li>
+              <li>
+                Any additional work or additional cost identified once the repair is underway requires your
+                separate approval before we proceed.
+              </li>
             </ul>
-            <p>Message frequency varies depending on your repair, invoice, and service activity.</p>
-            <p>Message and data rates may apply.</p>
+          </Section>
+
+          <Section title="WhatsApp Authorization">
             <p>
-              Reply STOP at any time to cancel text messages. Reply HELP for help, or contact us at{" "}
-              <a href={`mailto:${siteConfig.email}`} className="text-torays-navy underline decoration-torays-line hover:text-torays-red">
-                {siteConfig.email}
-              </a>
-              .
+              Our repair request form requires you to confirm you've read these Terms and our{" "}
+              <Link to="/privacy" className="text-torays-navy underline decoration-torays-line hover:text-torays-red">
+                Privacy Policy
+              </Link>{" "}
+              before you can submit a request, whether by WhatsApp or email. Submitting the form also authorizes{" "}
+              {siteConfig.businessName} to respond to you through WhatsApp about that specific estimate or repair.
             </p>
-            <p>Consent to receive SMS messages is not a condition of purchasing or receiving any service from us.</p>
-            <p>We do not send unsolicited marketing messages via SMS.</p>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>The authorization covers only a reply about the quote, repair, or request you submitted.</li>
+              <li>It does not authorize advertising, marketing, or promotional messages, and we do not send them.</li>
+              <li>You can still reach us — and be reached — by email or phone instead.</li>
+              <li>
+                When you submit a valid request, we prepare a message summarizing it and open WhatsApp for you;
+                you choose whether to send that message from your own WhatsApp account.
+              </li>
+            </ul>
             <p>
-              Message delivery is subject to your mobile carrier and is not guaranteed. We are not responsible
-              for messages that are delayed or undelivered due to carrier issues or factors outside our control.
+              WhatsApp delivery is provided by Meta Platforms, Inc. and is subject to your own WhatsApp account
+              and network connection; we're not responsible for messages delayed or undelivered due to factors
+              outside our control.
             </p>
           </Section>
 
           <Section title="Payments">
             <p>
               Payments for services are processed securely through third-party payment processors. Invoices and
-              payment status may be communicated to you by email and/or text message as described in our SMS
-              Terms above.
+              payment status may be communicated to you by email, WhatsApp, or phone, as described above.
             </p>
           </Section>
 

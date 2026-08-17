@@ -133,11 +133,11 @@ export const translations = {
       mapPlaceholder: "Map will appear once the shop address is added to site.config.js",
     },
     whatsappGate: {
-      title: "Let's start your repair request",
-      message:
-        "To help us understand your device and the problem, please complete our quick repair request first. It only takes about a minute.",
-      start: "Start Your Repair Request",
-      notNow: "Not Now",
+      title: "Before messaging us",
+      message: "Complete your repair request first so we can help you faster. It only takes a moment.",
+      start: "Start request",
+      notNow: "Not now",
+      close: "Close",
     },
     faq: {
       eyebrow: "FAQ",
@@ -190,10 +190,28 @@ export const translations = {
       reviewRequest: "Review Request",
       notSureOther: "Not sure / Other",
       photosNote: "You can attach photos after WhatsApp opens.",
-      sendWhatsApp: "Send via WhatsApp",
+      getQuote: "Get My Quote",
       sendEmail: "Send via Email",
       addEmailHint: "Add your email above to send via email.",
       editLabel: "Edit {label}",
+      // Split into pieces (not one flat sentence) so the Terms/Privacy
+      // links land exactly where the required wording puts them, while
+      // every word still comes from this translation file.
+      policyConsent: {
+        prefix:
+          "I understand that this request is only for a no-obligation estimate, does not authorize any repair or charge, and I agree to the ",
+        termsLabel: "Terms of Service",
+        middle: " and ",
+        privacyLabel: "Privacy Policy",
+        suffix: ".",
+        error: "Please accept the Terms and Privacy Policy to continue.",
+      },
+      // Shown separately from the mandatory checkbox above — the checkbox
+      // itself only covers the no-obligation-estimate/Terms acknowledgment,
+      // never WhatsApp, so this note is what actually discloses the
+      // WhatsApp authorization.
+      whatsappAuthNote:
+        "By submitting this request, you authorize Torays Boost LLC to respond through WhatsApp only regarding this estimate or repair. This does not authorize advertising.",
       titles: {
         device: "Choose your device",
         model: "Select or enter the model",
@@ -234,6 +252,8 @@ export const translations = {
         additionalDetails: "Additional details",
         whatsappGreeting: "Hi! I'd like to request a repair:",
         emailSubjectPrefix: "Repair Request",
+        consentConfirmation:
+          "✅ I understand that this request is only for a no-obligation estimate and does not authorize any repair or charge.",
       },
     },
   },
@@ -343,11 +363,11 @@ export const translations = {
       mapPlaceholder: "El mapa aparecerá cuando se agregue la dirección del taller en site.config.js",
     },
     whatsappGate: {
-      title: "Comencemos tu solicitud de reparación",
-      message:
-        "Para ayudarnos a entender tu equipo y el problema, completa primero nuestra solicitud rápida de reparación. Solo toma aproximadamente un minuto.",
-      start: "Iniciar solicitud de reparación",
+      title: "Antes de escribirnos",
+      message: "Completa primero tu solicitud de reparación para que podamos ayudarte más rápido. Solo tomará un momento.",
+      start: "Iniciar solicitud",
       notNow: "Ahora no",
+      close: "Cerrar",
     },
     faq: {
       eyebrow: "Preguntas Frecuentes",
@@ -400,10 +420,21 @@ export const translations = {
       reviewRequest: "Revisar solicitud",
       notSureOther: "No estoy seguro / Otro",
       photosNote: "Puedes adjuntar fotos después de abrir WhatsApp.",
-      sendWhatsApp: "Enviar por WhatsApp",
+      getQuote: "Cotizar",
       sendEmail: "Enviar por correo",
       addEmailHint: "Agrega tu correo arriba para enviar por email.",
       editLabel: "Editar {label}",
+      policyConsent: {
+        prefix:
+          "Entiendo que esta solicitud es únicamente para recibir un estimado sin compromiso, que no autoriza ninguna reparación ni cargo, y acepto los ",
+        termsLabel: "Términos de servicio",
+        middle: " y la ",
+        privacyLabel: "Política de privacidad",
+        suffix: ".",
+        error: "Acepta los Términos y la Política de privacidad para continuar.",
+      },
+      whatsappAuthNote:
+        "Al enviar esta solicitud, autorizas a Torays Boost LLC a responderte por WhatsApp únicamente en relación con este estimado o reparación. Esto no autoriza publicidad.",
       titles: {
         device: "Elige tu dispositivo",
         model: "Selecciona o escribe el modelo",
@@ -518,6 +549,8 @@ export const translations = {
         additionalDetails: "Detalles adicionales",
         whatsappGreeting: "¡Hola! Quisiera solicitar una reparación:",
         emailSubjectPrefix: "Solicitud de Reparación",
+        consentConfirmation:
+          "✅ Entiendo que esta solicitud es solamente para recibir un estimado sin compromiso y que no autoriza ninguna reparación ni cargo.",
       },
     },
   },

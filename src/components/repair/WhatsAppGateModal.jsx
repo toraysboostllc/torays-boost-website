@@ -1,20 +1,22 @@
 import { useEffect, useRef } from "react";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, X } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext.jsx";
 
 const FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 const FOCUS_RING =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-torays-red/60 focus-visible:ring-offset-2 focus-visible:ring-offset-torays-bg";
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-torays-navy-light/60 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent";
 
 /**
  * The friendly "gate" shown before any general WhatsApp button (Navbar,
  * the floating button, the Contact card) is allowed to open WhatsApp —
  * it never opens wa.me itself; it either starts the Smart Repair Request
  * wizard (onStart) or just closes (onClose). Only the wizard's own final
- * step opens a real wa.me link. Mounted only while open, same pattern as
- * RepairRequestModal — no `open` prop needed.
+ * step (its Get My Quote / Cotizar button) opens a real wa.me link.
+ * Mounted only while open, same pattern as RepairRequestModal — no `open`
+ * prop needed. Deliberately small and light (a nudge, not a warning) —
+ * see .whatsapp-gate-panel in index.css for the frosted-glass surface.
  */
 export function WhatsAppGateModal({ onClose, onStart }) {
   const { t } = useLanguage();
@@ -60,7 +62,7 @@ export function WhatsAppGateModal({ onClose, onStart }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-torays-text/50 p-4 sm:p-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.30)] p-4"
       onClick={onClose}
     >
       <div
@@ -69,38 +71,47 @@ export function WhatsAppGateModal({ onClose, onStart }) {
         aria-modal="true"
         aria-labelledby="whatsapp-gate-title"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-2xl bg-torays-bg p-6 shadow-2xl sm:p-8"
+        className="whatsapp-gate-panel relative w-[calc(100%-40px)] max-w-[340px] rounded-2xl border p-[18px] shadow-[0_8px_32px_rgba(15,23,42,0.16)] backdrop-blur-[14px] sm:max-w-[360px]"
       >
-        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-torays-red/10 text-torays-red">
-          <MessageCircle size={20} />
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t("whatsappGate.close")}
+          className={`absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-full text-[color:var(--wgp-close)] transition-colors hover:bg-black/5 ${FOCUS_RING}`}
+        >
+          <X size={15} />
+        </button>
+
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--wgp-icon-bg)]">
+          <MessageCircle size={20} className="text-torays-navy-light" />
         </div>
 
         <h2
           ref={titleRef}
           tabIndex={-1}
           id="whatsapp-gate-title"
-          className="mt-4 font-heading text-xl font-semibold text-torays-text outline-none sm:text-2xl"
+          className="mt-2.5 pr-5 font-heading text-[17px] font-semibold leading-snug text-[color:var(--wgp-title)] outline-none sm:text-[18px]"
         >
           {t("whatsappGate.title")}
         </h2>
-        <p className="mt-3 text-sm leading-relaxed text-torays-text-secondary sm:text-base">
+        <p className="mt-1.5 text-[13px] leading-relaxed text-[color:var(--wgp-text)] sm:text-[14px]">
           {t("whatsappGate.message")}
         </p>
 
-        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className={`min-h-11 rounded-full border border-torays-line px-5 py-2.5 text-sm font-medium text-torays-text-secondary transition-colors hover:text-torays-text ${FOCUS_RING}`}
-          >
-            {t("whatsappGate.notNow")}
-          </button>
+        <div className="mt-4 flex flex-col gap-2">
           <button
             type="button"
             onClick={onStart}
-            className={`min-h-11 rounded-full bg-torays-red px-5 py-2.5 text-sm font-heading font-semibold text-white transition-colors hover:bg-torays-red-light ${FOCUS_RING}`}
+            className={`min-h-11 rounded-full bg-torays-navy-light px-4 py-2 text-[13px] font-heading font-semibold text-white transition-colors hover:bg-torays-navy sm:text-sm ${FOCUS_RING}`}
           >
             {t("whatsappGate.start")}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className={`min-h-11 rounded-full border border-[color:var(--wgp-secondary-border)] bg-transparent px-4 py-2 text-[13px] font-medium text-[color:var(--wgp-secondary-text)] transition-colors hover:bg-black/5 sm:text-sm ${FOCUS_RING}`}
+          >
+            {t("whatsappGate.notNow")}
           </button>
         </div>
       </div>

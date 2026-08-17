@@ -131,6 +131,22 @@ describe("buildRepairRequestWhatsAppLink", () => {
     expect(text).toContain("Galaxy S23");
     expect(text).not.toMatch(/\$\d/);
   });
+
+  it("ends with the exact English no-obligation-estimate confirmation line", () => {
+    const link = buildRepairRequestWhatsAppLink(buildState());
+    const text = decodeURIComponent(link.split("?text=")[1]);
+    expect(text.endsWith(
+      "✅ I understand that this request is only for a no-obligation estimate and does not authorize any repair or charge."
+    )).toBe(true);
+  });
+
+  it("ends with the exact Spanish no-obligation-estimate confirmation line", () => {
+    const link = buildRepairRequestWhatsAppLink(buildState({}, "es"));
+    const text = decodeURIComponent(link.split("?text=")[1]);
+    expect(text.endsWith(
+      "✅ Entiendo que esta solicitud es solamente para recibir un estimado sin compromiso y que no autoriza ninguna reparación ni cargo."
+    )).toBe(true);
+  });
 });
 
 describe("buildRepairRequestEmailSubject / buildRepairRequestMailtoLink", () => {

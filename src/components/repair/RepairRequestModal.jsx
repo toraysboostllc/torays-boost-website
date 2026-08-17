@@ -312,6 +312,36 @@ function ReviewStep({ estimator, t }) {
       : t(`wizard.brands.${brand.id}`)
     : null;
   const messageState = { answers, category, brand, problem, smartQuestions, group, t };
+  const [showPolicyError, setShowPolicyError] = useState(false);
+  const policyCheckboxRef = useRef(null);
+
+  // Shared gate for every way this request can be sent (WhatsApp or
+  // email) — all earlier steps already required device/problem/name/phone
+  // via their own canGoNext checks, so by the time the visitor reaches
+  // Review the rest of the form is already valid; this checkbox is the one
+  // remaining thing that can block submission through either method.
+  function ensurePolicyAccepted() {
+    if (!answers.policyAccepted) {
+      setShowPolicyError(true);
+      policyCheckboxRef.current?.focus();
+      return false;
+    }
+    setShowPolicyError(false);
+    return true;
+  }
+
+  // window.open() must run synchronously inside this click handler (no
+  // awaits before it) or browsers treat it as an unrequested popup and
+  // block it.
+  function handleGetQuote() {
+    if (!ensurePolicyAccepted()) return;
+    window.open(buildRepairRequestWhatsAppLink(messageState), "_blank", "noopener,noreferrer");
+  }
+
+  function handleSendEmail() {
+    if (!ensurePolicyAccepted()) return;
+    window.location.href = buildRepairRequestMailtoLink(messageState);
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -336,24 +366,68 @@ function ReviewStep({ estimator, t }) {
       </div>
 
       <div className="flex flex-col gap-3">
-        <a
-          href={buildRepairRequestWhatsAppLink(messageState)}
-          target="_blank"
-          rel="noreferrer"
+        <div className="flex flex-col gap-2">
+          <label className="flex min-h-11 items-start gap-3 rounded-xl border border-[#D8E1F2] bg-white px-4 py-3">
+            <input
+              ref={policyCheckboxRef}
+              type="checkbox"
+              checked={answers.policyAccepted}
+              aria-describedby={showPolicyError ? "policy-consent-error" : undefined}
+              aria-invalid={showPolicyError}
+              onChange={(e) => {
+                estimator.setField("policyAccepted", e.target.checked);
+                if (e.target.checked) setShowPolicyError(false);
+              }}
+              className={`mt-0.5 h-5 w-5 shrink-0 rounded border-[#9FB3D6] text-torays-red ${FOCUS_RING}`}
+            />
+            <span className="text-xs leading-relaxed text-torays-text-secondary">
+              {t("wizard.policyConsent.prefix")}
+              <a
+                href="/terms"
+                target="_blank"
+                rel="noreferrer"
+                className="text-torays-navy underline decoration-torays-line hover:text-torays-red"
+              >
+                {t("wizard.policyConsent.termsLabel")}
+              </a>
+              {t("wizard.policyConsent.middle")}
+              <a
+                href="/privacy"
+                target="_blank"
+                rel="noreferrer"
+                className="text-torays-navy underline decoration-torays-line hover:text-torays-red"
+              >
+                {t("wizard.policyConsent.privacyLabel")}
+              </a>
+              {t("wizard.policyConsent.suffix")}
+            </span>
+          </label>
+          {showPolicyError && (
+            <p id="policy-consent-error" role="alert" className="px-1 text-xs text-torays-red">
+              {t("wizard.policyConsent.error")}
+            </p>
+          )}
+          <p className="px-1 text-xs leading-relaxed text-torays-text-secondary">{t("wizard.whatsappAuthNote")}</p>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleGetQuote}
           className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-6 py-3.5 text-base font-heading font-medium text-white shadow-[0_1px_0_rgba(255,255,255,0.35)_inset,0_2px_6px_rgba(10,40,15,0.3)] transition-colors active:translate-y-px ${GREEN_XP} ${FOCUS_RING}`}
         >
           <MessageCircle size={18} />
-          {t("wizard.sendWhatsApp")}
-        </a>
+          {t("wizard.getQuote")}
+        </button>
 
         {email ? (
-          <a
-            href={buildRepairRequestMailtoLink(messageState)}
+          <button
+            type="button"
+            onClick={handleSendEmail}
             className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-6 py-3.5 text-base font-heading font-medium text-white shadow-[0_1px_0_rgba(255,255,255,0.35)_inset,0_2px_6px_rgba(6,30,80,0.3)] transition-colors active:translate-y-px ${BLUE_XP} ${FOCUS_RING}`}
           >
             <Mail size={18} />
             {t("wizard.sendEmail")}
-          </a>
+          </button>
         ) : (
           <div className="flex flex-col gap-1">
             <button

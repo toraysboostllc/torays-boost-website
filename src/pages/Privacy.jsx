@@ -4,7 +4,7 @@ import { Navbar } from "../components/layout/Navbar.jsx";
 import { Footer } from "../components/layout/Footer.jsx";
 import { siteConfig } from "../config/site.config.js";
 
-const LAST_UPDATED = "August 7, 2026";
+const LAST_UPDATED = "August 17, 2026";
 
 function Section({ title, children }) {
   return (
@@ -20,7 +20,7 @@ function Section({ title, children }) {
 export function Privacy() {
   useSEO({
     title: "Privacy Policy",
-    description: `How ${siteConfig.businessName} collects, uses, and protects your information, including SMS text message communications.`,
+    description: `How ${siteConfig.businessName} collects, uses, and protects the information you share when requesting a repair quote.`,
   });
 
   return (
@@ -41,76 +41,70 @@ export function Privacy() {
             <a href={siteConfig.url} className="text-torays-navy underline decoration-torays-line hover:text-torays-red">
               {siteConfig.domain}
             </a>{" "}
-            and provides electronics repair services. This Privacy Policy explains what information we collect,
-            how we use it, and your choices — including in connection with text message (SMS) communications
-            about your repair or service.
+            and provides electronics repair services. This Privacy Policy explains what information our repair
+            request form collects, how we use it, and your choices — including when you authorize us to respond
+            to you through WhatsApp about that request.
           </p>
 
           <Section title="Information We Collect">
-            <p>When you request a quote, drop off a device, or otherwise use our services, we may collect:</p>
+            <p>When you submit a repair request, request a quote, or otherwise contact us, we may collect:</p>
             <ul className="list-disc space-y-1 pl-5">
               <li>Your name</li>
               <li>Your phone number</li>
-              <li>Your email address</li>
+              <li>Your email address (optional)</li>
               <li>
-                Service and device information — the device you're having repaired, the reported issue, repair
-                status, invoices, and payment status
+                Device and repair information — the device you're having repaired, the reported problem, and any
+                additional details you choose to share
               </li>
             </ul>
           </Section>
 
           <Section title="How We Use Your Information">
-            <p>We use your name, phone number, email address, and service data to:</p>
+            <p>We use the information above solely to:</p>
             <ul className="list-disc space-y-1 pl-5">
-              <li>Perform the repair or service you requested</li>
-              <li>Contact you about the status of your repair (received, in progress, ready for pickup)</li>
-              <li>Send invoices, payment reminders, and payment confirmations</li>
-              <li>Respond to your questions and provide customer service follow-up</li>
+              <li>Prepare a quote for the repair you requested</li>
+              <li>Respond to you about that request — by WhatsApp (if you authorize it), email, or phone</li>
+              <li>Perform the repair or service you ultimately request</li>
+              <li>Respond to your questions and provide related customer service follow-up</li>
             </ul>
           </Section>
 
-          <Section title="SMS / Text Message Communications">
+          <Section title="WhatsApp Communications">
             <p>
-              If you provide your mobile number when requesting service, we may send you text messages related
-              to that service, including:
-            </p>
-            <ul className="list-disc space-y-1 pl-5">
-              <li>Confirmation that your device/repair has been received</li>
-              <li>Notice that your repair is ready</li>
-              <li>Invoice ready notifications</li>
-              <li>Payment reminders</li>
-              <li>Payment received confirmations</li>
-              <li>General customer service follow-up related to your service</li>
-            </ul>
-            <p>
-              <strong className="font-semibold text-torays-text">Consent.</strong> Consent to receive these
-              messages is currently collected verbally: when you give us your mobile number to request service,
-              you are agreeing to receive text message updates related to that service.
+              Submitting our repair request form is only a request for a no-obligation estimate — it does not
+              authorize any repair or charge. It does authorize us to respond to you through WhatsApp about that
+              specific estimate or repair request. This authorization only covers a reply related to the quote,
+              repair, or request you submitted — it does{" "}
+              <strong className="font-semibold text-torays-text">not</strong> authorize advertising, marketing, or
+              promotional messages of any kind, and we do not send them.
             </p>
             <p>
-              <strong className="font-semibold text-torays-text">
-                We do not sell or share mobile phone numbers or SMS consent/opt-in data with third parties for
-                marketing or promotional purposes.
-              </strong>{" "}
-              This information is used solely to operate our repair and customer service communications.
+              If you'd prefer we reply only by email or phone instead of WhatsApp, just say so in the additional
+              details of your request and we'll honor that.
             </p>
             <p>
-              We may use third-party service providers, such as Twilio, solely to transmit the text messages
-              described above. These providers are engaged only to deliver messages necessary to operate our
-              service and are not authorized to use your information for their own marketing purposes.
+              WhatsApp is operated by Meta Platforms, Inc. When you message us there, that conversation is also
+              subject to WhatsApp's own terms and privacy practices, which are outside our control.
             </p>
-            <p>Message frequency varies depending on your repair, invoice, and service activity.</p>
-            <p>Message and data rates may apply.</p>
-            <p>Reply STOP at any time to cancel SMS messages. Reply HELP for help.</p>
-            <p>We do not use SMS for unsolicited marketing.</p>
           </Section>
 
           <Section title="How We Share Information">
             <p>
-              Outside of the SMS-specific commitment above, we do not sell your personal information. We may
-              share information with service providers who help us operate the business — such as payment
-              processors and messaging providers — solely to provide our services to you, or when required by
-              law.
+              <strong className="font-semibold text-torays-text">
+                We do not sell your personal information, and we do not share it for advertising or marketing
+                purposes.
+              </strong>{" "}
+              We may share information with service providers who help us operate the business — such as payment
+              processors and the messaging platforms described above — solely to provide our services to you, or
+              when required by law.
+            </p>
+          </Section>
+
+          <Section title="Data Retention">
+            <p>
+              We keep repair and contact records for as long as reasonably needed to complete your repair, respond
+              to related questions, and meet our own accounting and legal obligations. We may delete or anonymize
+              older records once they're no longer needed for those purposes.
             </p>
           </Section>
 
@@ -122,10 +116,24 @@ export function Privacy() {
             </p>
           </Section>
 
+          <Section title="Cookies & Local Storage">
+            <p>
+              The public website does not use advertising or tracking cookies. It stores your language preference
+              (English/Español) in your browser's local storage so the site remembers your choice — nothing else
+              is stored there, and this preference is never sent to us or to any third party.
+            </p>
+            <p>
+              Our separate wholesale partner portal, used only by repair shops we've approved, uses functional
+              session cookies solely to keep that login secure — this doesn't apply to visitors requesting a
+              repair quote.
+            </p>
+          </Section>
+
           <Section title="Your Choices">
             <p>
-              You can stop SMS messages at any time by replying STOP. You can request access to, correction of,
-              or deletion of your personal information by contacting us using the details below.
+              You can request access to, correction of, or deletion of your personal information at any time by
+              contacting us using the details below. If you've authorized WhatsApp responses and change your
+              mind, just let us know and we'll stop reaching out that way.
             </p>
           </Section>
 

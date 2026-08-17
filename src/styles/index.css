@@ -52,6 +52,40 @@
   }
 }
 
+/*
+ * The general WhatsApp prompt (WhatsAppGateModal) is the only frosted-glass
+ * surface on this site — scoped to its own class rather than Tailwind's
+ * `dark:` variant, since this project's darkMode is "class"-based with no
+ * toggle anywhere; this instead follows the visitor's OS-level preference
+ * automatically via prefers-color-scheme, without touching any other
+ * component's theming.
+ */
+.whatsapp-gate-panel {
+  --wgp-bg: rgba(255, 255, 255, 0.88);
+  --wgp-border: rgba(15, 23, 42, 0.1);
+  --wgp-title: #0f1424;
+  --wgp-text: #525b78;
+  --wgp-icon-bg: rgba(51, 91, 169, 0.12);
+  --wgp-secondary-border: rgba(15, 23, 42, 0.14);
+  --wgp-secondary-text: #525b78;
+  --wgp-close: #8a91ac;
+  background-color: var(--wgp-bg);
+  border-color: var(--wgp-border);
+}
+
+@media (prefers-color-scheme: dark) {
+  .whatsapp-gate-panel {
+    --wgp-bg: rgba(15, 23, 42, 0.84);
+    --wgp-border: rgba(255, 255, 255, 0.12);
+    --wgp-title: #f1f5f9;
+    --wgp-text: #cbd5e1;
+    --wgp-icon-bg: rgba(148, 178, 235, 0.18);
+    --wgp-secondary-border: rgba(255, 255, 255, 0.18);
+    --wgp-secondary-text: #cbd5e1;
+    --wgp-close: #94a3b8;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

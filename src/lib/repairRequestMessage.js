@@ -37,7 +37,8 @@ export function buildRepairRequestSummary({ answers, category, brand, problem, s
 export function buildRepairRequestWhatsAppLink(state) {
   const { t } = state;
   const summary = buildRepairRequestSummary(state);
-  return buildWhatsAppLink(`${t("wizard.summary.whatsappGreeting")}\n\n${summary}`);
+  const confirmation = t("wizard.summary.consentConfirmation");
+  return buildWhatsAppLink(`${t("wizard.summary.whatsappGreeting")}\n\n${summary}\n\n${confirmation}`);
 }
 
 export function buildRepairRequestEmailSubject({ category, answers, t }) {
