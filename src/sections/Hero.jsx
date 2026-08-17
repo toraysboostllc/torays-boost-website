@@ -1,4 +1,3 @@
-import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Button } from "../components/ui/Button.jsx";
 import { CircuitBackground } from "../components/ui/CircuitBackground.jsx";
@@ -115,12 +114,7 @@ export function Hero({ onOpenRepairRequest }) {
       <div className="relative mx-auto max-w-6xl px-5 sm:px-8">
         <PromoCarousel onOpenRepairRequest={onOpenRepairRequest} />
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
-          className={`flex max-w-xl flex-col items-start justify-start gap-8 ${MIN_H_CLASSES}`}
-        >
+        <div className={`flex max-w-xl flex-col items-start justify-start gap-8 ${MIN_H_CLASSES}`}>
           <span className="rounded-full border border-torays-red/30 bg-torays-red/10 px-4 py-1.5 text-xs font-heading font-semibold uppercase tracking-[0.2em] text-torays-red">
             {t("hero.eyebrow")}
           </span>
@@ -141,7 +135,7 @@ export function Hero({ onOpenRepairRequest }) {
           <div className="mt-1 border-t border-torays-line pt-5">
             <TrustBadges />
           </div>
-        </motion.div>
+        </div>
       </div>
 
       <img

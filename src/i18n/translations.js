@@ -63,6 +63,7 @@ export const translations = {
     common: {
       langEn: "English",
       langEs: "Español",
+      loading: "Loading…",
     },
     nav: {
       home: "Torays Boost home",
@@ -261,6 +262,7 @@ export const translations = {
     common: {
       langEn: "English",
       langEs: "Español",
+      loading: "Cargando…",
     },
     nav: {
       home: "Inicio de Torays Boost",

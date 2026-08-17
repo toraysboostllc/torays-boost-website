@@ -154,7 +154,7 @@ describe("Hero framing: stable across languages (no re-crop/zoom on the collage 
     expect(heroSrc).not.toMatch(/sm:py-20|lg:py-28/);
   });
 
-  it("the motion.div applies MIN_H_CLASSES directly, not conditionally by language", () => {
+  it("the Hero content column applies MIN_H_CLASSES directly, not conditionally by language", () => {
     const classNameMatch = heroSrc.match(/className=\{`([^`]*)\$\{MIN_H_CLASSES\}`\}/);
     expect(classNameMatch).toBeTruthy();
     expect(classNameMatch[1]).not.toMatch(/\$\{t\(|\$\{lang/);
