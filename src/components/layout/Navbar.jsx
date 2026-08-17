@@ -12,7 +12,7 @@ const LINK_HREFS = ["#services", "#about", "#how-it-works", "#faq", "#contact"];
 const LINK_KEYS = ["nav.services", "nav.about", "nav.howItWorks", "nav.faq", "nav.contact"];
 const LINK_SUBKEYS = ["services", "about", "howItWorks", "faq", "contact"];
 
-export function Navbar() {
+export function Navbar({ onWhatsAppClick }) {
   const { t } = useLanguage();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
@@ -70,7 +70,7 @@ export function Navbar() {
         <div className="hidden xl:flex items-center gap-3">
           <LanguageSwitcher variant="header" />
           <WholesalePortalLink variant="header" />
-          <WhatsAppCta variant="header" />
+          <WhatsAppCta variant="header" onClick={onWhatsAppClick} />
         </div>
 
         <button
@@ -116,7 +116,13 @@ export function Navbar() {
               ))}
               <LanguageSwitcher variant="mobile" className="mt-2" />
               <WholesalePortalLink variant="mobile" onClick={() => setOpen(false)} />
-              <WhatsAppCta variant="mobile" onClick={() => setOpen(false)} />
+              <WhatsAppCta
+                variant="mobile"
+                onClick={() => {
+                  setOpen(false);
+                  onWhatsAppClick();
+                }}
+              />
             </div>
           </motion.div>
         )}

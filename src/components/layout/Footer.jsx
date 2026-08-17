@@ -60,6 +60,12 @@ export function Footer() {
             <Link to="/terms" className="text-xs text-torays-text-muted transition-colors hover:text-torays-text">
               {t("footer.termsConditions")}
             </Link>
+            <Link
+              to="/image-credits"
+              className="text-xs text-torays-text-muted transition-colors hover:text-torays-text"
+            >
+              {t("footer.imageCredits")}
+            </Link>
             <p className="text-xs text-torays-text-muted">{siteConfig.domain}</p>
           </div>
         </div>

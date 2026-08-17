@@ -10,22 +10,20 @@ export const siteConfig = {
   url: "https://toraysboost.com",
   // Confirmed public contact — payments@toraysboost.com is billing-only,
   // never used as a public contact address.
-  email: "toraysboost@gmail.com",
+  email: "toraysboostllc@gmail.com",
 
   // E.164 format without "+", per buildWhatsAppLink()'s wa.me URL format.
   whatsapp: {
-    number: "13053011152",
-    displayNumber: "(305) 301-1152",
+    number: "17867937665",
+    displayNumber: "+1 (786) 793-7665",
     defaultMessage: "Hi! I'd like a quote for a repair.",
   },
 
-  // TODO: fill in real address + regenerate mapEmbedUrl from Google Maps
-  // ("Share" > "Embed a map") once the shop address is confirmed.
+  // Deliberately a general service area, not a street address — Torays
+  // Boost isn't publishing a precise physical location, so there's no
+  // separate city/state/zip to concatenate and no map embed to show.
   address: {
-    line1: "",
-    city: "",
-    state: "",
-    zip: "",
+    line1: "Kendall, Miami, FL 33196",
     mapEmbedUrl: "",
   },
 

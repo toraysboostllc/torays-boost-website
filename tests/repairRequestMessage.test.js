@@ -54,17 +54,27 @@ function buildState(overrides = {}, lang = "en") {
 }
 
 describe("Confirmed public contacts", () => {
-  it("site.config.js WhatsApp number is exactly the confirmed number", () => {
-    expect(siteConfig.whatsapp.number).toBe("13053011152");
+  it("site.config.js WhatsApp number is exactly the confirmed E.164 number", () => {
+    expect(siteConfig.whatsapp.number).toBe("17867937665");
   });
 
   it("site.config.js shows the WhatsApp number formatted as approved", () => {
-    expect(siteConfig.whatsapp.displayNumber).toBe("(305) 301-1152");
+    expect(siteConfig.whatsapp.displayNumber).toBe("+1 (786) 793-7665");
   });
 
-  it("site.config.js email is exactly toraysboost@gmail.com — never the payments address", () => {
-    expect(siteConfig.email).toBe("toraysboost@gmail.com");
+  it("site.config.js email is exactly toraysboostllc@gmail.com — never the payments address or the old email", () => {
+    expect(siteConfig.email).toBe("toraysboostllc@gmail.com");
     expect(siteConfig.email).not.toBe("payments@toraysboost.com");
+    expect(siteConfig.email).not.toBe("toraysboost@gmail.com");
+  });
+
+  it("site.config.js address is exactly the approved general service area, no invented street address", () => {
+    expect(siteConfig.address.line1).toBe("Kendall, Miami, FL 33196");
+  });
+
+  it("never leaves the old phone number or old email anywhere reachable from site.config.js", () => {
+    expect(JSON.stringify(siteConfig)).not.toMatch(/13053011152|301-1152/);
+    expect(JSON.stringify(siteConfig)).not.toContain("toraysboost@gmail.com");
   });
 });
 
@@ -109,9 +119,9 @@ describe("buildRepairRequestSummary: every answer present, never a price", () =>
 });
 
 describe("buildRepairRequestWhatsAppLink", () => {
-  it("opens exactly https://wa.me/13053011152 with a prefilled message", () => {
+  it("opens exactly https://wa.me/17867937665 with a prefilled message", () => {
     const link = buildRepairRequestWhatsAppLink(buildState());
-    expect(link).toMatch(/^https:\/\/wa\.me\/13053011152\?text=/);
+    expect(link).toMatch(/^https:\/\/wa\.me\/17867937665\?text=/);
   });
 
   it("the prefilled text, once decoded, contains the full summary and no price", () => {
@@ -134,10 +144,10 @@ describe("buildRepairRequestEmailSubject / buildRepairRequestMailtoLink", () => 
     expect(buildRepairRequestEmailSubject(state)).toBe("Repair Request — PlayStation / PS5 Not sure");
   });
 
-  it("mailto targets exactly toraysboost@gmail.com with the subject and full body", () => {
+  it("mailto targets exactly toraysboostllc@gmail.com with the subject and full body", () => {
     const state = buildState({ categoryId: "iphone", brand: null, answers: { model: "14 Pro" } });
     const link = buildRepairRequestMailtoLink(state);
-    expect(link).toMatch(/^mailto:toraysboost@gmail\.com\?/);
+    expect(link).toMatch(/^mailto:toraysboostllc@gmail\.com\?/);
     const params = new URLSearchParams(link.split("?")[1]);
     expect(params.get("subject")).toBe("Repair Request — iPhone 14 Pro");
     const body = params.get("body");

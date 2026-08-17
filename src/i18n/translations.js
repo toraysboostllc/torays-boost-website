@@ -63,7 +63,6 @@ export const translations = {
     common: {
       langEn: "English",
       langEs: "Español",
-      whatsappDefaultMessage: "Hello Torays Boost, I need a repair quote.",
     },
     nav: {
       home: "Torays Boost home",
@@ -120,7 +119,6 @@ export const translations = {
       email: "Email",
       whatsapp: "WhatsApp",
       address: "Address",
-      addressPlaceholder: "Address coming soon — contact us for directions.",
       hours: "Hours",
       hoursMonFri: "Monday – Friday",
       hoursSat: "Saturday",
@@ -133,6 +131,13 @@ export const translations = {
       messagePlaceholder: "How can we help?",
       sendMessage: "Send Message",
       mapPlaceholder: "Map will appear once the shop address is added to site.config.js",
+    },
+    whatsappGate: {
+      title: "Let's start your repair request",
+      message:
+        "To help us understand your device and the problem, please complete our quick repair request first. It only takes about a minute.",
+      start: "Start Your Repair Request",
+      notNow: "Not Now",
     },
     faq: {
       eyebrow: "FAQ",
@@ -174,6 +179,7 @@ export const translations = {
       tagline: "Professional microsoldering and board-level electronics repair.",
       privacyPolicy: "Privacy Policy",
       termsConditions: "Terms & Conditions",
+      imageCredits: "Image Credits",
       allRightsReserved: "All rights reserved.",
     },
     wizard: {
@@ -235,7 +241,6 @@ export const translations = {
     common: {
       langEn: "English",
       langEs: "Español",
-      whatsappDefaultMessage: "Hola Torays Boost, necesito una cotización de reparación.",
     },
     nav: {
       home: "Inicio de Torays Boost",
@@ -324,7 +329,6 @@ export const translations = {
       email: "Correo",
       whatsapp: "WhatsApp",
       address: "Dirección",
-      addressPlaceholder: "Dirección próximamente — contáctanos para direcciones.",
       hours: "Horario",
       hoursMonFri: "Lunes – Viernes",
       hoursSat: "Sábado",
@@ -337,6 +341,13 @@ export const translations = {
       messagePlaceholder: "¿Cómo podemos ayudarte?",
       sendMessage: "Enviar Mensaje",
       mapPlaceholder: "El mapa aparecerá cuando se agregue la dirección del taller en site.config.js",
+    },
+    whatsappGate: {
+      title: "Comencemos tu solicitud de reparación",
+      message:
+        "Para ayudarnos a entender tu equipo y el problema, completa primero nuestra solicitud rápida de reparación. Solo toma aproximadamente un minuto.",
+      start: "Iniciar solicitud de reparación",
+      notNow: "Ahora no",
     },
     faq: {
       eyebrow: "Preguntas Frecuentes",
@@ -378,6 +389,7 @@ export const translations = {
       tagline: "Microsoldadura profesional y reparación electrónica a nivel de placa.",
       privacyPolicy: "Política de Privacidad",
       termsConditions: "Términos y Condiciones",
+      imageCredits: "Créditos de imágenes",
       allRightsReserved: "Todos los derechos reservados.",
     },
     wizard: {

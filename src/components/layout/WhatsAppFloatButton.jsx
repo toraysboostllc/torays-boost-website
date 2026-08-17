@@ -1,17 +1,20 @@
 import { motion } from "framer-motion";
 import { MessageCircle } from "lucide-react";
-import { hasWhatsApp, buildWhatsAppLink } from "../../lib/whatsapp.js";
-import { useLanguage } from "../../i18n/LanguageContext.jsx";
+import { hasWhatsApp } from "../../lib/whatsapp.js";
 
-export function WhatsAppFloatButton() {
-  const { t } = useLanguage();
+/**
+ * General/"any time" WhatsApp entry point — never opens wa.me directly.
+ * Clicking it calls onClick (wired by Home.jsx to open the friendly
+ * WhatsAppGateModal). Only the Smart Repair Request's own final step
+ * opens a real wa.me link.
+ */
+export function WhatsAppFloatButton({ onClick }) {
   if (!hasWhatsApp) return null;
 
   return (
-    <motion.a
-      href={buildWhatsAppLink(t("common.whatsappDefaultMessage"))}
-      target="_blank"
-      rel="noreferrer"
+    <motion.button
+      type="button"
+      onClick={onClick}
       aria-label="Chat on WhatsApp"
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -20,6 +23,6 @@ export function WhatsAppFloatButton() {
       className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-torays-red text-white shadow-glow-red"
     >
       <MessageCircle size={26} />
-    </motion.a>
+    </motion.button>
   );
 }

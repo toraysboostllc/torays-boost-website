@@ -46,16 +46,16 @@ function extractTextColor(src, varName) {
   return decl.match(/text-\[(#[0-9a-f]{6})\]/i)[1];
 }
 
-describe("WhatsAppCta: destination, mechanics, and green XP style", () => {
-  it("keeps the existing wa.me destination — built from buildContactLink(), same as before this restyle", () => {
-    expect(whatsappSrc).toContain('import { buildContactLink } from "../../lib/whatsapp.js"');
-    expect(whatsappSrc).toContain("href={buildContactLink(t(\"common.whatsappDefaultMessage\"))}");
-  });
-
-  it("opens in a new tab via a plain <a> — correct for an external link, unlike the internal /wholesale Link", () => {
-    expect(whatsappSrc).toContain('target="_blank"');
-    expect(whatsappSrc).toContain('rel="noreferrer"');
-    expect(whatsappSrc).toMatch(/<a\s/);
+describe("WhatsAppCta: gated behind the friendly WhatsApp prompt, never a direct wa.me link", () => {
+  it("never builds or opens a wa.me link itself — it's a plain button that calls the onClick it's given", () => {
+    // Strip the /** */ doc comment first — it explains in prose why this
+    // component no longer touches wa.me, which shouldn't trip the check
+    // that's verifying exactly that.
+    const stripped = whatsappSrc.replace(/\/\*\*[\s\S]*?\*\//g, "");
+    expect(stripped).not.toMatch(/buildContactLink|buildWhatsAppLink|wa\.me/);
+    expect(stripped).not.toMatch(/target="_blank"|rel="noreferrer"/);
+    expect(stripped).toMatch(/<button\s/);
+    expect(stripped).toContain('onClick={onClick}');
   });
 
   it("guarantees a minimum 44px touch target on both variants", () => {
@@ -181,7 +181,7 @@ describe("Navbar: exactly one WhatsApp CTA and one Torays Boost Pro CTA per cont
     expect((desktopGroup.match(/<WholesalePortalLink/g) || []).length).toBe(1);
     expect((desktopGroup.match(/<WhatsAppCta/g) || []).length).toBe(1);
     expect(desktopGroup).toContain('<WholesalePortalLink variant="header" />');
-    expect(desktopGroup).toContain('<WhatsAppCta variant="header" />');
+    expect(desktopGroup).toContain('<WhatsAppCta variant="header" onClick={onWhatsAppClick} />');
   });
 
   it("mobile drawer renders exactly one WholesalePortalLink and one WhatsAppCta, both variant=\"mobile\", each closing the drawer on click", () => {
@@ -189,7 +189,9 @@ describe("Navbar: exactly one WhatsApp CTA and one Torays Boost Pro CTA per cont
     expect((drawer.match(/<WholesalePortalLink/g) || []).length).toBe(1);
     expect((drawer.match(/<WhatsAppCta/g) || []).length).toBe(1);
     expect(drawer).toMatch(/<WholesalePortalLink variant="mobile"[^>]*onClick=\{\(\) => setOpen\(false\)\}/);
-    expect(drawer).toMatch(/<WhatsAppCta variant="mobile"[^>]*onClick=\{\(\) => setOpen\(false\)\}/);
+    const mobileWhatsAppBlock = drawer.match(/<WhatsAppCta\s+variant="mobile"[\s\S]*?\/>/)[0];
+    expect(mobileWhatsAppBlock).toContain("setOpen(false)");
+    expect(mobileWhatsAppBlock).toContain("onWhatsAppClick()");
   });
 
   it("no longer imports the shared Button component or buildContactLink directly — WhatsAppCta owns its own destination now", () => {

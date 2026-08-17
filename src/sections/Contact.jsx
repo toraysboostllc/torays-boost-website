@@ -4,7 +4,7 @@ import { SectionHeading } from "../components/ui/SectionHeading.jsx";
 import { Card } from "../components/ui/Card.jsx";
 import { Button } from "../components/ui/Button.jsx";
 import { siteConfig } from "../config/site.config.js";
-import { hasWhatsApp, buildWhatsAppLink, buildMailtoLink } from "../lib/whatsapp.js";
+import { hasWhatsApp, buildMailtoLink } from "../lib/whatsapp.js";
 import { useLanguage } from "../i18n/LanguageContext.jsx";
 
 // site.config.js's hours entries are stored in English (days/time) since
@@ -57,10 +57,9 @@ function ContactForm() {
   );
 }
 
-export function Contact() {
+export function Contact({ onWhatsAppClick }) {
   const { t } = useLanguage();
   const { address, hours, email } = siteConfig;
-  const hasAddress = Boolean(address.line1);
 
   return (
     <section id="contact" className="py-20 sm:py-28">
@@ -84,14 +83,13 @@ export function Contact() {
                 <MessageCircle size={20} className="mt-0.5 shrink-0 text-torays-red" />
                 <div>
                   <p className="text-sm font-medium text-torays-text">{t("contact.whatsapp")}</p>
-                  <a
-                    href={buildWhatsAppLink(t("common.whatsappDefaultMessage"))}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sm text-torays-text-secondary hover:text-torays-text"
+                  <button
+                    type="button"
+                    onClick={onWhatsAppClick}
+                    className="text-sm text-torays-text-secondary underline decoration-torays-line hover:text-torays-text"
                   >
                     {siteConfig.whatsapp.displayNumber || "Chat with us"}
-                  </a>
+                  </button>
                 </div>
               </Card>
             )}
@@ -100,9 +98,7 @@ export function Contact() {
               <MapPin size={20} className="mt-0.5 shrink-0 text-torays-red" />
               <div>
                 <p className="text-sm font-medium text-torays-text">{t("contact.address")}</p>
-                <p className="text-sm text-torays-text-secondary">
-                  {hasAddress ? `${address.line1}, ${address.city}, ${address.state} ${address.zip}` : t("contact.addressPlaceholder")}
-                </p>
+                <p className="text-sm text-torays-text-secondary">{address.line1}</p>
               </div>
             </Card>
 
