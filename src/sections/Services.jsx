@@ -1,8 +1,33 @@
-import * as Icons from "lucide-react";
 import { SectionHeading } from "../components/ui/SectionHeading.jsx";
 import { Card } from "../components/ui/Card.jsx";
 import { services } from "../config/services.config.js";
 import { useLanguage } from "../i18n/LanguageContext.jsx";
+import imgPs5 from "../assets/services/service-ps5.webp";
+import imgHdmi from "../assets/services/service-hdmi.webp";
+import imgMicrosoldering from "../assets/services/service-microsoldering.webp";
+import imgIphone from "../assets/services/service-iphone.webp";
+import imgIpad from "../assets/services/service-ipad.webp";
+import imgMacbook from "../assets/services/service-macbook.webp";
+import imgSamsung from "../assets/services/service-samsung.webp";
+import imgXbox from "../assets/services/service-xbox.webp";
+import imgSwitch from "../assets/services/service-nintendo-switch.webp";
+import imgDataRecovery from "../assets/services/service-data-recovery.webp";
+
+// One real photo per service card, replacing the old lucide-react icons.
+// Keyed by services.config.js's own id so a missing mapping fails loudly
+// (undefined src) rather than silently falling back to nothing.
+const SERVICE_IMAGES = {
+  ps5: imgPs5,
+  hdmi: imgHdmi,
+  microsoldering: imgMicrosoldering,
+  iphone: imgIphone,
+  ipad: imgIpad,
+  macbook: imgMacbook,
+  samsung: imgSamsung,
+  xbox: imgXbox,
+  switch: imgSwitch,
+  "data-recovery": imgDataRecovery,
+};
 
 export function Services() {
   const { t } = useLanguage();
@@ -17,22 +42,34 @@ export function Services() {
         />
 
         <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {services.map((service) => {
-            const Icon = Icons[service.icon];
-            return (
-              <Card key={service.id} glow="red" className="group">
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-torays-red/10 text-torays-red transition-colors duration-300 group-hover:bg-torays-red group-hover:text-white">
-                  {Icon && <Icon size={22} />}
-                </div>
-                <h3 className="font-heading text-lg font-semibold text-torays-text">
+          {services.map((service) => (
+            <Card key={service.id} glow="red" noPadding className="group flex h-full flex-col">
+              <div className="aspect-video w-full overflow-hidden">
+                <img
+                  src={SERVICE_IMAGES[service.id]}
+                  alt={t(`services.items.${service.id}.imageAlt`)}
+                  loading="lazy"
+                  decoding="async"
+                  width="1200"
+                  height="675"
+                  className="aspect-video w-full object-cover transition-transform duration-300 ease-out group-hover:scale-105 motion-reduce:transform-none motion-reduce:transition-none"
+                />
+              </div>
+              <div className="flex flex-1 flex-col p-6">
+                {/* line-clamp-1 + a fixed min-height keep every title the
+                    same box height whether the language's text is short
+                    (English) or long (Spanish) — same technique already
+                    used for the promo carousel's slide text, so toggling
+                    language never resizes or reflows the grid. */}
+                <h3 className="line-clamp-1 min-h-[1.75rem] font-heading text-lg font-semibold text-torays-text">
                   {t(`services.items.${service.id}.title`)}
                 </h3>
-                <p className="mt-2 text-sm text-torays-text-secondary">
+                <p className="mt-2 line-clamp-4 min-h-[5rem] text-sm text-torays-text-secondary">
                   {t(`services.items.${service.id}.description`)}
                 </p>
-              </Card>
-            );
-          })}
+              </div>
+            </Card>
+          ))}
         </div>
       </div>
     </section>

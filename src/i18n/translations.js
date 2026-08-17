@@ -36,7 +36,24 @@ const enQuestions = Object.fromEntries(
     Object.fromEntries(questions.map((q) => [q.id, q.text])),
   ])
 );
-const enServices = Object.fromEntries(services.map((s) => [s.id, { title: s.title, description: s.description }]));
+// Photo alt text for the Services cards — kept separate from services.config.js
+// since it describes the specific stock photo chosen per card, not the
+// service itself, and would drift from the image if it lived in config.
+const enServiceImageAlts = {
+  ps5: "Sony PlayStation 5 console standing upright next to its DualSense controller.",
+  hdmi: "Close-up of a PlayStation 5 motherboard, the kind of internal component repaired for HDMI issues.",
+  microsoldering: "Technician performing microsoldering on a circuit board under a professional microscope.",
+  iphone: "Opened iPhone with its internal components exposed on a repair bench.",
+  ipad: "Back view of a silver Apple iPad.",
+  macbook: "Side view of an open MacBook laptop on a desk.",
+  samsung: "Close-up of an Android smartphone screen, representing the Samsung phones and tablets we repair.",
+  xbox: "Xbox Series X console with its controller next to the retail box.",
+  switch: "Nintendo Switch console in its dock next to its blue and red Joy-Con controllers.",
+  "data-recovery": "Open laptop showing its internal motherboard and storage drive during data recovery work.",
+};
+const enServices = Object.fromEntries(
+  services.map((s) => [s.id, { title: s.title, description: s.description, imageAlt: enServiceImageAlts[s.id] }])
+);
 const enPromoSlides = Object.fromEntries(
   PROMO_SLIDES.map((s) => [s.id, { title: s.title, description: s.description }])
 );
@@ -277,16 +294,16 @@ export const translations = {
       title: "Qué Reparamos",
       subtitle: "Reparación a nivel de placa y de componentes para los dispositivos que más usas.",
       items: {
-        ps5: { title: "Reparación de PS5", description: "Puertos HDMI, fallas de encendido, lector de disco y diagnóstico completo a nivel de placa." },
-        hdmi: { title: "Reparación de HDMI", description: "Reemplazo de puerto HDMI a nivel micro para consolas y laptops — reflow de precisión, sin atajos." },
-        microsoldering: { title: "Microsoldadura", description: "Reparación a nivel de chip bajo microscopio profesional: reballing de IC, reparación de pistas, recuperación por daño de líquido." },
-        iphone: { title: "iPhone", description: "Pantallas, baterías, puertos de carga y reparación a nivel de placa para cada generación de iPhone." },
-        ipad: { title: "iPad", description: "Pantalla, digitalizador, batería y reparación de placa lógica en toda la línea de iPad." },
-        macbook: { title: "MacBook", description: "Recuperación por daño de líquido, teclado, batería y reparación de placa lógica." },
-        samsung: { title: "Samsung", description: "Pantalla, puerto de carga y reparación a nivel de chip para teléfonos y tablets Samsung." },
-        xbox: { title: "Xbox", description: "Reparaciones de HDMI, encendido y sobrecalentamiento con diagnóstico completo antes de la devolución." },
-        switch: { title: "Nintendo Switch", description: "Joy-Con drift, puerto de carga, pantalla y reparación a nivel de placa para todos los modelos de Switch." },
-        "data-recovery": { title: "Recuperación de Datos", description: "Recuperamos datos de dispositivos y discos dañados, expuestos a líquido o que no encienden." },
+        ps5: { title: "Reparación de PS5", description: "Puertos HDMI, fallas de encendido, lector de disco y diagnóstico completo a nivel de placa.", imageAlt: "Consola Sony PlayStation 5 de pie junto a su control DualSense." },
+        hdmi: { title: "Reparación de HDMI", description: "Reemplazo de puerto HDMI a nivel micro para consolas y laptops — reflow de precisión, sin atajos.", imageAlt: "Primer plano de una placa madre de PlayStation 5, el tipo de componente interno que reparamos en fallas de HDMI." },
+        microsoldering: { title: "Microsoldadura", description: "Reparación a nivel de chip bajo microscopio profesional: reballing de IC, reparación de pistas, recuperación por daño de líquido.", imageAlt: "Técnico realizando microsoldadura en una placa de circuito bajo un microscopio profesional." },
+        iphone: { title: "iPhone", description: "Pantallas, baterías, puertos de carga y reparación a nivel de placa para cada generación de iPhone.", imageAlt: "iPhone abierto con sus componentes internos expuestos sobre una mesa de reparación." },
+        ipad: { title: "iPad", description: "Pantalla, digitalizador, batería y reparación de placa lógica en toda la línea de iPad.", imageAlt: "Vista trasera de un iPad plateado de Apple." },
+        macbook: { title: "MacBook", description: "Recuperación por daño de líquido, teclado, batería y reparación de placa lógica.", imageAlt: "Vista lateral de una laptop MacBook abierta sobre un escritorio." },
+        samsung: { title: "Samsung", description: "Pantalla, puerto de carga y reparación a nivel de chip para teléfonos y tablets Samsung.", imageAlt: "Primer plano de la pantalla de un smartphone Android, representando los teléfonos y tablets Samsung que reparamos." },
+        xbox: { title: "Xbox", description: "Reparaciones de HDMI, encendido y sobrecalentamiento con diagnóstico completo antes de la devolución.", imageAlt: "Consola Xbox Series X con su control junto a la caja original." },
+        switch: { title: "Nintendo Switch", description: "Joy-Con drift, puerto de carga, pantalla y reparación a nivel de placa para todos los modelos de Switch.", imageAlt: "Consola Nintendo Switch en su base, junto a los controles Joy-Con azul y rojo." },
+        "data-recovery": { title: "Recuperación de Datos", description: "Recuperamos datos de dispositivos y discos dañados, expuestos a líquido o que no encienden.", imageAlt: "Laptop abierta mostrando su placa madre interna y unidad de almacenamiento durante un trabajo de recuperación de datos." },
       },
     },
     howItWorks: {
