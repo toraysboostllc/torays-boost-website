@@ -20,7 +20,7 @@ const SERVICE_IMAGE_FILES = {
   ipad: "service-ipad.webp",
   macbook: "service-macbook.webp",
   samsung: "service-samsung.webp",
-  xbox: "service-xbox.webp",
+  xbox: "xbox-repair.webp",
   switch: "service-nintendo-switch.webp",
   "data-recovery": "service-data-recovery.webp",
 };
@@ -181,8 +181,10 @@ describe("HDMI card photo swap: real PS5 HDMI port macro shot, isolated to the h
     expect(existsSync(join(root, "src/assets/services/ps5-hdmi-port-repair-miami.webp"))).toBe(true);
   });
 
-  it("sets an explicit object-position only for the hdmi card, every other card is unaffected", () => {
-    expect(servicesSrc).toContain('style={service.id === "hdmi" ? { objectPosition: "center 50%" } : undefined}');
+  it("sets an explicit object-position for the hdmi card, every untouched card is unaffected", () => {
+    expect(servicesSrc).toContain(
+      'style={["hdmi", "xbox"].includes(service.id) ? { objectPosition: "center 50%" } : undefined}'
+    );
   });
 
   it("EN and ES alt text both use the exact requested SEO string", () => {
@@ -199,6 +201,47 @@ describe("HDMI card photo swap: real PS5 HDMI port macro shot, isolated to the h
     const otherIds = services.map((s) => s.id).filter((id) => id !== "hdmi");
     otherIds.forEach((id) => {
       expect(translations.en.services.items[id].imageAlt).not.toBe("PS5 HDMI port repair in Miami by Torays Boost");
+    });
+  });
+});
+
+describe("Xbox card photo swap: original 'XBOX REPAIR' square graphic, isolated to the xbox card only", () => {
+  it("imports the new descriptive filename, not the old CC-licensed stock photo", () => {
+    expect(servicesSrc).toContain('import imgXbox from "../assets/services/xbox-repair.webp"');
+    expect(servicesSrc).not.toMatch(/service-xbox\.webp/);
+  });
+
+  it("the old stock photo is gone from disk, the new one is the only xbox-related asset", () => {
+    expect(existsSync(join(root, "src/assets/services/service-xbox.webp"))).toBe(false);
+    expect(existsSync(join(root, "src/assets/services/xbox-repair.webp"))).toBe(true);
+  });
+
+  it("sets an explicit object-position for the xbox card too, same centered crop as hdmi", () => {
+    expect(servicesSrc).toContain(
+      'style={["hdmi", "xbox"].includes(service.id) ? { objectPosition: "center 50%" } : undefined}'
+    );
+  });
+
+  it("EN and ES alt text both use the exact requested SEO string", () => {
+    expect(translations.en.services.items.xbox.imageAlt).toBe(
+      "Professional Xbox Series X board-level repair by Torays Boost in Miami"
+    );
+    expect(translations.es.services.items.xbox.imageAlt).toBe(
+      "Professional Xbox Series X board-level repair by Torays Boost in Miami"
+    );
+  });
+
+  it("xbox title/description copy is untouched by the photo swap", () => {
+    expect(translations.en.services.items.xbox.title).toBe("Xbox");
+    expect(translations.es.services.items.xbox.title).toBe("Xbox");
+  });
+
+  it("no other card's imageAlt was touched by this round", () => {
+    const otherIds = services.map((s) => s.id).filter((id) => id !== "xbox");
+    otherIds.forEach((id) => {
+      expect(translations.en.services.items[id].imageAlt).not.toBe(
+        "Professional Xbox Series X board-level repair by Torays Boost in Miami"
+      );
     });
   });
 });

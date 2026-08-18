@@ -23,8 +23,8 @@ const MODIFICATIONS =
   "Horizontal composition using a blurred derivative background, color correction, moderate sharpening, resizing and WebP conversion.";
 
 /**
- * Public attribution page for the two Services-section stock photos that
- * require it under their CC BY-SA 4.0 license (iPad, Xbox Series X) — see
+ * Public attribution page for the Services-section stock photo that
+ * requires it under its CC BY-SA 4.0 license (iPad) — see
  * docs/service-image-attributions.md for the source-of-truth text this
  * page renders. English-only, same as Privacy/Terms (out of i18n scope).
  */
@@ -63,42 +63,6 @@ export function ImageCredits() {
                   <a
                     key="src"
                     href="https://commons.wikimedia.org/wiki/File:IPad_Pro_11_silver.jpg"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-torays-navy underline decoration-torays-line hover:text-torays-red"
-                  >
-                    commons.wikimedia.org
-                  </a>,
-                ],
-                ["License", "Creative Commons Attribution-ShareAlike 4.0 International"],
-                [
-                  "License URL",
-                  <a
-                    key="lic"
-                    href="https://creativecommons.org/licenses/by-sa/4.0/"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-torays-navy underline decoration-torays-line hover:text-torays-red"
-                  >
-                    creativecommons.org/licenses/by-sa/4.0
-                  </a>,
-                ],
-                ["Modifications", MODIFICATIONS],
-                ["Status", "The modified image remains available under CC BY-SA 4.0."],
-              ]}
-            />
-
-            <Credit
-              title="Xbox Series X"
-              fields={[
-                ["File used", "service-xbox.webp"],
-                ["Original title", '"Xbox Series X 2"'],
-                ["Author", "Der. Bellemer"],
-                [
-                  "Original source",
-                  <a
-                    key="src"
-                    href="https://commons.wikimedia.org/wiki/File:Xbox_Series_X_2.jpg"
                     target="_blank"
                     rel="noreferrer"
                     className="text-torays-navy underline decoration-torays-line hover:text-torays-red"

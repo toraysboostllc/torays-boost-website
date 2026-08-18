@@ -10,7 +10,7 @@ import imgIphone from "../assets/services/service-iphone.webp";
 import imgIpad from "../assets/services/service-ipad.webp";
 import imgMacbook from "../assets/services/service-macbook.webp";
 import imgSamsung from "../assets/services/service-samsung.webp";
-import imgXbox from "../assets/services/service-xbox.webp";
+import imgXbox from "../assets/services/xbox-repair.webp";
 import imgSwitch from "../assets/services/service-nintendo-switch.webp";
 import imgDataRecovery from "../assets/services/service-data-recovery.webp";
 
@@ -54,7 +54,7 @@ export function Services() {
                   width="1200"
                   height="675"
                   className="aspect-video w-full object-cover transition-transform duration-300 ease-out group-hover:scale-105 motion-reduce:transform-none motion-reduce:transition-none"
-                  style={service.id === "hdmi" ? { objectPosition: "center 50%" } : undefined}
+                  style={["hdmi", "xbox"].includes(service.id) ? { objectPosition: "center 50%" } : undefined}
                 />
               </div>
               <div className="flex flex-1 flex-col p-6">

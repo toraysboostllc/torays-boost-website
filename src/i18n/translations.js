@@ -47,7 +47,7 @@ const enServiceImageAlts = {
   ipad: "Back view of a silver Apple iPad.",
   macbook: "Side view of an open MacBook laptop on a desk.",
   samsung: "Close-up of an Android smartphone screen, representing the Samsung phones and tablets we repair.",
-  xbox: "Xbox Series X console with its controller next to the retail box.",
+  xbox: "Professional Xbox Series X board-level repair by Torays Boost in Miami",
   switch: "Nintendo Switch console in its dock next to its blue and red Joy-Con controllers.",
   "data-recovery": "Open laptop showing its internal motherboard and storage drive during data recovery work.",
 };
@@ -347,7 +347,7 @@ export const translations = {
         ipad: { title: "iPad", description: "Pantalla, digitalizador, batería y reparación de placa lógica en toda la línea de iPad.", imageAlt: "Vista trasera de un iPad plateado de Apple." },
         macbook: { title: "MacBook", description: "Recuperación por daño de líquido, teclado, batería y reparación de placa lógica.", imageAlt: "Vista lateral de una laptop MacBook abierta sobre un escritorio." },
         samsung: { title: "Samsung", description: "Pantalla, puerto de carga y reparación a nivel de chip para teléfonos y tablets Samsung.", imageAlt: "Primer plano de la pantalla de un smartphone Android, representando los teléfonos y tablets Samsung que reparamos." },
-        xbox: { title: "Xbox", description: "Reparaciones de HDMI, encendido y sobrecalentamiento con diagnóstico completo antes de la devolución.", imageAlt: "Consola Xbox Series X con su control junto a la caja original." },
+        xbox: { title: "Xbox", description: "Reparaciones de HDMI, encendido y sobrecalentamiento con diagnóstico completo antes de la devolución.", imageAlt: "Professional Xbox Series X board-level repair by Torays Boost in Miami" },
         switch: { title: "Nintendo Switch", description: "Joy-Con drift, puerto de carga, pantalla y reparación a nivel de placa para todos los modelos de Switch.", imageAlt: "Consola Nintendo Switch en su base, junto a los controles Joy-Con azul y rojo." },
         "data-recovery": { title: "Recuperación de Datos", description: "Recuperamos datos de dispositivos y discos dañados, expuestos a líquido o que no encienden.", imageAlt: "Laptop abierta mostrando su placa madre interna y unidad de almacenamiento durante un trabajo de recuperación de datos." },
       },
