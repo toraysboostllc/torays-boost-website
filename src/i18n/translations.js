@@ -41,7 +41,7 @@ const enQuestions = Object.fromEntries(
 // service itself, and would drift from the image if it lived in config.
 const enServiceImageAlts = {
   ps5: "Sony PlayStation 5 console standing upright next to its DualSense controller.",
-  hdmi: "Close-up of a PlayStation 5 motherboard, the kind of internal component repaired for HDMI issues.",
+  hdmi: "PS5 HDMI port repair in Miami by Torays Boost",
   microsoldering: "Technician performing microsoldering on a circuit board under a professional microscope.",
   iphone: "Opened iPhone with its internal components exposed on a repair bench.",
   ipad: "Back view of a silver Apple iPad.",
@@ -341,7 +341,7 @@ export const translations = {
       subtitle: "Reparación a nivel de placa y de componentes para los dispositivos que más usas.",
       items: {
         ps5: { title: "Reparación de PS5", description: "Puertos HDMI, fallas de encendido, lector de disco y diagnóstico completo a nivel de placa.", imageAlt: "Consola Sony PlayStation 5 de pie junto a su control DualSense." },
-        hdmi: { title: "Reparación de HDMI", description: "Reemplazo de puerto HDMI a nivel micro para consolas y laptops — reflow de precisión, sin atajos.", imageAlt: "Primer plano de una placa madre de PlayStation 5, el tipo de componente interno que reparamos en fallas de HDMI." },
+        hdmi: { title: "Reparación de HDMI", description: "Reemplazo de puerto HDMI a nivel micro para consolas y laptops — reflow de precisión, sin atajos.", imageAlt: "PS5 HDMI port repair in Miami by Torays Boost" },
         microsoldering: { title: "Microsoldadura", description: "Reparación a nivel de chip bajo microscopio profesional: reballing de IC, reparación de pistas, recuperación por daño de líquido.", imageAlt: "Técnico realizando microsoldadura en una placa de circuito bajo un microscopio profesional." },
         iphone: { title: "iPhone", description: "Pantallas, baterías, puertos de carga y reparación a nivel de placa para cada generación de iPhone.", imageAlt: "iPhone abierto con sus componentes internos expuestos sobre una mesa de reparación." },
         ipad: { title: "iPad", description: "Pantalla, digitalizador, batería y reparación de placa lógica en toda la línea de iPad.", imageAlt: "Vista trasera de un iPad plateado de Apple." },

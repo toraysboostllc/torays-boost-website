@@ -4,7 +4,7 @@ import { Card } from "../components/ui/Card.jsx";
 import { services } from "../config/services.config.js";
 import { useLanguage } from "../i18n/LanguageContext.jsx";
 import imgPs5 from "../assets/services/service-ps5.webp";
-import imgHdmi from "../assets/services/service-hdmi.webp";
+import imgHdmi from "../assets/services/ps5-hdmi-port-repair-miami.webp";
 import imgMicrosoldering from "../assets/services/service-microsoldering.webp";
 import imgIphone from "../assets/services/service-iphone.webp";
 import imgIpad from "../assets/services/service-ipad.webp";
@@ -54,6 +54,7 @@ export function Services() {
                   width="1200"
                   height="675"
                   className="aspect-video w-full object-cover transition-transform duration-300 ease-out group-hover:scale-105 motion-reduce:transform-none motion-reduce:transition-none"
+                  style={service.id === "hdmi" ? { objectPosition: "center 50%" } : undefined}
                 />
               </div>
               <div className="flex flex-1 flex-col p-6">

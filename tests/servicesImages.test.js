@@ -14,7 +14,7 @@ const cardSrc = read("src/components/ui/Card.jsx");
 
 const SERVICE_IMAGE_FILES = {
   ps5: "service-ps5.webp",
-  hdmi: "service-hdmi.webp",
+  hdmi: "ps5-hdmi-port-repair-miami.webp",
   microsoldering: "service-microsoldering.webp",
   iphone: "service-iphone.webp",
   ipad: "service-ipad.webp",
@@ -167,6 +167,39 @@ describe("Services.jsx: alt text sourced from the i18n system, correct in both l
     const enIds = Object.keys(translations.en.services.items).sort();
     const esIds = Object.keys(translations.es.services.items).sort();
     expect(enIds).toEqual(esIds);
+  });
+});
+
+describe("HDMI card photo swap: real PS5 HDMI port macro shot, isolated to the hdmi card only", () => {
+  it("imports the new descriptive filename, not the old generic one", () => {
+    expect(servicesSrc).toContain('import imgHdmi from "../assets/services/ps5-hdmi-port-repair-miami.webp"');
+    expect(servicesSrc).not.toMatch(/service-hdmi\.webp/);
+  });
+
+  it("the old generic file is gone from disk, the new one is the only hdmi-related asset", () => {
+    expect(existsSync(join(root, "src/assets/services/service-hdmi.webp"))).toBe(false);
+    expect(existsSync(join(root, "src/assets/services/ps5-hdmi-port-repair-miami.webp"))).toBe(true);
+  });
+
+  it("sets an explicit object-position only for the hdmi card, every other card is unaffected", () => {
+    expect(servicesSrc).toContain('style={service.id === "hdmi" ? { objectPosition: "center 50%" } : undefined}');
+  });
+
+  it("EN and ES alt text both use the exact requested SEO string", () => {
+    expect(translations.en.services.items.hdmi.imageAlt).toBe("PS5 HDMI port repair in Miami by Torays Boost");
+    expect(translations.es.services.items.hdmi.imageAlt).toBe("PS5 HDMI port repair in Miami by Torays Boost");
+  });
+
+  it("hdmi title/description copy is untouched by the photo swap", () => {
+    expect(translations.en.services.items.hdmi.title).toBe("HDMI Repair");
+    expect(translations.es.services.items.hdmi.title).toBe("Reparación de HDMI");
+  });
+
+  it("no other card's imageAlt was touched by this round", () => {
+    const otherIds = services.map((s) => s.id).filter((id) => id !== "hdmi");
+    otherIds.forEach((id) => {
+      expect(translations.en.services.items[id].imageAlt).not.toBe("PS5 HDMI port repair in Miami by Torays Boost");
+    });
   });
 });
 
