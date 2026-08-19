@@ -8,6 +8,7 @@
  * be imported from client-side code.
  */
 import crypto from "node:crypto";
+import { resolveRecommendedPrice } from "./wholesaleMargin.js";
 
 export function getEnv() {
   const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -266,7 +267,23 @@ export async function listMicrosolderingServiceIds(env, tagId, activeServiceIds)
   return new Set(rows.map((r) => r.service_id));
 }
 
-function toClientService(sv) {
+/** Fetches the single wholesale_portal_settings row (id=1, seeded by
+ *  wholesale-pricing-intelligence-migration.sql — always exists). Used both
+ *  to resolve each service's recommended_price (see resolveRecommendedPrice
+ *  in ./wholesaleMargin.js) and to surface the Torays Boost Sales module's
+ *  visible/status/entry_blocked flags to the portal. */
+export async function getPortalSettings(env) {
+  const rows = await rest(env, `wholesale_portal_settings?id=eq.1&select=*`);
+  return rows[0] || null;
+}
+
+/** `portalSettings` is required — every caller must resolve it once (see
+ *  buildWholesaleCatalog) and thread it through, never fetch it per-service.
+ *  recommended_price is computed server-side ONLY (see
+ *  api/_lib/wholesaleMargin.js's header for why) — this is the one place in
+ *  either repo that number is attached to a service before it reaches the
+ *  client. */
+function toClientService(sv, portalSettings) {
   return {
     id: sv.id,
     slug: sv.slug,
@@ -277,20 +294,25 @@ function toClientService(sv) {
     price_max: sv.price_max ?? null,
     notes: sv.notes ?? null,
     currency: sv.currency,
+    recommended_price: resolveRecommendedPrice(sv, portalSettings),
   };
 }
 
 /** Builds the full portal response — equipment-type-grouped catalog plus the
  *  Microsoldering lens — for a logged-in shop. Fixed query count regardless
  *  of catalog size: 3 catalog fetches (equipment types, categories,
- *  services) + 1 images fetch + 1 tag lookup + 1 service-tag fetch = 6
- *  Postgres round-trips, plus at most ONE batch Storage signing call. Never
- *  returns `storage_path` — only `{ url, alt_text }` per image, or `null`. */
+ *  services) + 1 portal settings fetch + 1 images fetch + 1 tag lookup + 1
+ *  service-tag fetch = 7 Postgres round-trips, plus at most ONE batch
+ *  Storage signing call. Never returns `storage_path` — only
+ *  `{ url, alt_text }` per image, or `null`. Every service's
+ *  `recommended_price` is resolved here, once, from the SAME portalSettings
+ *  row fetched at the top — never refetched per service. */
 export async function buildWholesaleCatalog(env) {
-  const [equipmentTypes, categories, services] = await Promise.all([
+  const [equipmentTypes, categories, services, portalSettings] = await Promise.all([
     listActiveEquipmentTypes(env),
     rest(env, `wholesale_categories?active=eq.true&select=*&order=sort_order.asc,name.asc`),
     rest(env, `wholesale_services?active=eq.true&select=*&order=sort_order.asc,name.asc`),
+    getPortalSettings(env),
   ]);
 
   const realEquipmentTypes = equipmentTypes.filter((et) => !et.is_tag_lens);
@@ -338,7 +360,7 @@ export async function buildWholesaleCatalog(env) {
       diagnostic_fee: cat.diagnostic_fee ?? null,
       diagnostic_description: cat.diagnostic_description ?? null,
       image: imageByCategory.get(cat.id) || null,
-      services: (servicesByCategory.get(cat.id) || []).map(toClientService),
+      services: (servicesByCategory.get(cat.id) || []).map((sv) => toClientService(sv, portalSettings)),
     };
   }
 
@@ -373,10 +395,18 @@ export async function buildWholesaleCatalog(env) {
         categories: (categoriesByEquipmentType.get(et.id) || [])
           .map((cat) => ({
             id: cat.id,
+            // `slug` (not present in this lens shape before) is required so
+            // buildWholesaleWizardCatalog's PS5/Xbox/Switch promotion logic
+            // (src/lib/wholesaleWizardCatalog.js) behaves identically inside
+            // the Microsoldering branch as it does for the regular catalog —
+            // otherwise a PS5 microsoldering service would only ever surface
+            // nested under "Video Consoles" here, inconsistent with the rest
+            // of the wizard.
+            slug: cat.slug,
             name: cat.name,
             services: (servicesByCategory.get(cat.id) || [])
               .filter((sv) => taggedServiceIds.has(sv.id))
-              .map(toClientService),
+              .map((sv) => toClientService(sv, portalSettings)),
           }))
           .filter((cat) => cat.services.length > 0),
       }))
@@ -388,7 +418,19 @@ export async function buildWholesaleCatalog(env) {
     };
   }
 
-  return { equipmentTypes: equipmentTypesOut, microsoldering };
+  return {
+    equipmentTypes: equipmentTypesOut,
+    microsoldering,
+    // Read-only for the portal — shops never write either of these. Falls
+    // back to safe, conservative defaults (maintenance + blocked, no
+    // rounding) if the singleton settings row is somehow missing, rather
+    // than throwing and breaking the whole catalog response over it.
+    salesModule: {
+      visible: portalSettings?.sales_visible ?? true,
+      status: portalSettings?.sales_status ?? "maintenance",
+      entryBlocked: portalSettings?.sales_entry_blocked ?? true,
+    },
+  };
 }
 
 export async function logEvent(env, { shopId, deviceId, event, ip, userAgent }) {

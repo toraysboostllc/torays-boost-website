@@ -77,5 +77,10 @@ export default async function handler(req, res) {
     return;
   }
 
-  res.status(200).json({ shopName: shop.name, equipmentTypes: catalog.equipmentTypes, microsoldering: catalog.microsoldering });
+  res.status(200).json({
+    shopName: shop.name,
+    equipmentTypes: catalog.equipmentTypes,
+    microsoldering: catalog.microsoldering,
+    salesModule: catalog.salesModule,
+  });
 }

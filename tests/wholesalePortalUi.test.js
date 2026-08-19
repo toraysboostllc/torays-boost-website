@@ -125,26 +125,38 @@ describe("wholesaleEquipmentIcon: pure presentational mapping", () => {
   });
 });
 
-describe("WholesalePrices page: grid/drill-down/lens view state machine, server-trust (no client-side Hidden filtering)", () => {
+describe("WholesalePrices page: wizard-driven portal, server-trust (no client-side Hidden filtering)", () => {
   const src = read("src/pages/WholesalePrices.jsx");
+  const wizardSrc = read("src/components/wholesale/WholesaleWizard.jsx");
 
   it("wraps the page in the scoped dark theme class, never touching torays-* tokens", () => {
     expect(src).toContain('className="wsp-scope"');
     expect(src).not.toMatch(/torays-(bg|surface|navy|red)\b/);
   });
 
-  it("renders the Microsoldering card only when the server actually returned a microsoldering object (never assumes it exists)", () => {
-    expect(src).toContain("state.microsoldering &&");
+  it("passes microsoldering straight through to WholesaleWizard — the existence check itself now lives there (see next check), not duplicated in this file", () => {
+    expect(src).toContain("microsoldering={state.microsoldering}");
+  });
+
+  it("WholesaleWizard renders the Microsoldering card only when the server actually returned a microsoldering object (never assumes it exists)", () => {
+    expect(wizardSrc).toMatch(/\{microsoldering && \(/);
   });
 
   it("does not re-filter equipmentTypes/services by an active/hidden flag client-side — trusts the server's already-filtered response", () => {
     expect(src).not.toMatch(/\.filter\(\s*\(?\w*\)?\s*=>\s*\w*\.active\b/);
+    expect(wizardSrc).not.toMatch(/\.filter\(\s*\(?\w*\)?\s*=>\s*\w*\.active\b/);
   });
 
-  it("reads equipmentTypes/microsoldering from fetchWholesaleCatalog's new response shape, not the old flat categories field", () => {
+  it("reads equipmentTypes/microsoldering from fetchWholesaleCatalog's response shape, not the old flat categories field", () => {
     expect(src).toContain("result.equipmentTypes");
     expect(src).toContain("result.microsoldering");
     expect(src).not.toContain("result.categories");
+  });
+
+  it("distinguishes auth failures (redirect) from transient errors (inline retry) — regression coverage for the fixed redirect-on-any-error bug", () => {
+    expect(src).toMatch(/result\.kind === "auth"/);
+    expect(src).toContain('navigate("/wholesale")');
+    expect(src).toMatch(/status: "error"/);
   });
 });
 

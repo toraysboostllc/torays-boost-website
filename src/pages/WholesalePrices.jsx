@@ -1,28 +1,57 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LogOut } from "lucide-react";
+import { LogOut, Lock } from "lucide-react";
 import { Logo } from "../components/ui/Logo.jsx";
 import { useSEO } from "../lib/seo.js";
 import { fetchWholesaleCatalog, wholesaleLogout } from "../lib/wholesaleAuth.js";
-import { EquipmentTypeCard } from "../components/wholesale/EquipmentTypeCard.jsx";
-import { CategoryDrilldown } from "../components/wholesale/CategoryDrilldown.jsx";
-import { MicrosolderingLensView } from "../components/wholesale/MicrosolderingLensView.jsx";
+import { WholesaleLocaleProvider, useWholesaleLocale } from "../i18n/WholesaleLocaleContext.jsx";
+import { WholesaleLocaleSelector } from "../components/wholesale/WholesaleLocaleSelector.jsx";
+import { WholesaleWizard } from "../components/wholesale/WholesaleWizard.jsx";
+import { WholesaleSalesModule } from "../components/wholesale/WholesaleSalesModule.jsx";
 
+/**
+ * Same auth/session model as before this round — nothing here changed:
+ * ws_session is an HttpOnly cookie the browser sends automatically, no
+ * client-held token, no local session check. The only thing that changed
+ * is HOW a failed fetch is handled — see loadCatalog() below.
+ */
 export function WholesalePrices() {
+  return (
+    <WholesaleLocaleProvider>
+      <WholesalePricesContent />
+    </WholesaleLocaleProvider>
+  );
+}
+
+function WholesalePricesContent() {
+  const { t } = useWholesaleLocale();
   useSEO({ title: "Wholesale Prices", noindex: true });
   const navigate = useNavigate();
 
-  // status: "loading" | "ready". view: "grid" | an equipmentTypes[].id | "microsoldering".
-  const [state, setState] = useState({ status: "loading", shopName: "", equipmentTypes: [], microsoldering: null });
-  const [view, setView] = useState("grid");
+  // status: "loading" | "ready" | "error"
+  const [state, setState] = useState({
+    status: "loading",
+    shopName: "",
+    equipmentTypes: [],
+    microsoldering: null,
+    salesModule: null,
+    errorMessage: "",
+  });
 
-  useEffect(() => {
-    // No local session check possible (or needed) — ws_session is an
-    // HttpOnly cookie the browser sends automatically. If it's missing or
-    // expired, the API just returns 401 and we redirect from there.
+  function loadCatalog() {
+    setState((prev) => ({ ...prev, status: "loading" }));
     fetchWholesaleCatalog().then((result) => {
       if (!result.ok) {
-        navigate("/wholesale");
+        // Fixed bug: only a genuine auth failure (expired session / revoked
+        // access) redirects to the login screen. A transient server/network
+        // error (result.kind === "transient") shows the real error inline
+        // with a Retry button instead of silently bouncing the shop back to
+        // /wholesale, which used to happen for ANY failure here.
+        if (result.kind === "auth") {
+          navigate("/wholesale");
+          return;
+        }
+        setState((prev) => ({ ...prev, status: "error", errorMessage: result.message }));
         return;
       }
       setState({
@@ -30,9 +59,18 @@ export function WholesalePrices() {
         shopName: result.shopName,
         equipmentTypes: result.equipmentTypes,
         microsoldering: result.microsoldering,
+        salesModule: result.salesModule,
+        errorMessage: "",
       });
     });
-  }, [navigate]);
+  }
+
+  useEffect(() => {
+    loadCatalog();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadCatalog is
+    // stable in intent (only reads navigate, which react-router guarantees
+    // stable); re-running this on every render would refetch in a loop.
+  }, []);
 
   async function handleLogout() {
     await wholesaleLogout();
@@ -42,63 +80,56 @@ export function WholesalePrices() {
   if (state.status === "loading") {
     return (
       <div className="wsp-scope flex min-h-screen items-center justify-center">
-        <p className="wsp-text-soft">Loading…</p>
+        <p className="wsp-text-soft">{t("portal.loading")}</p>
       </div>
     );
   }
 
-  const selectedEquipmentType =
-    typeof view === "string" && view !== "grid" && view !== "microsoldering"
-      ? state.equipmentTypes.find((et) => et.id === view)
-      : null;
+  if (state.status === "error") {
+    return (
+      <div className="wsp-scope flex min-h-screen flex-col items-center justify-center gap-4 px-5 text-center">
+        <p className="wsp-text-soft">{state.errorMessage || t("portal.errorTransient")}</p>
+        <button type="button" onClick={loadCatalog} className="wsp-btn wsp-btn-primary">
+          {t("portal.retry")}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="wsp-scope">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-5 py-10 sm:px-8">
-        <div className="flex items-center justify-between">
-          <Logo />
-          <div className="flex items-center gap-4">
-            <span className="wsp-text-soft text-sm font-medium">{state.shopName}</span>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Logo />
+            <WholesaleLocaleSelector />
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-col gap-1">
+              <div className="wsp-portal-badges">
+                <span className="wsp-portal-badge">{t("portal.badge")}</span>
+                <span className="wsp-portal-private-badge">
+                  <Lock size={11} aria-hidden="true" />
+                  {t("portal.privateArea")}
+                </span>
+              </div>
+              <span className="wsp-text-soft text-sm font-medium">
+                {t("portal.welcome", { shopName: state.shopName })}
+              </span>
+            </div>
             <button type="button" onClick={handleLogout} className="wsp-btn wsp-btn-ghost">
               <LogOut size={16} />
-              Log Out
+              {t("portal.logout")}
             </button>
           </div>
         </div>
 
-        {view === "grid" && (
-          <>
-            <h1 className="text-2xl font-bold sm:text-3xl">Wholesale Prices</h1>
+        <h1 className="text-2xl font-bold sm:text-3xl">{t("portal.title")}</h1>
 
-            {state.equipmentTypes.length === 0 && !state.microsoldering && (
-              <div className="wsp-empty">No prices have been added yet.</div>
-            )}
+        <WholesaleWizard equipmentTypes={state.equipmentTypes} microsoldering={state.microsoldering} />
 
-            <div className="wsp-grid">
-              {state.equipmentTypes.map((equipmentType) => (
-                <EquipmentTypeCard
-                  key={equipmentType.id}
-                  entity={equipmentType}
-                  onClick={() => setView(equipmentType.id)}
-                />
-              ))}
-              {state.microsoldering && (
-                <EquipmentTypeCard
-                  entity={{ slug: "microsoldering", name: "Microsoldering", image: state.microsoldering.image }}
-                  onClick={() => setView("microsoldering")}
-                />
-              )}
-            </div>
-          </>
-        )}
-
-        {selectedEquipmentType && (
-          <CategoryDrilldown equipmentType={selectedEquipmentType} onBack={() => setView("grid")} />
-        )}
-
-        {view === "microsoldering" && state.microsoldering && (
-          <MicrosolderingLensView microsoldering={state.microsoldering} onBack={() => setView("grid")} />
-        )}
+        <WholesaleSalesModule salesModule={state.salesModule} />
       </div>
     </div>
   );

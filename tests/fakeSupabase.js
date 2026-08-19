@@ -17,6 +17,25 @@ export function createFakeSupabase() {
     wholesale_images: [],
     wholesale_tags: [],
     wholesale_service_tags: [],
+    // Seeded with the same single default row
+    // wholesale-pricing-intelligence-migration.sql inserts for real (id=1) —
+    // every test starts from the post-migration state, not a fresh-install
+    // state, matching every other table here (which assume
+    // wholesale-migration.sql/wholesale-navigation-migration.sql already
+    // ran). A test that specifically wants to exercise "settings row
+    // missing" can still `fake.db.wholesale_portal_settings = []`.
+    wholesale_portal_settings: [
+      {
+        id: 1,
+        default_target_margin_percent: 40,
+        rounding_rule: "none",
+        sales_visible: true,
+        sales_status: "maintenance",
+        sales_entry_blocked: true,
+        updated_at: new Date(0).toISOString(),
+        updated_by: null,
+      },
+    ],
     profiles: [],
   };
   const authUsers = {}; // token -> user object, for /auth/v1/user

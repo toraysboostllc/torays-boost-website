@@ -432,6 +432,19 @@ describe("Microsoldering lens: tagged + active services group correctly", () => 
     expect(res.body.microsoldering.equipmentTypes[0].categories[0].services[0].name).toBe("Board-level micro-soldering repair");
   });
 
+  it("lens categories carry `slug` — required for the wizard's PS5/Xbox/Switch promotion (src/lib/wholesaleWizardCatalog.js) to behave identically inside the Microsoldering branch", async () => {
+    seedShopWithSession();
+    seedMicrosolderingType();
+    const et = seedEquipmentType({ slug: "iphone", name: "iPhone" });
+    const cat = seedCategory(et.id, { slug: "iphone-15-17", name: "iPhone 15 / 16 / 17" });
+    const service = seedService(cat.id, { name: "Board-level micro-soldering repair" });
+    tagService(service.id);
+
+    const res = await callPrices();
+
+    expect(res.body.microsoldering.equipmentTypes[0].categories[0].slug).toBe("iphone-15-17");
+  });
+
   it("a tagged service that is inactive never appears in the lens", async () => {
     seedShopWithSession();
     seedMicrosolderingType();
