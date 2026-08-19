@@ -5,6 +5,8 @@ import {
   computeMarkupPercent,
   computeFixedPricing,
   computeRangePricing,
+  hasCompletePriceTiers,
+  isHighProfitPrice,
 } from "../src/lib/wholesaleMargin.js";
 
 describe("computePotentialProfit: customerPrice - wholesalePrice, never clamped to zero", () => {
@@ -132,5 +134,90 @@ describe("computeRangePricing: full bundle for a `range` service — always a ra
     expect(computeRangePricing({ wholesaleMin: NaN, wholesaleMax: 90, customerPrice: 150 })).toBeNull();
     expect(computeRangePricing({ wholesaleMin: 70, wholesaleMax: 90, customerPrice: -5 })).toBeNull();
     expect(computeRangePricing({ wholesaleMin: -70, wholesaleMax: 90, customerPrice: 150 })).toBeNull();
+  });
+});
+
+describe("hasCompletePriceTiers: legacy vs configured, never a partial/guessed shape", () => {
+  it("true only when all three tier prices are real numbers", () => {
+    expect(hasCompletePriceTiers({ competitive_price: 40, recommended_price: 45, high_profit_price: 55 })).toBe(true);
+  });
+
+  it("false when all three are null (legacy — never treated as 'configured with zeros')", () => {
+    expect(hasCompletePriceTiers({ competitive_price: null, recommended_price: null, high_profit_price: null })).toBe(false);
+  });
+
+  it("false when only one or two of the three are set — never a partial tier UI", () => {
+    expect(hasCompletePriceTiers({ competitive_price: 40, recommended_price: null, high_profit_price: 55 })).toBe(false);
+    expect(hasCompletePriceTiers({ competitive_price: null, recommended_price: 45, high_profit_price: 55 })).toBe(false);
+    expect(hasCompletePriceTiers({ competitive_price: 40, recommended_price: 45, high_profit_price: null })).toBe(false);
+  });
+
+  it("false for a missing/null service object, never throws", () => {
+    expect(hasCompletePriceTiers(null)).toBe(false);
+    expect(hasCompletePriceTiers(undefined)).toBe(false);
+  });
+});
+
+describe("isHighProfitPrice: 'igual o superior' al nivel Gold siempre clasifica como High Profit", () => {
+  it("true when the customer price exceeds the Gold price", () => {
+    expect(isHighProfitPrice(60, 55)).toBe(true);
+  });
+
+  it("true on an exact match — 'igual o superior', not just 'superior'", () => {
+    expect(isHighProfitPrice(55, 55)).toBe(true);
+  });
+
+  it("false when below the Gold price, even by a cent", () => {
+    expect(isHighProfitPrice(54.99, 55)).toBe(false);
+  });
+
+  it("false (never a guess) when either input is missing/invalid", () => {
+    expect(isHighProfitPrice(null, 55)).toBe(false);
+    expect(isHighProfitPrice(60, null)).toBe(false);
+    expect(isHighProfitPrice(NaN, 55)).toBe(false);
+  });
+});
+
+describe("Price tier examples from the approved spec — exact numbers, verified through the real pure-calc functions", () => {
+  it("DualSense: Shop Cost $25, Silver $40/$15 profit/37.5% margin, Purple $45/$20/44.4%, Gold $55/$30/54.5%", () => {
+    const shopCost = 25;
+    const silver = computeFixedPricing({ wholesalePrice: shopCost, customerPrice: 40 });
+    expect(silver.potentialProfit).toBe(15);
+    expect(silver.estimatedMarginPercent).toBeCloseTo(37.5, 1);
+
+    const purple = computeFixedPricing({ wholesalePrice: shopCost, customerPrice: 45 });
+    expect(purple.potentialProfit).toBe(20);
+    expect(purple.estimatedMarginPercent).toBeCloseTo(44.4, 1);
+
+    const gold = computeFixedPricing({ wholesalePrice: shopCost, customerPrice: 55 });
+    expect(gold.potentialProfit).toBe(30);
+    expect(gold.estimatedMarginPercent).toBeCloseTo(54.5, 1);
+  });
+
+  it("Board-level repair: Shop Cost $50, Silver $90, Purple $120, Gold $140 — all real profits, none a loss", () => {
+    const shopCost = 50;
+    const silver = computeFixedPricing({ wholesalePrice: shopCost, customerPrice: 90 });
+    expect(silver.potentialProfit).toBe(40);
+    expect(silver.isLoss).toBe(false);
+
+    const purple = computeFixedPricing({ wholesalePrice: shopCost, customerPrice: 120 });
+    expect(purple.potentialProfit).toBe(70);
+    expect(purple.isLoss).toBe(false);
+
+    const gold = computeFixedPricing({ wholesalePrice: shopCost, customerPrice: 140 });
+    expect(gold.potentialProfit).toBe(90);
+    expect(gold.isLoss).toBe(false);
+  });
+
+  it("a custom price below Shop Cost is a real loss, on either example", () => {
+    expect(computeFixedPricing({ wholesalePrice: 25, customerPrice: 20 }).isLoss).toBe(true);
+    expect(computeFixedPricing({ wholesalePrice: 50, customerPrice: 45 }).isLoss).toBe(true);
+  });
+
+  it("a custom price at or above Gold classifies as High Profit on both examples", () => {
+    expect(isHighProfitPrice(55, 55)).toBe(true); // DualSense, exact Gold
+    expect(isHighProfitPrice(60, 55)).toBe(true); // DualSense, above Gold
+    expect(isHighProfitPrice(140, 140)).toBe(true); // board repair, exact Gold
+    expect(isHighProfitPrice(200, 140)).toBe(true); // board repair, above Gold
   });
 });

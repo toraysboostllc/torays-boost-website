@@ -321,6 +321,16 @@ function toClientService(sv, portalSettings) {
     notes: sv.notes ?? null,
     currency: sv.currency,
     recommended_price: resolveRecommendedPrice(sv, portalSettings),
+    // Silver/Gold price tiers (Phase 1, pricing_type='fixed' only) — raw
+    // passthrough, no formula/fallback of any kind (unlike
+    // recommended_price above): the DB constraint
+    // wholesale_services_price_tiers_check already guarantees these two
+    // columns are either both null (legacy — the client falls back to
+    // today's single recommended-price experience) or both set alongside a
+    // non-null recommended_price, so the client can safely tell "complete"
+    // from "legacy" just by checking these two for null.
+    competitive_price: sv.competitive_price ?? null,
+    high_profit_price: sv.high_profit_price ?? null,
   };
 }
 

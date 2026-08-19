@@ -1,8 +1,16 @@
 import { useState } from "react";
-import { RotateCcw, ShieldCheck, AlertTriangle } from "lucide-react";
+import { RotateCcw, ShieldCheck, AlertTriangle, Tag, Star, TrendingUp, Check } from "lucide-react";
 import { useWholesaleLocale } from "../../i18n/WholesaleLocaleContext.jsx";
-import { computeFixedPricing, computeRangePricing } from "../../lib/wholesaleMargin.js";
+import { computeFixedPricing, computeRangePricing, hasCompletePriceTiers, isHighProfitPrice } from "../../lib/wholesaleMargin.js";
 import { translateCatalogLabel } from "../../lib/wholesaleCatalogI18n.js";
+
+/** Silver/Purple/Gold, in display order. Purely presentational metadata —
+ *  the actual prices come from the service object, keyed the same way. */
+const PRICE_TIERS = [
+  { key: "competitive", priceField: "competitive_price", labelKey: "result.tierCompetitive", Icon: Tag },
+  { key: "recommended", priceField: "recommended_price", labelKey: "result.tierRecommended", Icon: Star },
+  { key: "highProfit", priceField: "high_profit_price", labelKey: "result.tierHighProfit", Icon: TrendingUp },
+];
 
 /** Which single number to show for "Tu precio Shop" — fixed/range/quote all
  *  need a different presentation, and `quote` genuinely has none yet. */
@@ -26,10 +34,42 @@ export function WholesaleResultPanel({ selection, service, onConsultAnother }) {
   const isQuote = service.pricing_type === "quote";
   const isRange = service.pricing_type === "range";
 
+  // Silver/Purple/Gold only ever apply to a service DESK has fully and
+  // explicitly configured (never a formula, never a partial set — see
+  // hasCompletePriceTiers) — every service without that stays on exactly
+  // today's single-recommended-price experience, unchanged.
+  const hasTiers = hasCompletePriceTiers(service);
+
   const [customerPriceInput, setCustomerPriceInput] = useState(
     service.recommended_price != null ? String(service.recommended_price) : ""
   );
   const customerPrice = customerPriceInput === "" ? null : Number(customerPriceInput);
+
+  function selectTier(priceField) {
+    setCustomerPriceInput(String(service[priceField]));
+  }
+
+  // "Igual o superior" al nivel Gold siempre clasifica como High Profit,
+  // incluso si el monto no coincide con ningún nivel exacto (el shop
+  // escribió más que Gold) — este chequeo va primero, antes de comparar
+  // contra Silver/Purple, para que ese caso límite nunca se pierda.
+  const activeTierKey = !hasTiers || customerPrice == null
+    ? null
+    : isHighProfitPrice(customerPrice, service.high_profit_price)
+      ? "highProfit"
+      : customerPrice === service.competitive_price
+        ? "competitive"
+        : customerPrice === service.recommended_price
+          ? "recommended"
+          : null;
+
+  const heroLabel = hasTiers
+    ? t(
+        activeTierKey
+          ? PRICE_TIERS.find((tier) => tier.key === activeTierKey).labelKey
+          : "result.tierCustomLabel"
+      )
+    : t("result.recommendedPrice");
 
   const fixedResult =
     !isQuote && !isRange && customerPrice != null
@@ -84,11 +124,47 @@ export function WholesaleResultPanel({ selection, service, onConsultAnother }) {
               <span className="wsp-result-money-value">{wholesaleDisplayPrice(service, formatPrice)}</span>
             </div>
 
-            {/* The editable "recommended customer price" — the input itself
-                IS this figure, never a duplicate read-only value elsewhere. */}
+            {/* Three compact, always-visible price levels — shown only once
+                DESK has configured all three (see hasTiers above); a
+                service still on the single-price experience never shows a
+                skeleton/empty tier row. Selecting one immediately updates
+                the editable price below (and therefore profit/margin) —
+                the input stays the single source of truth for what the
+                shop is charging, never a duplicate read-only figure. */}
+            {hasTiers && (
+              <div className="wsp-result-tier-group" role="radiogroup" aria-label={t("result.tierGroupLabel")}>
+                {PRICE_TIERS.map((tier) => {
+                  const tierPrice = service[tier.priceField];
+                  const isActive = activeTierKey === tier.key;
+                  return (
+                    <button
+                      key={tier.key}
+                      type="button"
+                      role="radio"
+                      aria-checked={isActive}
+                      onClick={() => selectTier(tier.priceField)}
+                      className={`wsp-result-tier-card wsp-result-tier-${tier.key}${isActive ? " wsp-result-tier-selected" : ""}`}
+                    >
+                      <span className="wsp-result-tier-top">
+                        <tier.Icon size={14} aria-hidden="true" className="wsp-result-tier-icon" />
+                        {isActive && <Check size={14} aria-hidden="true" className="wsp-result-tier-check" />}
+                      </span>
+                      <span className="wsp-result-tier-label">{t(tier.labelKey)}</span>
+                      <span className="wsp-result-tier-price">{formatPrice(tierPrice)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* The editable customer price — the input itself IS this
+                figure, never a duplicate read-only value elsewhere. Its
+                label reflects whichever tier (if any) the current value
+                matches, or a generic "custom price" label once the shop
+                types something that matches none of the three. */}
             <div className="wsp-result-money-hero">
               <div className="wsp-result-money-hero-top">
-                <span className="wsp-result-money-label">{t("result.recommendedPrice")}</span>
+                <span className="wsp-result-money-label">{heroLabel}</span>
                 <span className="wsp-result-editable-badge">{t("result.editableLabel")}</span>
               </div>
               <input
@@ -99,7 +175,7 @@ export function WholesaleResultPanel({ selection, service, onConsultAnother }) {
                 value={customerPriceInput}
                 onChange={(e) => setCustomerPriceInput(e.target.value)}
                 className="wsp-result-recommended-input"
-                aria-label={t("result.recommendedPrice")}
+                aria-label={heroLabel}
               />
             </div>
 

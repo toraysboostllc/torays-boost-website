@@ -853,6 +853,108 @@
   color: var(--wsp-profit-text);
 }
 
+/* ---------------------------------------------------------------------
+   Price tiers — Silver (Competitive) / Purple (Recommended) / Gold (High
+   Profit). Shown only once a service has all three configured (see
+   hasTiers in WholesaleResultPanel.jsx) — a legacy service never renders
+   this group at all, so there is no empty/partial state to style here.
+   Gradients are the exact approved values; every card keeps the same
+   dark-navy card text color regardless of which gradient it sits on —
+   confirmed AA-safe against both stops of all three (each gradient stays
+   light-to-medium, nothing near-black to force a light-text scheme like
+   the wizard's own photo background needed). Color is never the only
+   signal: every card always shows its own icon + text label + price, and
+   the selected card adds a visible border/shadow/checkmark, never a
+   color-only change. */
+.wsp-result-tier-group {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.wsp-result-tier-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-height: 44px;
+  padding: 10px 6px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  text-align: center;
+  color: var(--wsp-card-text);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+}
+
+.wsp-result-tier-competitive {
+  background: linear-gradient(135deg, #f4f7fb 0%, #aeb8c6 100%);
+}
+
+.wsp-result-tier-recommended {
+  background: linear-gradient(135deg, #f1eaff 0%, #b99cff 100%);
+}
+
+.wsp-result-tier-highProfit {
+  background: linear-gradient(135deg, #fff4bf 0%, #d4af37 100%);
+}
+
+.wsp-result-tier-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 16px;
+}
+
+.wsp-result-tier-icon {
+  opacity: 0.75;
+}
+
+.wsp-result-tier-check {
+  color: var(--wsp-blue);
+}
+
+.wsp-result-tier-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.wsp-result-tier-price {
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 640px) {
+  .wsp-result-tier-price {
+    font-size: 17px;
+  }
+}
+
+.wsp-result-tier-selected {
+  border-color: var(--wsp-blue);
+  box-shadow: 0 0 0 1px var(--wsp-blue), 0 4px 10px rgba(37, 99, 235, 0.25);
+  transform: translateY(-1px);
+}
+
+.wsp-result-tier-card:focus-visible {
+  outline: 2px solid var(--wsp-blue);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wsp-result-tier-card {
+    transition: none;
+  }
+  .wsp-result-tier-selected {
+    transform: none;
+  }
+}
+
 /* The editable recommended-customer-price "hero" — the single most visible
    figure on the panel. The input IS the figure, never a duplicate
    read-only value elsewhere on the page. */

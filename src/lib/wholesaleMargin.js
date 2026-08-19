@@ -81,6 +81,33 @@ export function computeFixedPricing({ wholesalePrice, customerPrice }) {
   };
 }
 
+/** A service has a complete Silver/Purple/Gold tier configuration only when
+ *  all three prices are real numbers — competitive_price and
+ *  high_profit_price are never set independently of one another or of
+ *  recommended_price (the DB constraint enforces this), but this stays a
+ *  defensive three-way check rather than trusting any two-of-three shape.
+ *  Never invents a value: a service with any of the three missing is
+ *  treated as "legacy" (single recommended-price experience), exactly the
+ *  behavior that existed before tiers, never a partially-filled tier UI. */
+export function hasCompletePriceTiers(service) {
+  return (
+    service != null &&
+    isFiniteNumber(service.competitive_price) &&
+    isFiniteNumber(service.recommended_price) &&
+    isFiniteNumber(service.high_profit_price)
+  );
+}
+
+/** True once the shop's customer price reaches the Gold/High Profit level —
+ *  "igual o superior" per spec, so an exact match on the Gold price and
+ *  anything the shop types above it both classify as High Profit. Only
+ *  meaningful when the service actually has a high_profit_price; returns
+ *  false (never a guess) when either input is missing. */
+export function isHighProfitPrice(customerPrice, highProfitPrice) {
+  if (!isFiniteNumber(customerPrice) || !isFiniteNumber(highProfitPrice)) return false;
+  return customerPrice >= highProfitPrice;
+}
+
 /** Full bundle for a `range`-pricing_type service. Never a single number
  *  claiming false precision — profit and margin are both shown as ranges:
  *    ganancia mínima = customerPrice - wholesaleMax  (worst case for the shop)

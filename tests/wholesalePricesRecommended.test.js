@@ -212,3 +212,60 @@ describe("GET /api/wholesale-prices: unauthorized/revoked access is unaffected b
     expect(res.body.salesModule).toBeUndefined(); // no catalog data of any kind leaks on a revoked/blocked response
   });
 });
+
+describe("GET /api/wholesale-prices: Silver/Purple/Gold price tiers pass through raw, no formula, no fallback", () => {
+  it("a legacy service (competitive_price/high_profit_price both null in the DB) reports both as null — the client, not this endpoint, decides to fall back to the single-price experience", async () => {
+    const fake = createFakeSupabase();
+    seedApprovedShopAndDevice(fake);
+    const et = seedEquipmentType(fake);
+    const cat = seedCategory(fake, et.id);
+    seedService(fake, cat.id, { fixed_price: 25, recommended_price: 45 });
+
+    const res = await callPrices(fake);
+    const service = res.body.equipmentTypes[0].categories[0].services[0];
+    expect(service.competitive_price).toBeNull();
+    expect(service.high_profit_price).toBeNull();
+    expect(service.recommended_price).toBe(45);
+  });
+
+  it("a fully-configured service (the DualSense example from the spec) reports all three tiers exactly as stored, with no rounding/derivation of any kind", async () => {
+    const fake = createFakeSupabase();
+    seedApprovedShopAndDevice(fake);
+    const et = seedEquipmentType(fake);
+    const cat = seedCategory(fake, et.id);
+    seedService(fake, cat.id, {
+      fixed_price: 25,
+      recommended_price: 45,
+      competitive_price: 40,
+      high_profit_price: 55,
+    });
+
+    const res = await callPrices(fake);
+    const service = res.body.equipmentTypes[0].categories[0].services[0];
+    expect(service.fixed_price).toBe(25);
+    expect(service.competitive_price).toBe(40);
+    expect(service.recommended_price).toBe(45);
+    expect(service.high_profit_price).toBe(55);
+  });
+
+  it("the board-level-repair example from the spec passes through exactly as stored too", async () => {
+    const fake = createFakeSupabase();
+    seedApprovedShopAndDevice(fake);
+    const et = seedEquipmentType(fake);
+    const cat = seedCategory(fake, et.id);
+    seedService(fake, cat.id, {
+      name: "Board-Level Repair",
+      fixed_price: 50,
+      recommended_price: 120,
+      competitive_price: 90,
+      high_profit_price: 140,
+    });
+
+    const res = await callPrices(fake);
+    const service = res.body.equipmentTypes[0].categories[0].services[0];
+    expect(service.fixed_price).toBe(50);
+    expect(service.competitive_price).toBe(90);
+    expect(service.recommended_price).toBe(120);
+    expect(service.high_profit_price).toBe(140);
+  });
+});

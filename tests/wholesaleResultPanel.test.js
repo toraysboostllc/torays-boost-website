@@ -11,10 +11,13 @@ const panelSrc = read("src/components/wholesale/WholesaleResultPanel.jsx");
 
 describe("WholesaleResultPanel.jsx: wired to the tested pure calc functions, never reimplements the math", () => {
   it("imports computeFixedPricing/computeRangePricing from the tested lib, never a local reimplementation", () => {
-    expect(panelSrc).toContain(
-      'import { computeFixedPricing, computeRangePricing } from "../../lib/wholesaleMargin.js"'
-    );
+    expect(panelSrc).toMatch(/import \{[^}]*computeFixedPricing[^}]*computeRangePricing[^}]*\} from "\.\.\/\.\.\/lib\/wholesaleMargin\.js";/);
     expect(panelSrc).not.toMatch(/function computeFixedPricing|function computeRangePricing/);
+  });
+
+  it("imports hasCompletePriceTiers/isHighProfitPrice from the same tested lib for the tier feature, never reimplemented locally", () => {
+    expect(panelSrc).toMatch(/import \{[^}]*hasCompletePriceTiers[^}]*isHighProfitPrice[^}]*\} from "\.\.\/\.\.\/lib\/wholesaleMargin\.js";/);
+    expect(panelSrc).not.toMatch(/function hasCompletePriceTiers|function isHighProfitPrice/);
   });
 
   it("never contains its own margin/profit arithmetic (no raw subtraction/division of price fields)", () => {
@@ -112,11 +115,15 @@ describe("WholesaleResultPanel.jsx: mobile-friendly numeric input", () => {
 });
 
 describe("WholesaleResultPanel.jsx: Recommended Customer Price is the single editable hero figure, never duplicated", () => {
-  it("the editable input IS the recommendedPrice figure — same wsp-result-money-hero block carries both the label and the input", () => {
+  it("the editable input IS the hero figure — same wsp-result-money-hero block carries both the (dynamic) label and the input", () => {
     const heroStart = panelSrc.indexOf("wsp-result-money-hero");
     const heroEnd = panelSrc.indexOf("</div>", panelSrc.indexOf("wsp-result-recommended-input"));
     const heroBlock = panelSrc.slice(heroStart, heroEnd);
-    expect(heroBlock).toContain('t("result.recommendedPrice")');
+    // The label is now dynamic (heroLabel) so the hero reflects whichever
+    // tier — or none — the current typed value matches; it still defaults
+    // to result.recommendedPrice for every legacy (no-tiers) service, see
+    // the "heroLabel derivation" describe block below.
+    expect(heroBlock).toContain("{heroLabel}");
     expect(heroBlock).toContain("wsp-result-recommended-input");
     expect(heroBlock).toContain("customerPriceInput");
   });
@@ -126,11 +133,9 @@ describe("WholesaleResultPanel.jsx: Recommended Customer Price is the single edi
     expect(panelSrc).toContain('t("result.editableLabel")');
   });
 
-  it("recommended_price is never rendered a second time as a separate read-only value — every reference to it lives inside the useState initializer line, none elsewhere in the render output", () => {
+  it("the input is still seeded from service.recommended_price, same as before tiers existed", () => {
     const initializerLine = 'service.recommended_price != null ? String(service.recommended_price) : ""';
     expect(panelSrc).toContain(initializerLine);
-    const withoutInitializer = panelSrc.replace(initializerLine, "");
-    expect(withoutInitializer).not.toContain("service.recommended_price");
   });
 
   it("editing the input recalculates profit/margin immediately — profitDisplay/marginDisplay are derived from customerPrice on every render, no separate 'apply' step", () => {
@@ -171,5 +176,68 @@ describe("WholesaleResultPanel.jsx: catalog names (equipo/model/service) are loc
     expect(panelSrc).toContain("translateCatalogLabel(selection.equipoName, language)");
     expect(panelSrc).toContain("translateCatalogLabel(selection.modelName, language)");
     expect(panelSrc).toContain("translateCatalogLabel(service.name, language)");
+  });
+});
+
+describe("WholesaleResultPanel.jsx: Silver/Purple/Gold price tiers — shown only when fully configured", () => {
+  it("hasTiers is derived from hasCompletePriceTiers(service), never a hand-rolled null-check", () => {
+    expect(panelSrc).toContain("const hasTiers = hasCompletePriceTiers(service);");
+  });
+
+  it("the tier card group renders only when hasTiers is true — a legacy service (no competitive/high_profit price) never sees an empty or partial tier row", () => {
+    expect(panelSrc).toMatch(/\{hasTiers && \(\s*<div className="wsp-result-tier-group"/);
+  });
+
+  it("PRICE_TIERS defines exactly the three approved levels, in Silver/Purple/Gold order, each reading its own field off the service object", () => {
+    const tiersBlock = panelSrc.slice(panelSrc.indexOf("const PRICE_TIERS"), panelSrc.indexOf("];") + 2);
+    expect(tiersBlock).toMatch(/key:\s*"competitive"[\s\S]*priceField:\s*"competitive_price"/);
+    expect(tiersBlock).toMatch(/key:\s*"recommended"[\s\S]*priceField:\s*"recommended_price"/);
+    expect(tiersBlock).toMatch(/key:\s*"highProfit"[\s\S]*priceField:\s*"high_profit_price"/);
+    // order in the source array is display order — Silver, then Purple, then Gold
+    expect(tiersBlock.indexOf('key: "competitive"')).toBeLessThan(tiersBlock.indexOf('key: "recommended"'));
+    expect(tiersBlock.indexOf('key: "recommended"')).toBeLessThan(tiersBlock.indexOf('key: "highProfit"'));
+  });
+
+  it("the tier group is a real radiogroup — each card is role=radio with aria-checked reflecting the active tier, for keyboard/screen-reader users", () => {
+    expect(panelSrc).toContain('role="radiogroup"');
+    expect(panelSrc).toContain('role="radio"');
+    expect(panelSrc).toContain("aria-checked={isActive}");
+  });
+
+  it("every tier card renders an icon AND a text label AND the price — color is never the only indication of which tier is which or which is selected", () => {
+    const cardBlock = panelSrc.slice(panelSrc.indexOf("PRICE_TIERS.map"), panelSrc.indexOf("</div>\n            )}"));
+    expect(cardBlock).toContain("<tier.Icon");
+    expect(cardBlock).toContain("{t(tier.labelKey)}");
+    expect(cardBlock).toContain("{formatPrice(tierPrice)}");
+    // the selected state adds a Check icon AND a dedicated class, not just a color change
+    expect(cardBlock).toContain("wsp-result-tier-selected");
+    expect(cardBlock).toMatch(/isActive && <Check/);
+  });
+
+  it("clicking a tier card sets the editable input to that tier's exact price — selectTier writes straight into customerPriceInput, no intermediate rounding/formula", () => {
+    expect(panelSrc).toContain("function selectTier(priceField) {");
+    expect(panelSrc).toContain("setCustomerPriceInput(String(service[priceField]));");
+    expect(panelSrc).toContain("onClick={() => selectTier(tier.priceField)}");
+  });
+
+  it("activeTierKey classifies >= high_profit_price as High Profit BEFORE checking exact matches against Silver/Purple — the >= rule always wins on a tie", () => {
+    const block = panelSrc.slice(panelSrc.indexOf("const activeTierKey"), panelSrc.indexOf("const heroLabel"));
+    const highProfitCheckPos = block.indexOf("isHighProfitPrice(customerPrice, service.high_profit_price)");
+    const competitiveCheckPos = block.indexOf('customerPrice === service.competitive_price');
+    expect(highProfitCheckPos).toBeGreaterThan(-1);
+    expect(competitiveCheckPos).toBeGreaterThan(-1);
+    expect(highProfitCheckPos).toBeLessThan(competitiveCheckPos);
+  });
+
+  it("heroLabel falls back to result.recommendedPrice for legacy (no-tiers) services — the exact same label every service showed before tiers existed", () => {
+    expect(panelSrc).toMatch(/const heroLabel = hasTiers[\s\S]*?: t\("result\.recommendedPrice"\);/);
+  });
+
+  it("heroLabel falls back to result.tierCustomLabel once the typed price matches none of the three tiers", () => {
+    expect(panelSrc).toContain('"result.tierCustomLabel"');
+  });
+
+  it("loss is still measured against fixed_price (Shop Cost) directly via computeFixedPricing's wholesalePrice param — tiers never change what counts as a loss", () => {
+    expect(panelSrc).toContain("computeFixedPricing({ wholesalePrice: service.fixed_price, customerPrice })");
   });
 });

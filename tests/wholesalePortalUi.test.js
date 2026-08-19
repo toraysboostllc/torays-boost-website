@@ -668,3 +668,58 @@ describe("scope: card hover/lift effect can't introduce horizontal overflow or l
     expect(gridRule).not.toMatch(/width:\s*\d+px/);
   });
 });
+
+describe("wholesalePortal.css: price-tier cards — exact approved Silver/Purple/Gold gradients, AA-safe text, real touch targets", () => {
+  const css = read("src/styles/wholesalePortal.css");
+  const luminanceOf = (hex) => {
+    const n = parseInt(hex.slice(1), 16);
+    return ((n >> 16) & 255) + ((n >> 8) & 255) + (n & 255);
+  };
+
+  it("uses the exact three approved gradients, one per tier, never a placeholder or reused card color", () => {
+    const competitiveRule = css.match(/\.wsp-result-tier-competitive\s*\{[\s\S]*?\n\}/)[0];
+    const recommendedRule = css.match(/\.wsp-result-tier-recommended\s*\{[\s\S]*?\n\}/)[0];
+    const highProfitRule = css.match(/\.wsp-result-tier-highProfit\s*\{[\s\S]*?\n\}/)[0];
+    expect(competitiveRule).toMatch(/linear-gradient\(135deg,\s*#f4f7fb 0%,\s*#aeb8c6 100%\)/i);
+    expect(recommendedRule).toMatch(/linear-gradient\(135deg,\s*#f1eaff 0%,\s*#b99cff 100%\)/i);
+    expect(highProfitRule).toMatch(/linear-gradient\(135deg,\s*#fff4bf 0%,\s*#d4af37 100%\)/i);
+  });
+
+  it("every tier gradient stays light enough for the shared dark card text color to keep real contrast — even at each gradient's darkest stop", () => {
+    const darkestStops = ["#aeb8c6", "#b99cff", "#d4af37"]; // the darker end of each of the 3 gradients
+    const cardTextHex = css.match(/--wsp-card-text:\s*(#[0-9a-fA-F]{6})/)[1];
+    for (const stop of darkestStops) {
+      expect(luminanceOf(stop) - luminanceOf(cardTextHex)).toBeGreaterThan(250);
+    }
+  });
+
+  it(".wsp-result-tier-card uses the shared dark card text color, never a light-on-dark scheme (unlike the wizard's own photo background, these gradients are all light enough to stay dark-on-light throughout)", () => {
+    const rule = css.match(/\.wsp-result-tier-card\s*\{[\s\S]*?\n\}/)[0];
+    expect(rule).toMatch(/color:\s*var\(--wsp-card-text\);/);
+  });
+
+  it("the tier group is a 3-column grid, compact enough to avoid adding scroll to the already no-scroll-tuned result screen", () => {
+    const rule = css.match(/\.wsp-result-tier-group\s*\{[\s\S]*?\n\}/)[0];
+    expect(rule).toMatch(/grid-template-columns:\s*repeat\(3, 1fr\)/);
+  });
+
+  it("each tier card meets the 44px touch-target floor and gets a keyboard focus-visible ring", () => {
+    const cardRule = css.match(/\.wsp-result-tier-card\s*\{[\s\S]*?\n\}/)[0];
+    expect(cardRule).toMatch(/min-height:\s*44px/);
+    const focusRule = css.match(/\.wsp-result-tier-card:focus-visible\s*\{[\s\S]*?\n\}/)[0];
+    expect(focusRule).toMatch(/outline:/);
+  });
+
+  it("the selected tier gets a real border/shadow change, not just a color swap, and that change is skipped under prefers-reduced-motion", () => {
+    const selectedRule = css.match(/\.wsp-result-tier-selected\s*\{[\s\S]*?\n\}/)[0];
+    expect(selectedRule).toMatch(/border-color:/);
+    expect(selectedRule).toMatch(/box-shadow:/);
+    expect(selectedRule).toMatch(/transform:/);
+    const mediaStart = css.indexOf("@media (prefers-reduced-motion: reduce)", css.indexOf(".wsp-result-tier-selected"));
+    const mediaBlock = css.slice(mediaStart, mediaStart + 200);
+    expect(mediaBlock).toContain(".wsp-result-tier-card");
+    expect(mediaBlock).toContain("transition: none;");
+    expect(mediaBlock).toContain(".wsp-result-tier-selected");
+    expect(mediaBlock).toContain("transform: none;");
+  });
+});
