@@ -274,12 +274,209 @@ describe("preflight file", () => {
   });
 });
 
+describe("preflight file: coverage correction 1 — all 6 new columns checked individually, not by a partial stand-in", () => {
+  // A prior version of this file only checked wholesale_price_history's
+  // old_competitive_price column as a stand-in for all four new history
+  // columns — that could PASS while new_competitive_price,
+  // old_high_profit_price, and new_high_profit_price were still missing.
+  // Exact column names below are taken from wholesale-price-tiers-
+  // migration.sql section 2 (asserted in the "wrapping and columns"
+  // describe block above) — confirmed identical here.
+  const EXPECTED_COLUMNS = [
+    { table: "wholesale_services", column: "competitive_price" },
+    { table: "wholesale_services", column: "high_profit_price" },
+    { table: "wholesale_price_history", column: "old_competitive_price" },
+    { table: "wholesale_price_history", column: "new_competitive_price" },
+    { table: "wholesale_price_history", column: "old_high_profit_price" },
+    { table: "wholesale_price_history", column: "new_high_profit_price" },
+  ];
+
+  it.each(EXPECTED_COLUMNS)("checks $table.$column individually via its own exists(...) lookup", ({ table, column }) => {
+    const pattern = `table_name = '${table}' and column_name = '${column}'`;
+    expect(preflight).toContain(pattern);
+    // Must be wrapped in its own exists(select 1 from information_schema.columns ...) —
+    // not folded into a count(*)/IN(...) list, which is exactly the pattern
+    // that let 3 of the 4 history columns go unchecked before.
+    const idx = preflight.indexOf(pattern);
+    const lineStart = preflight.lastIndexOf("\n", idx) + 1;
+    const line = preflight.slice(lineStart, preflight.indexOf("\n", idx));
+    expect(line).toMatch(/^\s*exists \(select 1 from information_schema\.columns where table_schema = 'public' and/);
+  });
+
+  it("never falls back to a bare count(*)/IN(...) list for the tier columns (the exact pattern that caused the original gap)", () => {
+    expect(preflight).not.toMatch(/column_name in \([^)]*'old_competitive_price'/);
+    expect(preflight).not.toMatch(/column_name in \([^)]*'competitive_price'/);
+  });
+
+  it("the tier_columns_individual_state check's PASS branches reference all 6 column booleans, not just 3", () => {
+    const idx = preflight.indexOf("'tier_columns_individual_state'");
+    expect(idx).toBeGreaterThan(-1);
+    const block = preflight.slice(idx, preflight.indexOf("from state", idx));
+    for (const { table, column } of EXPECTED_COLUMNS) {
+      const boolName = table === "wholesale_services" ? `services_has_${column}` : `history_has_${column}`;
+      expect(block).toContain(boolName);
+    }
+  });
+});
+
+describe("preflight file: coverage correction 2 — v2 and the tier columns are cross-checked, never independently PASS-able", () => {
+  it("defines is_clean_initial requiring v2 absent AND all 6 columns absent", () => {
+    const stateIdx = preflight.indexOf("state as (");
+    const endIdx = preflight.indexOf("as is_clean_initial", stateIdx);
+    const block = preflight.slice(stateIdx, endIdx);
+    expect(block).toContain("v2_name_matches = 0");
+    expect(block).toContain("not services_has_competitive_price");
+    expect(block).toContain("not services_has_high_profit_price");
+    expect(block).toContain("not history_has_old_competitive_price");
+    expect(block).toContain("not history_has_new_competitive_price");
+    expect(block).toContain("not history_has_old_high_profit_price");
+    expect(block).toContain("not history_has_new_high_profit_price");
+  });
+
+  it("defines is_clean_applied requiring exactly one correctly-signed v2 AND all 6 columns present", () => {
+    const startIdx = preflight.indexOf("as is_clean_initial");
+    const endIdx = preflight.indexOf("as is_clean_applied", startIdx);
+    const block = preflight.slice(startIdx, endIdx);
+    expect(block).toContain("v2_name_matches = 1");
+    expect(block).toContain("v2_exact_14arg_matches = 1");
+    expect(block).toContain("services_has_competitive_price");
+    expect(block).toContain("services_has_high_profit_price");
+    expect(block).toContain("history_has_old_competitive_price");
+    expect(block).toContain("history_has_new_competitive_price");
+    expect(block).toContain("history_has_old_high_profit_price");
+    expect(block).toContain("history_has_new_high_profit_price");
+  });
+
+  it("the cross-consistency check only yields PASS for is_clean_initial or is_clean_applied — never independently of each other", () => {
+    const idx = preflight.indexOf("'v2_and_tier_columns_cross_consistency'");
+    expect(idx).toBeGreaterThan(-1);
+    const block = preflight.slice(idx, preflight.indexOf("from state", idx));
+    expect(block).toContain("when is_clean_initial or is_clean_applied then 'PASS'");
+    // No other branch of this check's CASE expression may resolve to PASS.
+    const caseBlock = block.slice(block.indexOf("case"), block.indexOf("end,"));
+    const passBranches = (caseBlock.match(/then 'PASS'/g) || []).length;
+    expect(passBranches).toBe(1);
+  });
+
+  it("kept separate from v1's check — v1_untouched_exact_12arg_signature never references v2 or the tier columns", () => {
+    const idx = preflight.indexOf("'v1_untouched_exact_12arg_signature'");
+    const block = preflight.slice(idx, preflight.indexOf("from state", idx));
+    expect(block).not.toContain("v2_name_matches");
+    expect(block).not.toContain("services_has_competitive_price");
+    expect(block).not.toContain("history_has_");
+  });
+
+  // Re-implements the exact boolean logic from is_clean_initial/
+  // is_clean_applied/the cross-consistency CASE in JS so the two
+  // inconsistent cross-states from the review can be enumerated and
+  // asserted against directly — a pure text match on the SQL can confirm
+  // the right fields are referenced, but only evaluating the logic proves
+  // OVERALL STATUS can never reach PASS for these specific states. Keep in
+  // sync by hand with the CASE expression above if that logic ever changes.
+  function evaluateCrossConsistency(s) {
+    const allColumnsAbsent =
+      !s.servicesCompetitive && !s.servicesHighProfit &&
+      !s.historyOldCompetitive && !s.historyNewCompetitive &&
+      !s.historyOldHighProfit && !s.historyNewHighProfit;
+    const allColumnsPresent =
+      s.servicesCompetitive && s.servicesHighProfit &&
+      s.historyOldCompetitive && s.historyNewCompetitive &&
+      s.historyOldHighProfit && s.historyNewHighProfit;
+    const isCleanInitial = s.v2NameMatches === 0 && allColumnsAbsent;
+    const isCleanApplied = s.v2NameMatches === 1 && s.v2Exact14ArgMatches === 1 && allColumnsPresent;
+    if (isCleanInitial || isCleanApplied) return "PASS";
+    if (s.v2NameMatches > 1) return "FAIL";
+    return "REVIEW REQUIRED";
+  }
+
+  it("clean initial state (v2 absent, all columns absent) is PASS", () => {
+    expect(evaluateCrossConsistency({
+      v2NameMatches: 0, v2Exact14ArgMatches: 0,
+      servicesCompetitive: false, servicesHighProfit: false,
+      historyOldCompetitive: false, historyNewCompetitive: false,
+      historyOldHighProfit: false, historyNewHighProfit: false,
+    })).toBe("PASS");
+  });
+
+  it("clean applied state (v2 present with correct signature, all columns present) is PASS", () => {
+    expect(evaluateCrossConsistency({
+      v2NameMatches: 1, v2Exact14ArgMatches: 1,
+      servicesCompetitive: true, servicesHighProfit: true,
+      historyOldCompetitive: true, historyNewCompetitive: true,
+      historyOldHighProfit: true, historyNewHighProfit: true,
+    })).toBe("PASS");
+  });
+
+  it("INCONSISTENT STATE 1 (from the review): v2 present with the correct signature, but the columns are absent — never PASS", () => {
+    expect(evaluateCrossConsistency({
+      v2NameMatches: 1, v2Exact14ArgMatches: 1,
+      servicesCompetitive: false, servicesHighProfit: false,
+      historyOldCompetitive: false, historyNewCompetitive: false,
+      historyOldHighProfit: false, historyNewHighProfit: false,
+    })).not.toBe("PASS");
+  });
+
+  it("INCONSISTENT STATE 2 (from the review): all columns present, but v2 is absent — never PASS", () => {
+    expect(evaluateCrossConsistency({
+      v2NameMatches: 0, v2Exact14ArgMatches: 0,
+      servicesCompetitive: true, servicesHighProfit: true,
+      historyOldCompetitive: true, historyNewCompetitive: true,
+      historyOldHighProfit: true, historyNewHighProfit: true,
+    })).not.toBe("PASS");
+  });
+
+  it("partial column coverage alone (only 3 of 6 present) with v2 absent is never PASS, even though it was the exact gap the original bug had", () => {
+    expect(evaluateCrossConsistency({
+      v2NameMatches: 0, v2Exact14ArgMatches: 0,
+      servicesCompetitive: true, servicesHighProfit: true,
+      historyOldCompetitive: true, historyNewCompetitive: false,
+      historyOldHighProfit: false, historyNewHighProfit: false,
+    })).not.toBe("PASS");
+  });
+
+  it("an ambiguous v2 overload (more than one function named wholesale_update_service_full_v2) is FAIL, never PASS, regardless of column state", () => {
+    expect(evaluateCrossConsistency({
+      v2NameMatches: 2, v2Exact14ArgMatches: 1,
+      servicesCompetitive: true, servicesHighProfit: true,
+      historyOldCompetitive: true, historyNewCompetitive: true,
+      historyOldHighProfit: true, historyNewHighProfit: true,
+    })).toBe("FAIL");
+  });
+});
+
 describe("verify file", () => {
   it("is entirely read-only — no RPC call to either function itself", () => {
     const code = stripComments(verify).toLowerCase();
     expect(code).not.toMatch(/\b(insert into|update |delete from|alter table|create table|drop |grant |revoke )\b/);
     expect(verify).not.toMatch(/select\s+wholesale_update_service_full/);
     expect(verify).not.toMatch(/rpc\/wholesale_update_service_full/);
+  });
+
+  it("checks all 6 new columns individually (2 on wholesale_services, 4 on wholesale_price_history), never by a bare count(*)", () => {
+    for (const column of ["competitive_price", "high_profit_price"]) {
+      expect(verify).toContain(`table_name = 'wholesale_services' and column_name = '${column}'`);
+    }
+    for (const column of ["old_competitive_price", "new_competitive_price", "old_high_profit_price", "new_high_profit_price"]) {
+      expect(verify).toContain(`table_name = 'wholesale_price_history' and column_name = '${column}'`);
+    }
+    // The prior count(*)-based fields must be gone from the executable SQL
+    // entirely, not just unused — their presence there (as opposed to in a
+    // comment explaining the correction) would suggest the old, weaker
+    // check is still reachable from somewhere.
+    const verifyCode = stripComments(verify);
+    expect(verifyCode).not.toContain("services_tier_columns_count");
+    expect(verifyCode).not.toContain("history_tier_columns_count");
+  });
+
+  it("the services_tier_columns_present and history_tier_columns_present checks require ALL of their respective columns, not a count threshold", () => {
+    const servicesIdx = verify.indexOf("'services_tier_columns_present'");
+    const servicesBlock = verify.slice(servicesIdx, verify.indexOf("from raw", servicesIdx));
+    expect(servicesBlock).toContain("services_has_competitive_price and services_has_high_profit_price");
+
+    const historyIdx = verify.indexOf("'history_tier_columns_present'");
+    const historyBlock = verify.slice(historyIdx, verify.indexOf("from raw", historyIdx));
+    expect(historyBlock).toContain("history_has_old_competitive_price and history_has_new_competitive_price");
+    expect(historyBlock).toContain("history_has_old_high_profit_price and history_has_new_high_profit_price");
   });
 
   it("checks v1's exact original 12-argument identity signature", () => {

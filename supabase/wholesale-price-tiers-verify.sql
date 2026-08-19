@@ -37,8 +37,19 @@
 
 with raw as (
   select
-    (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'wholesale_services' and column_name in ('competitive_price', 'high_profit_price')) as services_tier_columns_count,
-    (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'wholesale_price_history' and column_name in ('old_competitive_price', 'new_competitive_price', 'old_high_profit_price', 'new_high_profit_price')) as history_tier_columns_count,
+    -- The 2 new wholesale_services columns and 4 new wholesale_price_
+    -- history columns, checked INDIVIDUALLY — a prior version of this file
+    -- checked these via a bare count(*) (services_tier_columns_count = 2,
+    -- history_tier_columns_count = 4), which could reach the expected
+    -- count via a coincidental/wrong column rather than confirming each of
+    -- the 6 specific columns actually exists by name. Exact names taken
+    -- from wholesale-price-tiers-migration.sql.
+    exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'wholesale_services' and column_name = 'competitive_price') as services_has_competitive_price,
+    exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'wholesale_services' and column_name = 'high_profit_price') as services_has_high_profit_price,
+    exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'wholesale_price_history' and column_name = 'old_competitive_price') as history_has_old_competitive_price,
+    exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'wholesale_price_history' and column_name = 'new_competitive_price') as history_has_new_competitive_price,
+    exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'wholesale_price_history' and column_name = 'old_high_profit_price') as history_has_old_high_profit_price,
+    exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'wholesale_price_history' and column_name = 'new_high_profit_price') as history_has_new_high_profit_price,
 
     (select count(*) from pg_constraint c join pg_class t on t.oid = c.conrelid join pg_namespace n on n.oid = t.relnamespace where n.nspname = 'public' and t.relname = 'wholesale_services' and c.conname = 'wholesale_services_competitive_price_check') as competitive_check_exists,
     (select count(*) from pg_constraint c join pg_class t on t.oid = c.conrelid join pg_namespace n on n.oid = t.relnamespace where n.nspname = 'public' and t.relname = 'wholesale_services' and c.conname = 'wholesale_services_high_profit_price_check') as high_profit_check_exists,
@@ -89,15 +100,26 @@ v2_meta as (
 ),
 checks as (
   select 1 as ord, 'services_tier_columns_present' as check_name,
-    case when services_tier_columns_count = 2 then 'PASS' else 'FAIL' end as status,
-    'competitive_price/high_profit_price columns found on public.wholesale_services: ' || services_tier_columns_count || ' — expect 2' as details
+    case when services_has_competitive_price and services_has_high_profit_price then 'PASS' else 'FAIL' end as status,
+    'wholesale_services.competitive_price=' || services_has_competitive_price
+      || ', wholesale_services.high_profit_price=' || services_has_high_profit_price
+      || ' — expect true, true'
+      as details
   from raw
 
   union all
 
   select 2, 'history_tier_columns_present',
-    case when history_tier_columns_count = 4 then 'PASS' else 'FAIL' end,
-    'old_/new_competitive_price + old_/new_high_profit_price columns found on public.wholesale_price_history: ' || history_tier_columns_count || ' — expect 4'
+    case
+      when history_has_old_competitive_price and history_has_new_competitive_price
+        and history_has_old_high_profit_price and history_has_new_high_profit_price
+      then 'PASS' else 'FAIL'
+    end,
+    'wholesale_price_history.old_competitive_price=' || history_has_old_competitive_price
+      || ', new_competitive_price=' || history_has_new_competitive_price
+      || ', old_high_profit_price=' || history_has_old_high_profit_price
+      || ', new_high_profit_price=' || history_has_new_high_profit_price
+      || ' — expect true, true, true, true (checked individually, not by count, so a missing column can never hide behind the other three)'
   from raw
 
   union all
