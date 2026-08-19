@@ -280,6 +280,98 @@ describe("wholesalePortal.css: PCB background is cover/center/no-repeat, non-rep
   });
 });
 
+describe("Wizard business-photo background: local asset, imported once, no external/remote reference", () => {
+  it("the business photo the user provided was actually converted — a wholesale-wizard-background.webp file exists on disk", () => {
+    const stat = statSync(join(root, "src/assets/wholesale-wizard-background.webp"));
+    expect(stat.isFile()).toBe(true);
+  });
+
+  it("the WebP asset is optimized, not a raw/lossless dump of the ~1.8MB source PNG", () => {
+    const stat = statSync(join(root, "src/assets/wholesale-wizard-background.webp"));
+    const kb = stat.size / 1024;
+    expect(kb).toBeGreaterThan(20); // sanity floor — didn't get compressed into mush
+    expect(kb).toBeLessThan(500);
+  });
+
+  it("wholesalePortal.css references the local asset via a relative url(), never a remote http(s) image host", () => {
+    const css = read("src/styles/wholesalePortal.css");
+    expect(css).toContain('url("../assets/wholesale-wizard-background.webp")');
+    expect(css).not.toMatch(/url\(\s*["']?https?:\/\//);
+  });
+});
+
+describe("wholesalePortal.css: .wsp-wizard's own business-photo panel — cover/position/no-fixed-on-mobile/legibility overlay", () => {
+  const css = read("src/styles/wholesalePortal.css");
+  const wizardRule = css.match(/\.wsp-wizard\s*\{[\s\S]*?\n\}/)[0];
+
+  it("sets background-size: cover and background-position: center on every layer by default", () => {
+    expect(wizardRule).toMatch(/background-size:\s*cover,\s*cover;/);
+    expect(wizardRule).toMatch(/background-position:\s*center,\s*center;/);
+  });
+
+  it("never repeats the image and never uses background-attachment: fixed at any breakpoint", () => {
+    expect(wizardRule).toMatch(/background-repeat:\s*no-repeat,\s*no-repeat;/);
+    expect(wizardRule).toMatch(/background-attachment:\s*scroll,\s*scroll;/);
+    expect(css).not.toMatch(/\.wsp-wizard\s*\{[\s\S]*?background-attachment:\s*fixed/);
+    expect(css).not.toMatch(/@media[\s\S]*?\.wsp-wizard\s*\{[^}]*background-attachment:\s*fixed/);
+  });
+
+  it("layers a translucent navy overlay (driven by --wsp-navy-rgb) under the photo, mid-range alpha so the photo stays visible", () => {
+    expect(wizardRule).toContain(
+      "background-image: linear-gradient(rgba(var(--wsp-navy-rgb), 0.72), rgba(var(--wsp-navy-rgb), 0.72)),"
+    );
+    const alphas = [...wizardRule.matchAll(/rgba\(var\(--wsp-navy-rgb\),\s*([\d.]+)\)/g)].map((m) => Number(m[1]));
+    expect(alphas.length).toBeGreaterThan(0);
+    for (const alpha of alphas) {
+      expect(alpha).toBeGreaterThan(0.3);
+      expect(alpha).toBeLessThan(0.9);
+    }
+    // --wsp-navy-rgb must be the real split-out triplet of --wsp-navy, not an independently drifting value
+    const navyHex = css.match(/--wsp-navy:\s*(#[0-9a-fA-F]{6})/)[1];
+    const [r, g, b] = [navyHex.slice(1, 3), navyHex.slice(3, 5), navyHex.slice(5, 7)].map((h) => parseInt(h, 16));
+    const navyRgb = css.match(/--wsp-navy-rgb:\s*([\d, ]+);/)[1].split(",").map((n) => Number(n.trim()));
+    expect(navyRgb).toEqual([r, g, b]);
+  });
+
+  it("biases background-position toward the right (negotiation/shop side) only below the 768px breakpoint, to avoid an awkward center-crop on tall narrow phones", () => {
+    const mobileOverride = css.match(/@media \(max-width: 767px\)\s*\{[\s\S]*?\.wsp-wizard\s*\{[\s\S]*?\n\s*\}/)[0];
+    expect(mobileOverride).toMatch(/background-position:\s*78% center,\s*78% center;/);
+  });
+
+  it("every text node that sits directly on the photo (heading/subtitle/step-label, never inside an opaque card) uses the same solid light color, not the page's dark-navy tokens", () => {
+    const headingRule = css.match(/\.wsp-wizard-heading\s*\{[\s\S]*?\n\}/)[0];
+    const subtitleRule = css.match(/\.wsp-wizard-subtitle\s*\{[\s\S]*?\n\}/)[0];
+    const labelRule = css.match(/\n\.wsp-wizard-step-label\s*\{[\s\S]*?\n\}/)[0];
+    for (const rule of [headingRule, subtitleRule, labelRule]) {
+      expect(rule).toMatch(/color:\s*var\(--wsp-btn-text\);/);
+      expect(rule).not.toMatch(/color:\s*var\(--wsp-text-(strong|soft)\);/);
+    }
+  });
+
+  it("the Microsoldering banner has its own opaque card-style backing now that it sits directly on the photo, not the old barely-there translucent tint", () => {
+    const bannerRule = css.match(/\.wsp-wizard-microsoldering-banner\s*\{[\s\S]*?\n\}/)[0];
+    expect(bannerRule).toMatch(/background:\s*var\(--wsp-card-bg\);/);
+    expect(bannerRule).not.toMatch(/rgba\(59, 130, 246, 0\.08\)/);
+  });
+});
+
+describe("wholesalePortal.css: .wsp-card-clickable moderate glass effect — scoped away from money-bearing cards", () => {
+  const css = read("src/styles/wholesalePortal.css");
+
+  it(".wsp-card-clickable gets a translucent background + backdrop-filter blur", () => {
+    const rule = css.match(/\.wsp-card-clickable\s*\{[\s\S]*?\n\}/)[0];
+    expect(rule).toMatch(/background:\s*rgba\(238, 243, 252, 0\.87\);/);
+    expect(rule).toMatch(/backdrop-filter:\s*blur\(6px\);/);
+  });
+
+  it("WholesaleResultPanel and WholesaleSalesModule never gain -clickable, so their prices stay on a fully opaque .wsp-card background", () => {
+    const resultSrc = read("src/components/wholesale/WholesaleResultPanel.jsx");
+    const salesSrc = read("src/components/wholesale/WholesaleSalesModule.jsx");
+    expect(resultSrc).not.toContain("wsp-card-clickable");
+    expect(salesSrc).not.toContain("wsp-card-clickable");
+  });
+});
+
 describe("wholesalePortal.css: page tone — medium-light blue-gray, darker than the cards but not dark-mode-dark", () => {
   const css = read("src/styles/wholesalePortal.css");
   const luminanceOf = (hex) => {
@@ -419,15 +511,15 @@ describe("wholesalePortal.css: hover/focus/active selection effect", () => {
     expect(css).toMatch(/@media \(hover: hover\) and \(pointer: fine\)\s*\{[\s\S]*?\.wsp-card-clickable:hover/);
   });
 
-  it("hover lifts translateY(-8px), scales ~1.015, and brightens the border to the hover token", () => {
+  it("hover lifts translateY(-3px) — 'Pro catalog' pass, a lighter elevation than the prior -8px — scales ~1.015 (already within the approved 1.02 cap), and brightens the border to the hover token", () => {
     const hoverBlock = css.match(/@media \(hover: hover\) and \(pointer: fine\)\s*\{[\s\S]*?\n\}\n/)[0];
-    expect(hoverBlock).toMatch(/transform:\s*translateY\(-8px\)\s*scale\(1\.015\)/);
+    expect(hoverBlock).toMatch(/transform:\s*translateY\(-3px\)\s*scale\(1\.015\)/);
     expect(hoverBlock).toContain("border-color: var(--wsp-card-border-hover)");
   });
 
   it(":focus-visible applies the identical lift/scale/border treatment unconditionally (not gated behind the hover/pointer media query), plus its own visible focus ring", () => {
     const focusRule = css.match(/\.wsp-card-clickable:focus-visible\s*\{[\s\S]*?\n\}/)[0];
-    expect(focusRule).toMatch(/transform:\s*translateY\(-8px\)\s*scale\(1\.015\)/);
+    expect(focusRule).toMatch(/transform:\s*translateY\(-3px\)\s*scale\(1\.015\)/);
     expect(focusRule).toContain("border-color: var(--wsp-card-border-hover)");
     expect(focusRule).toMatch(/0 0 0 3px rgba\(240, 82, 94, 0\.45\)/); // red focus ring accent
     expect(focusRule).toContain("outline: none");
@@ -435,7 +527,15 @@ describe("wholesalePortal.css: hover/focus/active selection effect", () => {
 
   it(":active gives touch/click a brief, smaller lift — independent of the (hover: hover) gate, so it still fires on touch devices", () => {
     const activeRule = css.match(/\.wsp-card-clickable:active\s*\{[\s\S]*?\n\}/)[0];
-    expect(activeRule).toMatch(/transform:\s*translateY\(-2px\)/);
+    expect(activeRule).toMatch(/transform:\s*translateY\(-1px\)/);
+  });
+
+  it("hover/focus/active transforms never exceed the approved 1.02 scale cap", () => {
+    const scales = [...css.matchAll(/scale\((1\.\d+)\)/g)].map((m) => Number(m[1]));
+    expect(scales.length).toBeGreaterThan(0);
+    for (const scale of scales) {
+      expect(scale).toBeLessThanOrEqual(1.02);
+    }
   });
 
   it("the base .wsp-card transition is ~200ms, covering shadow/border/transform/background", () => {
@@ -450,6 +550,104 @@ describe("wholesalePortal.css: hover/focus/active selection effect", () => {
     expect(reducedBlock).toContain(".wsp-card-clickable:focus-visible");
     expect(reducedBlock).toContain(".wsp-card-clickable:active");
     expect(reducedBlock).toMatch(/transform:\s*none/);
+  });
+});
+
+describe("wholesalePortal.css: compact card redesign — shorter photo, tighter padding, no cropped product text", () => {
+  const css = read("src/styles/wholesalePortal.css");
+
+  it(".wsp-card-photo uses a shorter 16/9 aspect ratio, not the old 4/3 (a real ~25% height reduction)", () => {
+    const rule = css.match(/\.wsp-card-photo\s*\{[\s\S]*?\n\}/)[0];
+    expect(rule).toMatch(/aspect-ratio:\s*16\s*\/\s*9/);
+    expect(rule).not.toMatch(/aspect-ratio:\s*4\s*\/\s*3/);
+  });
+
+  it(".wsp-card-photo img uses object-fit: contain, never cover — fixes a real product photo (Controllers/'EFFECT JOYSTICKS') being cropped", () => {
+    const rule = css.match(/\.wsp-card-photo img\s*\{[\s\S]*?\n\}/)[0];
+    expect(rule).toContain("object-fit: contain");
+    expect(rule).not.toContain("object-fit: cover");
+  });
+
+  it(".wsp-card-body padding is tighter than the old 14px 16px, and clamps down further on short no-scroll viewports", () => {
+    const rule = css.match(/\.wsp-card-body\s*\{[\s\S]*?\n\}/)[0];
+    expect(rule).toMatch(/padding:\s*clamp\(6px, 1\.6vh, 10px\) clamp\(8px, 2vw, 12px\)/);
+  });
+});
+
+describe("wholesalePortal.css: wsp-grid-compact — 1/2/3/4/5-column responsive breakpoints (the wizard's own grid, distinct from the shared wsp-grid)", () => {
+  const css = read("src/styles/wholesalePortal.css");
+  const compactStart = css.indexOf(".wsp-grid-compact {");
+  const compactEnd = css.indexOf("repeat(5, 1fr)", compactStart);
+  const compactBlock = css.slice(compactStart, css.indexOf("}", css.indexOf("}", compactEnd) + 1) + 1);
+
+  it("stays at 2 columns at every width down to 320px — no-scroll spec: a 1-column fallback would double the row count on exactly the narrowest/shortest phones", () => {
+    expect(compactBlock).toMatch(/\.wsp-grid-compact\s*\{[^}]*grid-template-columns:\s*repeat\(2, 1fr\)/);
+    expect(compactBlock).not.toMatch(/@media \(max-width: 359px\)/);
+  });
+
+  it("widens to 3 at tablet (640px), 4 at desktop-medium (1024px), and 5 at desktop-wide (1280px)", () => {
+    expect(compactBlock).toMatch(/@media \(min-width: 640px\)[\s\S]*?repeat\(3, 1fr\)/);
+    expect(compactBlock).toMatch(/@media \(min-width: 1024px\)[\s\S]*?repeat\(4, 1fr\)/);
+    expect(compactBlock).toMatch(/@media \(min-width: 1280px\)[\s\S]*?repeat\(5, 1fr\)/);
+  });
+
+  it("never sets a fixed pixel width on grid-template-columns that could overflow narrow viewports — every tier is fr units", () => {
+    const columnValues = [...compactBlock.matchAll(/grid-template-columns:\s*([^;]+);/g)].map((m) => m[1]);
+    expect(columnValues.length).toBeGreaterThan(0);
+    for (const value of columnValues) {
+      expect(value).not.toMatch(/px/);
+    }
+  });
+});
+
+describe("wholesalePortal.css: 'Pro catalog' vivid blue accent — bumped from the prior muted #3b82f6", () => {
+  const css = read("src/styles/wholesalePortal.css");
+
+  it("--wsp-blue is a distinct, more saturated value than the old #3b82f6", () => {
+    const blueHex = css.match(/--wsp-blue:\s*(#[0-9a-fA-F]{6})/)[1];
+    expect(blueHex.toLowerCase()).not.toBe("#3b82f6");
+  });
+
+  it("adds a soft cyan token for depth, distinct from the main blue accent and from the red accent", () => {
+    expect(css).toMatch(/--wsp-cyan-soft:\s*#[0-9a-fA-F]{6}/);
+  });
+});
+
+describe("wholesalePortal.css: Microsoldering tile is 'featured' via border/shadow only, never a larger size", () => {
+  const css = read("src/styles/wholesalePortal.css");
+
+  it(".wsp-card-featured only touches border-color/box-shadow, never width/height/padding/transform", () => {
+    const rule = css.match(/\.wsp-card-featured\s*\{[\s\S]*?\n\}/)[0];
+    expect(rule).toMatch(/border-color:|box-shadow:/);
+    expect(rule).not.toMatch(/\bwidth:|\bheight:|padding:|transform:/);
+  });
+
+  it("EquipmentTypeCard applies wsp-card-featured only when the featured prop is passed, and the wizard passes it only for the Microsoldering tile", () => {
+    const cardSrc = read("src/components/wholesale/EquipmentTypeCard.jsx");
+    const wizardSrc = read("src/components/wholesale/WholesaleWizard.jsx");
+    expect(cardSrc).toMatch(/featured \? " wsp-card-featured" : ""/);
+    expect((wizardSrc.match(/featured\b/g) || []).length).toBeGreaterThan(0);
+    // only the Microsoldering EquipmentTypeCard call gets `featured`
+    const microTileBlock = wizardSrc.slice(
+      wizardSrc.indexOf('entity={{ slug: "microsoldering"'),
+      wizardSrc.indexOf("/>", wizardSrc.indexOf('entity={{ slug: "microsoldering"'))
+    );
+    expect(microTileBlock).toContain("featured");
+  });
+});
+
+describe("wholesalePortal.css: wizard active-step highlight — Equipo/Modelo/Falla indicator", () => {
+  const css = read("src/styles/wholesalePortal.css");
+
+  it("the active (current, not-yet-done) step gets a distinct glow/ring, different from both done and upcoming", () => {
+    expect(css).toMatch(/\.wsp-wizard-step-active \.wsp-wizard-step-circle\s*\{[^}]*box-shadow:/);
+    expect(css).toMatch(/\.wsp-wizard-step-active \.wsp-wizard-step-label\s*\{[^}]*font-weight:\s*700/);
+  });
+
+  it("WholesaleWizard computes the active step as the first not-done step, never a hardcoded index", () => {
+    const wizardSrc = read("src/components/wholesale/WholesaleWizard.jsx");
+    expect(wizardSrc).toContain('const activeIndex = steps.findIndex((step) => !step.done);');
+    expect(wizardSrc).toContain("wsp-wizard-step-active");
   });
 });
 

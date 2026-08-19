@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { ArrowLeft, Check, Cpu } from "lucide-react";
 import { useWholesaleLocale } from "../../i18n/WholesaleLocaleContext.jsx";
 import { buildWholesaleWizardCatalog } from "../../lib/wholesaleWizardCatalog.js";
+import { translateCatalogLabel } from "../../lib/wholesaleCatalogI18n.js";
 import { EquipmentTypeCard } from "./EquipmentTypeCard.jsx";
 import { WholesaleProgressPanel } from "./WholesaleProgressPanel.jsx";
 import { WholesaleResultPanel } from "./WholesaleResultPanel.jsx";
@@ -13,7 +14,9 @@ import { WholesaleResultPanel } from "./WholesaleResultPanel.jsx";
  * state — never a static decoration — so it stays honest even though a
  * 1-model Equipo skips straight past the Modelo screen (see
  * handleSelectEquipo below): that still marks Modelo done, because a model
- * WAS resolved, just not through an extra screen.
+ * WAS resolved, just not through an extra screen. The CURRENT step (the
+ * first one not yet done) additionally gets `wsp-wizard-step-active` so it
+ * reads clearly as "you are here", distinct from both done and upcoming.
  */
 function WizardSteps({ equipoDone, modeloDone, fallaDone, t }) {
   const steps = [
@@ -21,10 +24,14 @@ function WizardSteps({ equipoDone, modeloDone, fallaDone, t }) {
     { key: "modelo", label: t("wizard.stepModel"), done: modeloDone },
     { key: "falla", label: t("wizard.stepIssue"), done: fallaDone },
   ];
+  const activeIndex = steps.findIndex((step) => !step.done);
   return (
     <ol className="wsp-wizard-steps">
       {steps.map((step, i) => (
-        <li key={step.key} className={`wsp-wizard-step${step.done ? " wsp-wizard-step-done" : ""}`}>
+        <li
+          key={step.key}
+          className={`wsp-wizard-step${step.done ? " wsp-wizard-step-done" : ""}${i === activeIndex ? " wsp-wizard-step-active" : ""}`}
+        >
           <span className="wsp-wizard-step-row">
             <span className="wsp-wizard-step-circle" aria-hidden="true">
               {step.done ? <Check size={14} /> : i + 1}
@@ -52,7 +59,7 @@ function WizardSteps({ equipoDone, modeloDone, fallaDone, t }) {
  * (push forward, pop on Back) instead of hardcoding a back-target per screen.
  */
 export function WholesaleWizard({ equipmentTypes, microsoldering }) {
-  const { t } = useWholesaleLocale();
+  const { t, language } = useWholesaleLocale();
 
   const topEquipoList = useMemo(() => buildWholesaleWizardCatalog(equipmentTypes), [equipmentTypes]);
   const microsolderingEquipoList = useMemo(
@@ -122,18 +129,21 @@ export function WholesaleWizard({ equipmentTypes, microsoldering }) {
 
       {screen === "top" && (
         <>
-          <h2 className="wsp-wizard-heading">{t("wizard.chooseEquipment")}</h2>
+          <h1 className="wsp-wizard-heading">{t("wizard.chooseEquipment")}</h1>
+          <p className="wsp-wizard-subtitle">{t("wizard.chooseEquipmentSubtitle")}</p>
           <div className="wsp-grid wsp-grid-compact">
             {/* Only rendered when the server actually returned a
                 microsoldering object — same server-trust rule as the rest
                 of the portal: never assume the Equipment Type exists just
                 because this component was mounted (it's Hidden/inactive on
                 the server otherwise, exactly like any other equipment
-                type). */}
+                type). `featured` gives it a subtle distinguishing border/
+                shadow, never a larger size than the other cards. */}
             {microsoldering && (
               <EquipmentTypeCard
                 entity={{ slug: "microsoldering", name: t("microsoldering.title"), image: microsoldering.image }}
                 onClick={handleSelectMicrosoldering}
+                featured
               />
             )}
             {topEquipoList.map((equipo) => (
@@ -156,7 +166,7 @@ export function WholesaleWizard({ equipmentTypes, microsoldering }) {
               <p className="wsp-wizard-microsoldering-subtitle">{t("microsoldering.subtitle")}</p>
             </div>
           </div>
-          <h2 className="wsp-wizard-heading">{t("wizard.chooseEquipment")}</h2>
+          <h1 className="wsp-wizard-heading">{t("wizard.chooseEquipment")}</h1>
           {microsolderingEquipoList.length === 0 ? (
             <div className="wsp-empty">{t("wizard.chooseFault")}</div>
           ) : (
@@ -179,7 +189,7 @@ export function WholesaleWizard({ equipmentTypes, microsoldering }) {
             <ArrowLeft size={16} />
             {t("wizard.back")}
           </button>
-          <h2 className="wsp-wizard-heading">{t("wizard.chooseModel")}</h2>
+          <h1 className="wsp-wizard-heading">{t("wizard.chooseModel")}</h1>
           <div className="wsp-grid wsp-grid-compact">
             {selectedEquipo.models.map((model) => (
               <EquipmentTypeCard key={model.id} entity={model} onClick={() => handleSelectModel(model)} />
@@ -194,7 +204,7 @@ export function WholesaleWizard({ equipmentTypes, microsoldering }) {
             <ArrowLeft size={16} />
             {t("wizard.back")}
           </button>
-          <h2 className="wsp-wizard-heading">{t("wizard.chooseFault")}</h2>
+          <h1 className="wsp-wizard-heading">{t("wizard.chooseFault")}</h1>
           {selectedModel.services.length === 0 ? (
             <div className="wsp-empty">{t("wizard.chooseFault")}</div>
           ) : (
@@ -202,7 +212,7 @@ export function WholesaleWizard({ equipmentTypes, microsoldering }) {
               {selectedModel.services.map((service) => (
                 <li key={service.id}>
                   <button type="button" className="wsp-wizard-fault-item" onClick={() => handleSelectFault(service)}>
-                    {service.name}
+                    {translateCatalogLabel(service.name, language)}
                   </button>
                 </li>
               ))}

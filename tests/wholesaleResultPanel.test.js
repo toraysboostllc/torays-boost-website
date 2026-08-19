@@ -64,7 +64,7 @@ describe("WholesaleResultPanel.jsx: loss is shown, never hidden or zeroed", () =
   });
 
   it("the potential-profit figure itself gets a distinct loss style class, the number is never suppressed", () => {
-    expect(panelSrc).toMatch(/className=\{isLoss \? "wsp-result-figure-loss" : ""\}/);
+    expect(panelSrc).toMatch(/className=\{`wsp-result-money-value\$\{isLoss \? " wsp-result-figure-loss" : ""\}`\}/);
   });
 });
 
@@ -108,5 +108,68 @@ describe("WholesaleResultPanel.jsx: mobile-friendly numeric input", () => {
 
   it("rejects negative input at the HTML level too (min=0), belt-and-suspenders with the JS-level validation in wholesaleMargin.js", () => {
     expect(panelSrc).toContain('min="0"');
+  });
+});
+
+describe("WholesaleResultPanel.jsx: Recommended Customer Price is the single editable hero figure, never duplicated", () => {
+  it("the editable input IS the recommendedPrice figure — same wsp-result-money-hero block carries both the label and the input", () => {
+    const heroStart = panelSrc.indexOf("wsp-result-money-hero");
+    const heroEnd = panelSrc.indexOf("</div>", panelSrc.indexOf("wsp-result-recommended-input"));
+    const heroBlock = panelSrc.slice(heroStart, heroEnd);
+    expect(heroBlock).toContain('t("result.recommendedPrice")');
+    expect(heroBlock).toContain("wsp-result-recommended-input");
+    expect(heroBlock).toContain("customerPriceInput");
+  });
+
+  it("shows a small 'Editable' badge next to the recommended price label", () => {
+    expect(panelSrc).toContain("wsp-result-editable-badge");
+    expect(panelSrc).toContain('t("result.editableLabel")');
+  });
+
+  it("recommended_price is never rendered a second time as a separate read-only value — every reference to it lives inside the useState initializer line, none elsewhere in the render output", () => {
+    const initializerLine = 'service.recommended_price != null ? String(service.recommended_price) : ""';
+    expect(panelSrc).toContain(initializerLine);
+    const withoutInitializer = panelSrc.replace(initializerLine, "");
+    expect(withoutInitializer).not.toContain("service.recommended_price");
+  });
+
+  it("editing the input recalculates profit/margin immediately — profitDisplay/marginDisplay are derived from customerPrice on every render, no separate 'apply' step", () => {
+    expect(panelSrc).toMatch(/const customerPrice = customerPriceInput === "" \? null : Number\(customerPriceInput\);/);
+    expect(panelSrc).toContain("const profitDisplay = rangeResult");
+    expect(panelSrc).toContain("const marginDisplay = rangeResult");
+    // both are computed from fixedResult/rangeResult, which themselves depend on customerPrice — no onClick/onBlur gate before recompute
+    expect(panelSrc).not.toMatch(/onBlur=\{.*setCustomerPrice/);
+    expect(panelSrc).not.toContain("applyCustomerPrice");
+  });
+});
+
+describe("WholesaleResultPanel.jsx: money hierarchy — distinct size/color per figure, never a uniform table", () => {
+  it("uses dedicated row classes for shop cost, the recommended-price hero, profit, and the margin badge — never the old uniform wsp-result-figure-row", () => {
+    expect(panelSrc).toContain("wsp-result-shopcost");
+    expect(panelSrc).toContain("wsp-result-money-hero");
+    expect(panelSrc).toContain("wsp-result-profit");
+    expect(panelSrc).toContain("wsp-result-margin-badge");
+    expect(panelSrc).not.toContain("wsp-result-figure-row");
+    expect(panelSrc).not.toContain("wsp-result-figures");
+  });
+
+  it("shows the 'grow your margin' motivational line near the profit figure", () => {
+    expect(panelSrc).toContain("wsp-result-grow-margin");
+    expect(panelSrc).toContain('t("result.growMargin")');
+  });
+
+  it("wraps the money block in a one-shot reveal animation class", () => {
+    expect(panelSrc).toContain("wsp-result-money-reveal");
+  });
+});
+
+describe("WholesaleResultPanel.jsx: catalog names (equipo/model/service) are localized for display only, never mutated", () => {
+  it("imports translateCatalogLabel and applies it to every catalog-sourced name in the breadcrumb", () => {
+    expect(panelSrc).toContain(
+      'import { translateCatalogLabel } from "../../lib/wholesaleCatalogI18n.js";'
+    );
+    expect(panelSrc).toContain("translateCatalogLabel(selection.equipoName, language)");
+    expect(panelSrc).toContain("translateCatalogLabel(selection.modelName, language)");
+    expect(panelSrc).toContain("translateCatalogLabel(service.name, language)");
   });
 });

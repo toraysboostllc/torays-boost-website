@@ -41,13 +41,16 @@ describe("wholesaleTranslations.js: EN and ES have exactly the same keys", () =>
     expect(wholesaleTranslations.es.progress.stepEquipmentConfirmed).toBe("Equipo confirmado");
     expect(wholesaleTranslations.es.progress.stepFaultIdentified).toBe("Falla identificada");
     expect(wholesaleTranslations.es.progress.stepCalculating).toBe("Calculando oportunidad");
-    expect(wholesaleTranslations.es.result.title).toBe("Precio listo");
-    expect(wholesaleTranslations.es.result.shopPrice).toBe("Tu precio Shop");
-    expect(wholesaleTranslations.es.result.recommendedPrice).toBe("Precio recomendado");
+    expect(wholesaleTranslations.es.result.title).toBe("Cotización lista");
+    expect(wholesaleTranslations.es.result.shopPrice).toBe("Tu costo con Torays Boost");
+    expect(wholesaleTranslations.es.result.recommendedPrice).toBe("Precio recomendado al cliente");
     expect(wholesaleTranslations.es.result.potentialProfit).toBe("Ganancia potencial");
     expect(wholesaleTranslations.es.result.estimatedMargin).toBe("Margen estimado");
-    expect(wholesaleTranslations.es.result.customerPriceLabel).toBe("¿Cuánto cobrarás a tu cliente?");
-    expect(wholesaleTranslations.es.result.keepCustomerNote).toBe("Tú mantienes a tu cliente. Nosotros hacemos la microsoldadura.");
+    expect(wholesaleTranslations.es.result.editableLabel).toBe("Editable");
+    expect(wholesaleTranslations.es.result.growMargin).toBe("Aumenta tu margen con Torays Boost");
+    expect(wholesaleTranslations.es.result.keepCustomerNote).toBe(
+      "Tú conservas a tu cliente. Nosotros hacemos la reparación a nivel de placa."
+    );
     expect(wholesaleTranslations.es.result.disclaimer).toBe("Estimación antes de otros gastos.");
     expect(wholesaleTranslations.es.result.consultAnother).toBe("Consultar otro precio");
     expect(wholesaleTranslations.es.microsoldering.title).toBe("Microsoldadura");
@@ -58,6 +61,31 @@ describe("wholesaleTranslations.js: EN and ES have exactly the same keys", () =>
     expect(wholesaleTranslations.es.sales.maintenanceMessage).toBe(
       "Torays Boost Sales está en mantenimiento. Próximamente podrás comprar piezas, equipos y accesorios con precios especiales para shops."
     );
+  });
+
+  it("the new header copy (encabezado) is present verbatim in both languages", () => {
+    expect(wholesaleTranslations.en.wizard.chooseEquipment).toBe("Select a Device to View Pricing");
+    expect(wholesaleTranslations.en.wizard.chooseEquipmentSubtitle).toBe(
+      "Choose the device, model, and issue for an instant estimate."
+    );
+    expect(wholesaleTranslations.es.wizard.chooseEquipment).toBe("Selecciona un equipo para ver el precio");
+    expect(wholesaleTranslations.es.wizard.chooseEquipmentSubtitle).toBe(
+      "Elige el equipo, modelo y falla para obtener una estimación inmediata."
+    );
+  });
+
+  it("the customerPriceLabel key is gone entirely — the recommended-price field is now the editable value itself", () => {
+    expect(wholesaleTranslations.en.result.customerPriceLabel).toBeUndefined();
+    expect(wholesaleTranslations.es.result.customerPriceLabel).toBeUndefined();
+  });
+
+  it("the sound toggle has EN/ES labels for on, mute, and unmute", () => {
+    expect(wholesaleTranslations.en.audio.label).toBe("Sound");
+    expect(wholesaleTranslations.es.audio.label).toBe("Sonido");
+    expect(typeof wholesaleTranslations.en.audio.muteLabel).toBe("string");
+    expect(typeof wholesaleTranslations.en.audio.unmuteLabel).toBe("string");
+    expect(typeof wholesaleTranslations.es.audio.muteLabel).toBe("string");
+    expect(typeof wholesaleTranslations.es.audio.unmuteLabel).toBe("string");
   });
 
   it("welcome message uses {shopName} interpolation, never a hardcoded shop name", () => {

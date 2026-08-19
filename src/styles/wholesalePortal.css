@@ -44,12 +44,35 @@
   --wsp-surface3: #2a3b66;
   --wsp-border: #3e5688;
   --wsp-border-strong: #4a6fd6;
-  --wsp-blue: #3b82f6;
+  /* Correction pass ("Pro catalog" colors): bumped from the prior #3b82f6 to
+     a more saturated, punchier blue — the single accent for selection state
+     and primary actions across the whole redesign (card hover borders,
+     active wizard step, result-panel highlights). --wsp-cyan-soft is a new,
+     very-low-saturation cyan used only for depth/background tints (money
+     hero background, sound-toggle hover) — never a competing accent hue. */
+  --wsp-blue: #2563eb;
   --wsp-blue-light: #7fb0ff;
+  --wsp-cyan-soft: #38bdf8;
   --wsp-blue-tint: #1b2745;
   --wsp-blue-tint-strong: #2e4785;
   --wsp-navy: #0b1730;
+  /* RGB triplet of --wsp-navy, same split-out trick as --wsp-overlay-rgb
+     above — lets the wizard business-photo background below build its
+     translucent overlay via rgba(var(--wsp-navy-rgb), alpha). */
+  --wsp-navy-rgb: 11, 23, 48;
   --wsp-red: #f0525e;
+
+  /* Money-hierarchy colors (result panel) — each figure gets its own
+     distinct hue so a shop can tell "what I pay" from "what I can charge"
+     from "what I keep" at a glance, never by size/position alone. */
+  --wsp-recommended-text: #1a4fd6;
+  --wsp-recommended-bg-start: #e3edff;
+  --wsp-recommended-bg-end: #e0f6ff;
+  --wsp-profit-text: #0e8f6f;
+  --wsp-shopcost-text: #1c2b52;
+  --wsp-margin-badge-bg-start: #2f6fed;
+  --wsp-margin-badge-bg-end: #14b8e0;
+  --wsp-margin-badge-text: #ffffff;
   /* Page-level text (h1 title, shop name, section labels) — now dark navy,
      since the page itself is light. Deliberately the SAME dark tone as the
      card text tokens below (the whole surface is light now, on-page and
@@ -90,7 +113,13 @@
   --wsp-card-shadow-hover: 0 1px 0 rgba(255, 255, 255, 0.65) inset, 0 16px 32px rgba(8, 14, 30, 0.5),
     0 0 0 1px var(--wsp-blue-light);
 
+  /* dvh accounts for mobile browser chrome (address bar show/hide) so the
+     page's real available height is used for the no-scroll layout budget
+     below — vh alone is set once at load and can overshoot the true
+     visible area on phones. Kept as a fallback first (older engines that
+     don't understand dvh simply ignore that declaration and keep vh). */
   min-height: 100vh;
+  min-height: 100dvh;
   color: var(--wsp-text-strong);
   font-family: "Inter", sans-serif;
 
@@ -160,8 +189,18 @@
   transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
 }
 
+/* Moderate glass touch — scoped to `-clickable` only (the decorative
+   Equipment Type/Model photo grid inside the wizard), never the bare
+   `.wsp-card` these rules build on: WholesaleResultPanel and
+   WholesaleSalesModule use plain `.wsp-card` without `-clickable` and so
+   keep its fully opaque background untouched, since those show prices
+   and must read immediately per spec — this translucency is deliberately
+   reserved for cards that only carry a photo and a name. */
 .wsp-card-clickable {
   cursor: pointer;
+  background: rgba(238, 243, 252, 0.87);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 /* Small red accent bar on the left edge — brightens on hover/focus, same
@@ -188,9 +227,12 @@
    so a touch tap never leaves a "stuck" hover state on mobile (the classic
    touch-UA quirk where :hover styles persist after tapping away). Touch
    gets its own brief :active feedback below instead. */
+/* "Pro catalog" hover pass: a lighter elevation (-3px, was -8px) and scale
+   capped at 1.02 (already true at 1.015 — left as-is) per the approved
+   spec: noticeable but no longer a dramatic "lift off the page". */
 @media (hover: hover) and (pointer: fine) {
   .wsp-card-clickable:hover {
-    transform: translateY(-8px) scale(1.015);
+    transform: translateY(-3px) scale(1.015);
     border-color: var(--wsp-card-border-hover);
     background: var(--wsp-card-bg-hover);
     box-shadow: var(--wsp-card-shadow-hover);
@@ -209,7 +251,7 @@
    ring, since :focus-visible must work identically on every input method. */
 .wsp-card-clickable:focus-visible {
   outline: none;
-  transform: translateY(-8px) scale(1.015);
+  transform: translateY(-3px) scale(1.015);
   border-color: var(--wsp-card-border-hover);
   background: var(--wsp-card-bg-hover);
   box-shadow: var(--wsp-card-shadow-hover), 0 0 0 3px rgba(240, 82, 94, 0.45);
@@ -225,8 +267,16 @@
 /* Touch tap feedback — brief, works on every device (including a mouse
    click's momentary active state), never relies on :hover sticking. */
 .wsp-card-clickable:active {
-  transform: translateY(-2px) scale(1.005);
+  transform: translateY(-1px) scale(1.008);
   border-color: var(--wsp-card-border-hover);
+}
+
+/* Subtle distinguishing treatment for the Microsoldering tile — a brighter
+   border + soft blue glow, never a larger size than any other card (see
+   EquipmentTypeCard's `featured` prop). */
+.wsp-card-featured {
+  border-color: var(--wsp-blue);
+  box-shadow: var(--wsp-card-shadow), 0 0 0 1px rgba(37, 99, 235, 0.35), 0 0 18px rgba(56, 189, 248, 0.18);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -245,7 +295,10 @@
    --wsp-icon token below is what carries the contrast here instead. */
 .wsp-card-photo {
   width: 100%;
-  aspect-ratio: 4 / 3;
+  /* Compactness pass: 16/9 instead of 4/3 — a 25% shorter photo area is
+     most of the ~20-25% overall card-height reduction the approved spec
+     calls for. */
+  aspect-ratio: 16 / 9;
   background: linear-gradient(135deg, var(--wsp-placeholder-bg-start) 0%, var(--wsp-placeholder-bg-end) 100%);
   display: flex;
   align-items: center;
@@ -256,7 +309,13 @@
 .wsp-card-photo img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  /* `contain`, not `cover`: a `cover` crop was cutting off printed text on
+     at least one product photo (the Controllers card's "EFFECT JOYSTICKS"
+     label). Showing the whole photo, letterboxed on the placeholder
+     gradient when its aspect ratio doesn't match the card exactly, is the
+     safe general fix — a partially-cropped product photo is a worse
+     failure mode than a little padding around a fully-visible one. */
+  object-fit: contain;
   display: block;
 }
 
@@ -265,12 +324,15 @@
 }
 
 .wsp-card-body {
-  padding: 14px 16px;
+  /* No-scroll pass: was 10px 12px (already tightened once, from 14px 16px,
+     before this round) — clamp() so it settles even tighter on the
+     shortest viewports without a separate breakpoint rule. */
+  padding: clamp(6px, 1.6vh, 10px) clamp(8px, 2vw, 12px);
 }
 
 .wsp-card-title {
   font-weight: 700;
-  font-size: 15px;
+  font-size: clamp(12px, 3.2vw, 14px);
   color: var(--wsp-card-text);
 }
 
@@ -495,6 +557,51 @@
   }
 }
 
+/* Sound on/off toggle — same self-contained pill treatment as the locale
+   selector next to it (own tokens, not var(--wsp-*)), so it reads correctly
+   regardless of the surrounding page theme. */
+.wsp-sound-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #c3d4f0;
+  background: #f7faff;
+  color: #10192f;
+  font-family: "Inter", sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 2px 6px rgba(8, 14, 30, 0.12);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.wsp-sound-toggle:hover {
+  border-color: #2f6fed;
+}
+
+.wsp-sound-toggle:focus-visible {
+  outline: 2px solid #2f6fed;
+  outline-offset: 2px;
+}
+
+.wsp-sound-toggle-text {
+  white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+  /* Icon-only on very narrow screens — the locale selector already needs
+     the room, and "Sound"/"Sonido" is redundant with the speaker icon. */
+  .wsp-sound-toggle-text {
+    display: none;
+  }
+  .wsp-sound-toggle {
+    padding: 6px 10px;
+  }
+}
+
 /* ---------------------------------------------------------------------
    Progress panel — the ~3s "calculating" reveal. Lives INSIDE .wsp-scope
    (rendered only from WholesaleWizard.jsx, never the login page), so it
@@ -680,47 +787,179 @@
   padding: 14px 16px;
 }
 
-.wsp-result-figures {
+/* ---------------------------------------------------------------------
+   Money hierarchy — every figure gets its own size/color/weight so a shop
+   reads "what I pay / what I can charge / what I keep" in under 2 seconds,
+   never a uniform table of same-sized rows. Recommended Customer Price is
+   the visual hero (largest, most saturated blue, its own hero card);
+   Potential Profit is second (teal-green, never neon); Shop Cost and the
+   Margin badge are smaller and calmer so they never compete with either.
+--------------------------------------------------------------------- */
+.wsp-result-money {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 10px;
+}
+
+.wsp-result-money-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--wsp-card-text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.wsp-result-money-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
   border-radius: 12px;
-  overflow: hidden;
+  background: var(--wsp-card-bg-hover);
   border: 1px solid var(--wsp-card-border);
 }
 
-.wsp-result-figure-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 14px;
-  background: var(--wsp-card-bg-hover);
-  font-size: 14px;
-}
-
-.wsp-result-figure-row dt {
-  color: var(--wsp-card-text-soft);
-  font-weight: 500;
-}
-
-.wsp-result-figure-row dd {
-  font-weight: 700;
-  color: var(--wsp-card-text);
+.wsp-result-money-value {
   font-variant-numeric: tabular-nums;
 }
 
-.wsp-result-figure-row-accent {
-  background: rgba(59, 130, 246, 0.1);
+.wsp-result-shopcost .wsp-result-money-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--wsp-shopcost-text);
 }
 
-.wsp-result-figure-row-accent dt,
-.wsp-result-figure-row-accent dd {
-  color: var(--wsp-blue);
+.wsp-result-profit .wsp-result-money-value {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--wsp-profit-text);
+}
+
+@media (min-width: 640px) {
+  .wsp-result-profit .wsp-result-money-value {
+    font-size: 30px;
+  }
 }
 
 .wsp-result-figure-loss {
   color: var(--wsp-red) !important;
+}
+
+.wsp-result-grow-margin {
+  margin-top: -4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--wsp-profit-text);
+}
+
+/* The editable recommended-customer-price "hero" — the single most visible
+   figure on the panel. The input IS the figure, never a duplicate
+   read-only value elsewhere on the page. */
+.wsp-result-money-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--wsp-recommended-bg-start) 0%, var(--wsp-recommended-bg-end) 100%);
+  border: 1px solid rgba(26, 79, 214, 0.25);
+}
+
+.wsp-result-money-hero-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wsp-result-money-hero-top .wsp-result-money-label {
+  color: var(--wsp-recommended-text);
+}
+
+.wsp-result-editable-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--wsp-recommended-text);
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(26, 79, 214, 0.3);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.wsp-result-recommended-input {
+  width: 100%;
+  min-height: 46px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 28px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--wsp-recommended-text);
+}
+
+@media (min-width: 640px) {
+  .wsp-result-recommended-input {
+    font-size: 34px;
+  }
+}
+
+.wsp-result-recommended-input:focus-visible {
+  outline: none;
+}
+
+.wsp-result-money-hero:focus-within {
+  outline: 2px solid var(--wsp-blue);
+  outline-offset: 2px;
+}
+
+.wsp-result-margin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wsp-result-margin-badge {
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--wsp-margin-badge-text);
+  background: linear-gradient(135deg, var(--wsp-margin-badge-bg-start) 0%, var(--wsp-margin-badge-bg-end) 100%);
+  border-radius: 999px;
+  padding: 4px 14px;
+}
+
+@media (min-width: 640px) {
+  .wsp-result-margin-badge {
+    font-size: 22px;
+  }
+}
+
+/* Short, once-only reveal when the result panel mounts — never a repeating
+   or bouncy animation, and fully skipped for reduced-motion. */
+@keyframes wsp-result-money-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.wsp-result-money-reveal {
+  animation: wsp-result-money-reveal 320ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wsp-result-money-reveal {
+    animation: none;
+  }
 }
 
 .wsp-result-range-note {
@@ -740,31 +979,6 @@
   border: 1px solid rgba(240, 82, 94, 0.3);
   border-radius: 10px;
   padding: 10px 14px;
-}
-
-.wsp-result-customer-price-label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--wsp-card-text);
-}
-
-.wsp-result-customer-price-input {
-  min-height: 46px;
-  border-radius: 10px;
-  border: 1px solid var(--wsp-card-border);
-  background: #ffffff;
-  padding: 0 14px;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--wsp-card-text);
-}
-
-.wsp-result-customer-price-input:focus-visible {
-  outline: 2px solid var(--wsp-blue);
-  outline-offset: 1px;
 }
 
 .wsp-result-keep-customer-note {
@@ -883,18 +1097,83 @@
    views may still rely on its 1-col-mobile default): 2 columns from
    320px up per the approved spec, widening at larger breakpoints instead
    of stretching 2 columns across a full desktop width.
+
+   Business-photo background: the wizard's own hero panel, distinct from
+   the PCB texture already covering `.wsp-scope` behind it — communicates
+   negotiation/technology/repair-shop/profitability (the source photo has
+   electronics on its left and a business handshake on its right). A flat
+   (same-alpha-both-stops) navy overlay darkens the whole panel enough
+   that every text node placed directly on it (never inside its own
+   opaque card — those stay unaffected, see .wsp-card-clickable and the
+   money-bearing panels further down) can use one solid near-white color
+   with a wide WCAG AA margin, rather than tuning per-element alpha
+   against a photo whose underlying luminance varies by region.
+   `background-attachment` stays `scroll` at every breakpoint (never
+   `fixed`): this is a small rounded, padded panel, not the full-viewport
+   backdrop `.wsp-scope` already uses that pattern for — `fixed` here
+   would look detached from its own rounded box as the page scrolls past
+   it, `scroll` is what keeps it reading as one stable, contained image.
 --------------------------------------------------------------------- */
 .wsp-wizard {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: clamp(4px, 0.9vh, 12px);
+  border-radius: 18px;
+  padding: clamp(6px, 1.2vh, 16px) clamp(8px, 2.6vw, 16px);
+  overflow: hidden;
+  background-image: linear-gradient(rgba(var(--wsp-navy-rgb), 0.72), rgba(var(--wsp-navy-rgb), 0.72)),
+    url("../assets/wholesale-wizard-background.webp");
+  background-size: cover, cover;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
+  background-attachment: scroll, scroll;
+}
+
+/* Mobile: once the wizard's content stacks into a single column the panel
+   is often much taller than it is wide, so a centered `cover` zooms in
+   and crops toward the middle — losing both the electronics (left) and
+   handshake (right) focal points. Biasing right keeps the negotiation/
+   shop side (the more important half per spec) in frame instead of
+   centering on the empty space between the two. */
+@media (max-width: 767px) {
+  .wsp-wizard {
+    background-position: 78% center, 78% center;
+  }
 }
 
 .wsp-wizard-heading {
   font-family: "Space Grotesk", sans-serif;
-  font-size: 17px;
+  font-size: clamp(13px, 3.4vw, 17px);
   font-weight: 700;
-  color: var(--wsp-text-strong);
+  /* Sits directly on the photo background above, not inside a card — see
+     the .wsp-wizard comment for why this is a single solid light color
+     rather than a tuned-per-region one. */
+  color: var(--wsp-btn-text);
+  text-shadow: 0 1px 3px rgba(5, 10, 25, 0.55);
+}
+
+.wsp-wizard-subtitle {
+  font-size: clamp(10px, 2.8vw, 13px);
+  color: var(--wsp-btn-text);
+  text-shadow: 0 1px 3px rgba(5, 10, 25, 0.55);
+}
+
+/* No-scroll spec: on phone-width viewports the subtitle is the one purely
+   supplementary line in this block — the heading above it and the
+   equipment cards below already make the task self-evident, and every
+   other cut on this screen has already gone to real UI chrome, not
+   content. Gated on WIDTH (matches the phone-width card-row layout below,
+   not a height threshold) — a phone held in a tall orientation (e.g.
+   390x844) still needs this cut just as much as a short one (320x568),
+   since a 2-column, 44px-row grid of 10 real equipment cards is already
+   ~450px taller in the full stacked-photo layout than the compact one at
+   any phone width. Desktop/tablet widths never match this, so the
+   subtitle stays on every screen that actually has room for it. */
+@media (max-width: 480px) {
+  .wsp-wizard-subtitle {
+    display: none;
+  }
 }
 
 /* Equipo -> Modelo -> Falla progress indicator (WholesaleWizard.jsx's
@@ -923,13 +1202,17 @@
   width: 100%;
 }
 
+/* The circle keeps its own opaque light fill in every state (done/active/
+   upcoming) — that opaque backing is what makes its text/border colors
+   safe regardless of the photo behind the wizard panel, so none of the
+   three circle rules below needed to change for the new background. */
 .wsp-wizard-step-circle {
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 26px;
-  height: 26px;
+  width: clamp(18px, 4vh, 26px);
+  height: clamp(18px, 4vh, 26px);
   border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
@@ -944,6 +1227,24 @@
   border-color: var(--wsp-blue);
 }
 
+/* The CURRENT step (not yet done) — a glowing blue ring so "you are here"
+   reads clearly at a glance, distinct from both a done step (solid blue)
+   and an upcoming one (plain gray). */
+.wsp-wizard-step-active .wsp-wizard-step-circle {
+  color: var(--wsp-blue);
+  border-color: var(--wsp-blue);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+}
+
+/* Label text below each circle floats directly on the wizard's photo
+   background (no opaque backing of its own), so — like the heading/
+   subtitle above — every state uses the same solid light color; only
+   font-weight distinguishes upcoming/active/done. */
+.wsp-wizard-step-active .wsp-wizard-step-label {
+  color: var(--wsp-btn-text);
+  font-weight: 700;
+}
+
 .wsp-wizard-step-line {
   flex: 1;
   height: 2px;
@@ -956,20 +1257,29 @@
 }
 
 .wsp-wizard-step-label {
-  margin-top: 6px;
-  font-size: 11px;
+  margin-top: clamp(3px, 1vh, 6px);
+  font-size: clamp(10px, 2.6vw, 11px);
   font-weight: 600;
-  color: var(--wsp-text-soft);
+  color: var(--wsp-btn-text);
   text-align: center;
+  text-shadow: 0 1px 2px rgba(5, 10, 25, 0.5);
 }
 
 .wsp-wizard-step-done .wsp-wizard-step-label {
-  color: var(--wsp-text-strong);
+  color: var(--wsp-btn-text);
+  font-weight: 700;
 }
 
+/* No-scroll spec (device-selection screen): always 2 columns, including
+   320px — a fixed 1-column fallback below 360px used to exist here, but
+   it doubled the row count (and therefore the total grid height) on
+   exactly the narrowest, shortest phones where fitting the whole screen
+   without scrolling matters most. Legibility at 320px now comes from
+   .wsp-card-title's clamp() sizing and the short-viewport row-layout
+   override further down, not from dropping to a single column. */
 .wsp-grid-compact {
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: clamp(4px, 1.6vw, 10px);
 }
 
 @media (min-width: 640px) {
@@ -984,18 +1294,78 @@
   }
 }
 
+@media (min-width: 1280px) {
+  .wsp-grid-compact {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+/* No-scroll spec: on phone-width viewports (2-column grid, gated on WIDTH
+   — see the subtitle rule above for why a height-only gate misses tall
+   phones like 390x844), the stacked photo-then-title card is too tall to
+   fit every equipment card on screen at once: the 16/9 photo box alone
+   runs ~80-100px per row, and a real catalog can be 8-10+ top-level
+   cards (5 rows at 2 columns). Swapping to a compact horizontal row
+   (small fixed thumbnail + single-line title) keeps every card close to
+   the 44px touch-target floor instead. Scoped to `.wsp-grid-compact`
+   only — the wizard's own grid — so `.wsp-card` as used by the sales
+   module or result panel elsewhere is never affected by this override. */
+@media (max-width: 480px) {
+  .wsp-grid-compact .wsp-card-clickable {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+  }
+
+  .wsp-grid-compact .wsp-card-clickable .wsp-card-photo {
+    width: 40px;
+    height: 40px;
+    aspect-ratio: auto;
+    flex-shrink: 0;
+    border-radius: 8px;
+  }
+
+  .wsp-grid-compact .wsp-card-clickable .wsp-card-photo-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .wsp-grid-compact .wsp-card-clickable .wsp-card-body {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 8px 6px 0;
+  }
+
+  .wsp-grid-compact .wsp-card-clickable .wsp-card-title {
+    display: block;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .wsp-grid-compact .wsp-card-clickable .wsp-card-arrow {
+    display: none;
+  }
+}
+
 .wsp-wizard-back {
   align-self: flex-start;
 }
 
+/* Opaque card-style backing (was a faint translucent chip) — this banner
+   now sits directly on the wizard's photo background, and its own title/
+   subtitle below keep the dark card text tokens, so it needs real opaque
+   contrast underneath them rather than a barely-there tint. */
 .wsp-wizard-microsoldering-banner {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 12px 14px;
   border-radius: 12px;
-  background: rgba(59, 130, 246, 0.08);
-  border: 1px solid rgba(59, 130, 246, 0.22);
+  background: var(--wsp-card-bg);
+  border: 1px solid var(--wsp-card-border);
   color: var(--wsp-blue);
 }
 

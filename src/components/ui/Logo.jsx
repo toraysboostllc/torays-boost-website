@@ -1,6 +1,7 @@
 import logoSrc from "../../assets/torays-boost-logo.png";
 
 const SIZES = {
+  sm: "h-8 sm:h-11",
   default: "h-11 sm:h-14",
   lg: "h-16 sm:h-20",
 };

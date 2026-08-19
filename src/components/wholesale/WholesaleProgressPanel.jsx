@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
 import { CircuitBackground } from "../ui/CircuitBackground.jsx";
 import { useWholesaleLocale } from "../../i18n/WholesaleLocaleContext.jsx";
+import { playChime } from "../../lib/wholesaleSound.js";
 
 const REDUCED_MOTION_DURATION_MS = 500;
 const FULL_DURATION_MS = 3000;
@@ -49,6 +50,7 @@ export function WholesaleProgressPanel({ onComplete }) {
       if (elapsed < duration) {
         frameId = requestAnimationFrame(tick);
       } else {
+        playChime();
         onCompleteRef.current();
       }
     }
@@ -68,7 +70,7 @@ export function WholesaleProgressPanel({ onComplete }) {
     <div className="wsp-progress-panel" role="status" aria-live="polite">
       <CircuitBackground className="wsp-progress-circuit" opacity={0.15} />
       <div className="wsp-progress-content">
-        <h2 className="wsp-progress-headline">{t("progress.headline")}</h2>
+        <h1 className="wsp-progress-headline">{t("progress.headline")}</h1>
 
         <div className="wsp-progress-bar-track" aria-hidden="true">
           <div className="wsp-progress-bar-fill" style={{ width: `${percent}%` }} />

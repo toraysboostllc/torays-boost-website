@@ -6,6 +6,7 @@ import { useSEO } from "../lib/seo.js";
 import { fetchWholesaleCatalog, wholesaleLogout } from "../lib/wholesaleAuth.js";
 import { WholesaleLocaleProvider, useWholesaleLocale } from "../i18n/WholesaleLocaleContext.jsx";
 import { WholesaleLocaleSelector } from "../components/wholesale/WholesaleLocaleSelector.jsx";
+import { WholesaleSoundToggle } from "../components/wholesale/WholesaleSoundToggle.jsx";
 import { WholesaleWizard } from "../components/wholesale/WholesaleWizard.jsx";
 import { WholesaleSalesModule } from "../components/wholesale/WholesaleSalesModule.jsx";
 
@@ -98,15 +99,24 @@ function WholesalePricesContent() {
 
   return (
     <div className="wsp-scope">
-      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-5 py-10 sm:px-8">
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Logo />
-            <WholesaleLocaleSelector />
+      {/* No-scroll spec: this whole top chrome (logo/controls, badges/
+          welcome/logout, page title) sits above the wizard on the same
+          "Select a Device" screen that must fit a short phone viewport
+          without scrolling — gaps/padding use clamp()/vh so they shrink
+          together with the wizard's own spacing below instead of eating
+          a fixed chunk of the budget regardless of available height. */}
+      <div className="mx-auto flex max-w-6xl flex-col gap-[clamp(5px,1vh,16px)] px-4 py-[clamp(3px,0.8vh,14px)] sm:px-8">
+        <div className="flex flex-col gap-[clamp(3px,0.8vh,10px)]">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Logo size="sm" />
+            <div className="flex flex-wrap items-center gap-2">
+              <WholesaleSoundToggle />
+              <WholesaleLocaleSelector />
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-col gap-0.5">
               <div className="wsp-portal-badges">
                 <span className="wsp-portal-badge">{t("portal.badge")}</span>
                 <span className="wsp-portal-private-badge">
@@ -114,7 +124,7 @@ function WholesalePricesContent() {
                   {t("portal.privateArea")}
                 </span>
               </div>
-              <span className="wsp-text-soft text-sm font-medium">
+              <span className="wsp-text-soft text-xs font-medium sm:text-sm">
                 {t("portal.welcome", { shopName: state.shopName })}
               </span>
             </div>
@@ -125,8 +135,13 @@ function WholesalePricesContent() {
           </div>
         </div>
 
-        <h1 className="text-2xl font-bold sm:text-3xl">{t("portal.title")}</h1>
-
+        {/* No-scroll spec: the generic page title used to live here as its
+            own <h1>, on top of the wizard's own per-screen heading right
+            below it (e.g. "Select a Device to View Pricing") — redundant
+            content taking its own row of vertical space. Every wizard
+            screen (and the progress/result panels) already renders its own
+            heading, now promoted to <h1>, so the page keeps exactly one
+            top-level heading at all times without a separate static one. */}
         <WholesaleWizard equipmentTypes={state.equipmentTypes} microsoldering={state.microsoldering} />
 
         <WholesaleSalesModule salesModule={state.salesModule} />
