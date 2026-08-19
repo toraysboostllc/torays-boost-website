@@ -3,6 +3,7 @@ import { RotateCcw, ShieldCheck, AlertTriangle, Tag, Star, TrendingUp, Check } f
 import { useWholesaleLocale } from "../../i18n/WholesaleLocaleContext.jsx";
 import { computeFixedPricing, computeRangePricing, hasCompletePriceTiers, isHighProfitPrice } from "../../lib/wholesaleMargin.js";
 import { translateCatalogLabel } from "../../lib/wholesaleCatalogI18n.js";
+import { wholesaleHoverProps } from "../../lib/wholesaleSound.js";
 
 /** Silver/Purple/Gold, in display order. Purely presentational metadata —
  *  the actual prices come from the service object, keyed the same way. */
@@ -18,6 +19,36 @@ function wholesaleDisplayPrice(service, formatPrice) {
   if (service.pricing_type === "fixed") return formatPrice(service.fixed_price);
   if (service.pricing_type === "range") return `${formatPrice(service.price_min)} – ${formatPrice(service.price_max)}`;
   return null; // quote
+}
+
+/** Profit/margin for a single Silver/Purple/Gold price, reusing the exact
+ *  same tested calc functions as the editable hero figure below — a range
+ *  service measures the tier price against its own wholesale range (worst/
+ *  best case, same convention as rangeResult), a fixed service against its
+ *  single wholesale price. Never a raw subtraction here. */
+function computeTierPricing(service, tierPrice) {
+  if (service.pricing_type === "range") {
+    return computeRangePricing({ wholesaleMin: service.price_min, wholesaleMax: service.price_max, customerPrice: tierPrice });
+  }
+  return computeFixedPricing({ wholesalePrice: service.fixed_price, customerPrice: tierPrice });
+}
+
+/** Same min–max-vs-single-figure branching as the existing profitDisplay/
+ *  marginDisplay below, just scoped to one tier's own pricing result. */
+function formatTierProfit(tierPricing, formatPrice) {
+  if (!tierPricing) return "—";
+  if ("potentialProfitMin" in tierPricing) {
+    return `${formatPrice(tierPricing.potentialProfitMin)} – ${formatPrice(tierPricing.potentialProfitMax)}`;
+  }
+  return formatPrice(tierPricing.potentialProfit);
+}
+
+function formatTierMargin(tierPricing) {
+  if (!tierPricing) return "—";
+  if ("estimatedMarginPercentMin" in tierPricing) {
+    return `${tierPricing.estimatedMarginPercentMin?.toFixed(0) ?? "—"}–${tierPricing.estimatedMarginPercentMax?.toFixed(0) ?? "—"}%`;
+  }
+  return tierPricing.estimatedMarginPercent != null ? `${tierPricing.estimatedMarginPercent.toFixed(0)}%` : "—";
 }
 
 /**
@@ -119,22 +150,33 @@ export function WholesaleResultPanel({ selection, service, onConsultAnother }) {
       ) : (
         <>
           <div className="wsp-result-money wsp-result-money-reveal">
-            <div className="wsp-result-money-row wsp-result-shopcost">
+            {/* 1) "Your cost with Torays Boost" — read first, and the single
+                biggest number on this panel (see .wsp-result-shopcost-value
+                in wholesalePortal.css): this is what the shop actually pays
+                Torays Boost, so it anchors every other figure below it. */}
+            <div className="wsp-result-shopcost-hero">
               <span className="wsp-result-money-label">{t("result.shopPrice")}</span>
-              <span className="wsp-result-money-value">{wholesaleDisplayPrice(service, formatPrice)}</span>
+              <span className="wsp-result-shopcost-value">{wholesaleDisplayPrice(service, formatPrice)}</span>
             </div>
 
-            {/* Three compact, always-visible price levels — shown only once
-                DESK has configured all three (see hasTiers above); a
-                service still on the single-price experience never shows a
-                skeleton/empty tier row. Selecting one immediately updates
-                the editable price below (and therefore profit/margin) —
+            {/* 2) Silver / Purple (Recommended, preselected once its price
+                matches the initial editable value below) / Gold (High
+                Profit) — real tactile buttons, shown only once DESK has
+                configured all three (see hasTiers above); a service still
+                on the single-price experience never shows a skeleton/
+                partial tier row. Each card shows, in order: the estimated
+                customer price, the shop's estimated profit at that price,
+                and the margin as smaller secondary text — never color
+                alone (icon + text label always accompany the price).
+                Selecting one immediately updates the editable price below
+                (and therefore the profit/margin summary further down) —
                 the input stays the single source of truth for what the
                 shop is charging, never a duplicate read-only figure. */}
             {hasTiers && (
               <div className="wsp-result-tier-group" role="radiogroup" aria-label={t("result.tierGroupLabel")}>
                 {PRICE_TIERS.map((tier) => {
                   const tierPrice = service[tier.priceField];
+                  const tierPricing = computeTierPricing(service, tierPrice);
                   const isActive = activeTierKey === tier.key;
                   return (
                     <button
@@ -142,8 +184,8 @@ export function WholesaleResultPanel({ selection, service, onConsultAnother }) {
                       type="button"
                       role="radio"
                       aria-checked={isActive}
-                      onClick={() => selectTier(tier.priceField)}
                       className={`wsp-result-tier-card wsp-result-tier-${tier.key}${isActive ? " wsp-result-tier-selected" : ""}`}
+                      {...wholesaleHoverProps(() => selectTier(tier.priceField))}
                     >
                       <span className="wsp-result-tier-top">
                         <tier.Icon size={14} aria-hidden="true" className="wsp-result-tier-icon" />
@@ -151,6 +193,12 @@ export function WholesaleResultPanel({ selection, service, onConsultAnother }) {
                       </span>
                       <span className="wsp-result-tier-label">{t(tier.labelKey)}</span>
                       <span className="wsp-result-tier-price">{formatPrice(tierPrice)}</span>
+                      <span className="wsp-result-tier-profit">
+                        {t("result.tierProfitLabel")} {formatTierProfit(tierPricing, formatPrice)}
+                      </span>
+                      <span className="wsp-result-tier-margin">
+                        {formatTierMargin(tierPricing)} {t("result.tierMarginSuffix")}
+                      </span>
                     </button>
                   );
                 })}
@@ -205,7 +253,11 @@ export function WholesaleResultPanel({ selection, service, onConsultAnother }) {
       <p className="wsp-result-keep-customer-note">{t("result.keepCustomerNote")}</p>
       {!isQuote && <p className="wsp-result-disclaimer">{t("result.disclaimer")}</p>}
 
-      <button type="button" onClick={onConsultAnother} className="wsp-btn wsp-btn-primary wsp-result-consult-another">
+      <button
+        type="button"
+        {...wholesaleHoverProps(onConsultAnother)}
+        className="wsp-btn wsp-btn-primary wsp-result-consult-another"
+      >
         <RotateCcw size={16} aria-hidden="true" />
         {t("result.consultAnother")}
       </button>

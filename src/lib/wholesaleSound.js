@@ -149,3 +149,51 @@ export function playChime() {
 export function primeAudioContext() {
   getAudioContext()?.resume().catch(() => {});
 }
+
+/** True only on devices that support a real mouse hover — shared by every
+ *  hoverable control in the wizard (equipment/model cards, fault list,
+ *  price tiers, Back/language/primary buttons) so a touch device never gets
+ *  a false "hover" tone from a tap or a scroll; it gets one on tap/select
+ *  instead (see wholesaleHoverProps below). Re-checked at call time rather
+ *  than cached, matching the CSS (hover: hover) gate this mirrors. */
+export function isPointerHoverCapable() {
+  return typeof window !== "undefined" && window.matchMedia?.("(hover: hover) and (pointer: fine)").matches;
+}
+
+/**
+ * Shared onPointerEnter/onFocus/onClick wiring for every hoverable control
+ * in the wizard — one implementation instead of a hand-rolled copy per
+ * component. `onPointerEnter` only plays for a real mouse pointer:
+ * `event.pointerType` is "touch"/"pen" for a tap, so a touch tap or a scroll
+ * gesture never reaches playHoverTone() through this path at all — pointer
+ * events fire once per real entry (never per movement), so this alone
+ * already satisfies "once on enter, not while the pointer stays over, not
+ * per movement". `onFocus` always plays (keyboard navigation has no hover
+ * concept of its own — same behavior every other control here already had).
+ * When `onActivate` is given, the returned `onClick` plays once on
+ * tap/select ONLY on a device that can never hover in the first place, so a
+ * single interaction never plays the tone twice regardless of input method,
+ * then calls the real handler. Every returned handler is a fresh plain
+ * function per call — never a manually-attached DOM listener — so React's
+ * own synthetic-event delegation is what prevents duplicate listeners after
+ * a rerender, exactly as it already does for every other JSX event prop in
+ * this codebase.
+ */
+export function wholesaleHoverProps(onActivate) {
+  const props = {
+    onPointerEnter(event) {
+      if (event?.pointerType && event.pointerType !== "mouse") return;
+      playHoverTone();
+    },
+    onFocus() {
+      playHoverTone();
+    },
+  };
+  if (onActivate) {
+    props.onClick = (...args) => {
+      if (!isPointerHoverCapable()) playHoverTone();
+      onActivate(...args);
+    };
+  }
+  return props;
+}

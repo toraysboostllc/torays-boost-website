@@ -36,8 +36,28 @@ describe("WholesaleLocaleSelector.jsx: country is informational (flag + USA, no 
     expect(selectorSrc).toContain('t("localeSelector.countryValue")');
   });
 
-  it("renders the US flag emoji next to the country chip", () => {
-    expect(selectorSrc).toContain("🇺🇸");
+  it("never renders the 🇺🇸 flag emoji in actual JSX output — Windows has no glyph for it and falls back to showing the literal text 'US', which read as the nonsensical 'US USA' next to the country chip", () => {
+    // The emoji is still named in this file's own explanatory doc-comment
+    // (documenting WHY it was removed) — strip comments before asserting,
+    // so that prose mention doesn't make this check pass by accident.
+    const withoutComments = selectorSrc.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    expect(withoutComments).not.toContain("🇺🇸");
+  });
+
+  it("renders an inline SVG flag instead, decorative (aria-hidden) since the visible 'USA' text and the chip's own aria-label carry the accessible name", () => {
+    expect(selectorSrc).toContain("<UsFlagIcon");
+    const iconIdx = selectorSrc.indexOf("function UsFlagIcon");
+    const iconEnd = selectorSrc.indexOf("\n}", iconIdx);
+    const iconBlock = selectorSrc.slice(iconIdx, iconEnd);
+    expect(iconBlock).toContain("<svg");
+    expect(iconBlock).toContain('aria-hidden="true"');
+  });
+
+  it("the country chip carries an explicit aria-label combining 'Country'/'País' and 'USA' — never relies on the (decorative) flag alone", () => {
+    const chipIdx = selectorSrc.indexOf('className="wsp-locale-chip"');
+    const chipLine = selectorSrc.slice(chipIdx, selectorSrc.indexOf(">", chipIdx) + 1);
+    expect(chipLine).toContain("aria-label={countryAccessibleLabel}");
+    expect(selectorSrc).toContain('t("localeSelector.countryLabel")');
   });
 
   it("no longer renders a currency chip or its translation key — USD stays internal only", () => {

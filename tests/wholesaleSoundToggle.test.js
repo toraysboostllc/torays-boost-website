@@ -58,20 +58,21 @@ describe("WholesalePrices.jsx: sound toggle is wired into the portal header, nex
   });
 });
 
-describe("EquipmentTypeCard.jsx: hover/select tones, hover-capable devices only get the hover sound", () => {
-  it("imports playHoverTone from the sound engine", () => {
-    expect(cardSrc).toContain('import { playHoverTone } from "../../lib/wholesaleSound.js";');
+describe("EquipmentTypeCard.jsx: hover/select tones via the shared wholesaleHoverProps helper (correction pass — used to hand-roll its own isHoverCapable/handleEnter/handleClick, now shared with every other hoverable wizard control)", () => {
+  it("imports wholesaleHoverProps from the sound engine, never the raw playHoverTone directly", () => {
+    expect(cardSrc).toContain('import { wholesaleHoverProps } from "../../lib/wholesaleSound.js";');
+    expect(cardSrc).not.toContain("playHoverTone");
   });
 
-  it("plays on mouseEnter/focus only when the device is hover-capable — matches the CSS (hover: hover) and (pointer: fine) gate", () => {
-    expect(cardSrc).toContain('window.matchMedia?.("(hover: hover) and (pointer: fine)").matches');
-    expect(cardSrc).toContain("onMouseEnter={handleEnter}");
-    expect(cardSrc).toContain("onFocus={handleEnter}");
+  it("spreads wholesaleHoverProps(onClick) onto the button — pointerenter (mouse-only), focus, and tap/select all wired in one place", () => {
+    expect(cardSrc).toContain("const hoverProps = wholesaleHoverProps(onClick);");
+    expect(cardSrc).toContain("{...hoverProps}");
   });
 
-  it("touch/non-hover devices get the tone on click/select instead, never both on the same interaction", () => {
-    expect(cardSrc).toContain("function handleClick() {");
-    expect(cardSrc).toMatch(/if \(!isHoverCapable\(\)\) playHoverTone\(\);/);
+  it("the hover-capable gating (mouse-only pointerenter, tap/select fallback on touch) now lives once in wholesaleSound.js, not duplicated per-component — see wholesaleSound.test.js for that gating's own tests", () => {
+    expect(cardSrc).not.toContain("isHoverCapable");
+    expect(cardSrc).not.toContain("handleEnter");
+    expect(cardSrc).not.toContain("handleClick");
   });
 });
 

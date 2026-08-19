@@ -4,6 +4,7 @@ import { LogOut, Lock } from "lucide-react";
 import { Logo } from "../components/ui/Logo.jsx";
 import { useSEO } from "../lib/seo.js";
 import { fetchWholesaleCatalog, wholesaleLogout } from "../lib/wholesaleAuth.js";
+import { wholesaleHoverProps } from "../lib/wholesaleSound.js";
 import { WholesaleLocaleProvider, useWholesaleLocale } from "../i18n/WholesaleLocaleContext.jsx";
 import { WholesaleLocaleSelector } from "../components/wholesale/WholesaleLocaleSelector.jsx";
 import { WholesaleSoundToggle } from "../components/wholesale/WholesaleSoundToggle.jsx";
@@ -90,7 +91,7 @@ function WholesalePricesContent() {
     return (
       <div className="wsp-scope flex min-h-screen flex-col items-center justify-center gap-4 px-5 text-center">
         <p className="wsp-text-soft">{state.errorMessage || t("portal.errorTransient")}</p>
-        <button type="button" onClick={loadCatalog} className="wsp-btn wsp-btn-primary">
+        <button type="button" {...wholesaleHoverProps(loadCatalog)} className="wsp-btn wsp-btn-primary">
           {t("portal.retry")}
         </button>
       </div>
@@ -128,7 +129,7 @@ function WholesalePricesContent() {
                 {t("portal.welcome", { shopName: state.shopName })}
               </span>
             </div>
-            <button type="button" onClick={handleLogout} className="wsp-btn wsp-btn-ghost">
+            <button type="button" {...wholesaleHoverProps(handleLogout)} className="wsp-btn wsp-btn-ghost">
               <LogOut size={16} />
               {t("portal.logout")}
             </button>

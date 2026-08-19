@@ -220,4 +220,16 @@ describe("Price tier examples from the approved spec — exact numbers, verified
     expect(isHighProfitPrice(140, 140)).toBe(true); // board repair, exact Gold
     expect(isHighProfitPrice(200, 140)).toBe(true); // board repair, above Gold
   });
+
+  it("Tactile result redesign fixture: Shop Cost $75, Silver $120/$45 profit, Purple $159/$84, Gold $190/$115 — the exact numbers from the approved mock", () => {
+    const shopCost = 75;
+    const silver = computeFixedPricing({ wholesalePrice: shopCost, customerPrice: 120 });
+    expect(silver.potentialProfit).toBe(45);
+
+    const purple = computeFixedPricing({ wholesalePrice: shopCost, customerPrice: 159 });
+    expect(purple.potentialProfit).toBe(84);
+
+    const gold = computeFixedPricing({ wholesalePrice: shopCost, customerPrice: 190 });
+    expect(gold.potentialProfit).toBe(115);
+  });
 });

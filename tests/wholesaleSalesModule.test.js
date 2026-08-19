@@ -77,3 +77,21 @@ describe("WholesaleSalesModule CSS: the status badge wraps to its own line at na
     expect(badgeBlock).toMatch(/flex-shrink:\s*0;/);
   });
 });
+
+describe("wholesaleTranslations.js: the module name is exactly 'Torays Boost Sales' in both languages — never a typo like 'Toraus'", () => {
+  const dictSrc = read("src/i18n/wholesaleTranslations.js");
+
+  it("never contains the misspelling 'Toraus' anywhere in the dictionary", () => {
+    expect(dictSrc).not.toContain("Toraus");
+  });
+
+  it("sales.title is the exact string 'Torays Boost Sales' in both en and es", () => {
+    const matches = dictSrc.match(/title:\s*"Torays Boost Sales"/g) || [];
+    expect(matches.length).toBe(2);
+  });
+
+  it("the maintenance message also spells it correctly in both languages", () => {
+    expect(dictSrc).toMatch(/"Torays Boost Sales is under maintenance/);
+    expect(dictSrc).toMatch(/"Torays Boost Sales está en mantenimiento/);
+  });
+});

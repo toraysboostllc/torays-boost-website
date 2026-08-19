@@ -1,20 +1,34 @@
 /**
  * Wholesale Shops Portal — scoped, standalone visual theme (Fase 3B).
  *
- * Approved direction: medium-intensity blue-gray electronic background (a
- * real PCB close-up photo showing clearly through a light translucent
- * tint — never a dark-mode reading), Torays blue/red accents, large white/
- * ice-blue photo "window" cards sitting visibly lighter than the page
- * behind them, dark-navy readable text throughout, XP-style gradient
- * buttons and card bezels. Buttons are the one deliberate exception: they
- * keep their own dark gradient background (unchanged from the prior
- * round) since they never sit on a light surface in this UI, so they read
- * their text from a dedicated --wsp-btn-text token instead of the
- * page/card text tokens below.
+ * Approved direction: medium-intensity blue-gray electronic background (the
+ * real business photo — electronics on the left, negotiation/shop on the
+ * right — showing clearly through a light translucent tint, never a
+ * dark-mode reading), Torays blue/red accents, large white/ice-blue photo
+ * "window" cards sitting visibly lighter than the page behind them,
+ * dark-navy readable text throughout, XP-style gradient buttons and card
+ * bezels. Buttons are the one deliberate exception: they keep their own
+ * dark gradient background (unchanged from the prior round) since they
+ * never sit on a light surface in this UI, so they read their text from a
+ * dedicated --wsp-btn-text token instead of the page/card text tokens
+ * below.
+ *
+ * Correction pass: the business photo (wholesale-wizard-background.webp)
+ * used to live ONLY inside the wizard's own panel (.wsp-wizard below),
+ * with the PCB close-up photo covering the rest of .wsp-scope around it —
+ * two different photos on one screen, and the business photo never reached
+ * behind the header/greeting/locale-sound row or the Sales module. This
+ * was wrong: the business photo is now the SINGLE global background on
+ * .wsp-scope itself (covering the entire authenticated portal — header,
+ * greeting, locale/sound selector, wizard, and Sales module alike), the
+ * PCB photo is removed entirely (never referenced anywhere in this file
+ * anymore), and .wsp-wizard becomes a translucent navy "glass" panel with
+ * NO image of its own — it lets .wsp-scope's photo show through beneath
+ * it, tinted and blurred, rather than showing a second, different photo.
  *
  * Scoping: every rule lives under `.wsp-scope`, applied only to the
  * `/wholesale/prices` page wrapper (WholesaleLogin.jsx never uses this
- * class, so the PCB background/overlay never appears on the login screen).
+ * class, so this background/overlay never appears on the login screen).
  * This site has no light/dark toggle elsewhere (`torays-*` tokens,
  * Adenda 3's light/premium theme) — this section has its own fixed visual
  * identity for the B2B shop audience, independent of that toggle. Nothing
@@ -123,20 +137,25 @@
   color: var(--wsp-text-strong);
   font-family: "Inter", sans-serif;
 
-  /* PCB photo background with a translucent LIGHT blue-gray tint layered on
-     top (same flat-color-both-stops linear-gradient trick as before, just
-     with a light color now — never the `opacity` CSS property on this
-     element or its content, only alpha within this background-image
-     layer). Composited over the (fairly dark/saturated) PCB photo, this
-     mid-alpha light tint produces a medium blue-gray page tone that reads
-     clearly as "not dark mode" while keeping the circuit board texture
-     visible — deliberately a shade darker than the white/ice-blue cards
-     sitting on top of it, and deliberately lighter than a page that would
-     force light-on-dark content. `cover`/`center`/`no-repeat` on both
-     layers, one value per layer since there are two backgrounds stacked
-     here. */
+  /* THE single global background for the whole authenticated portal —
+     business photo (electronics on the left, negotiation/shop on the
+     right) with a translucent LIGHT blue-gray tint layered on top (same
+     flat-color-both-stops linear-gradient trick as before). Composited
+     over the photo, this mid-alpha light tint produces a medium blue-gray
+     page tone that reads clearly as "not dark mode" while keeping the
+     photo visible — deliberately a shade darker than the white/ice-blue
+     cards sitting on top of it, and deliberately lighter than a page that
+     would force light-on-dark content directly on .wsp-scope (the header
+     row, greeting, and badges all sit right on this background, outside
+     any card). `cover`/`no-repeat` on both layers, one value per layer
+     since there are two backgrounds stacked here — `cover` alone already
+     guarantees no tiling/repetition regardless of viewport size.
+     background-position defaults to `center` here (desktop/tablet widths
+     are wide enough that `cover` shows both the electronics on the left
+     and the negotiation/shop side on the right); narrower widths override
+     this below to keep the business side in frame instead. */
   background-image: linear-gradient(rgba(var(--wsp-overlay-rgb), 0.62), rgba(var(--wsp-overlay-rgb), 0.62)),
-    url("../assets/wholesale-pcb-background.webp");
+    url("../assets/wholesale-wizard-background.webp");
   background-size: cover, cover;
   background-position: center, center;
   background-repeat: no-repeat, no-repeat;
@@ -145,6 +164,19 @@
      same pattern already used for the main site's body background in
      src/styles/index.css). Desktop/tablet opt back into `fixed` below. */
   background-attachment: scroll, scroll;
+}
+
+/* Mobile/narrow: once the page's own content area is narrower than it is
+   tall, a centered `cover` crops toward the middle of the photo — losing
+   both the electronics (left) and the negotiation/shop side (right).
+   Biasing right keeps the business side (the more important half per
+   spec) in frame instead of centering on the gap between the two — same
+   crop bias this photo already used when it lived inside .wsp-wizard
+   alone, now applied to the full-screen background instead. */
+@media (max-width: 767px) {
+  .wsp-scope {
+    background-position: 78% center, 78% center;
+  }
 }
 
 @media (min-width: 768px) {
@@ -790,10 +822,13 @@
 /* ---------------------------------------------------------------------
    Money hierarchy — every figure gets its own size/color/weight so a shop
    reads "what I pay / what I can charge / what I keep" in under 2 seconds,
-   never a uniform table of same-sized rows. Recommended Customer Price is
-   the visual hero (largest, most saturated blue, its own hero card);
-   Potential Profit is second (teal-green, never neon); Shop Cost and the
-   Margin badge are smaller and calmer so they never compete with either.
+   never a uniform table of same-sized rows. "Your Cost with Torays Boost"
+   is now the single largest, most dominant figure on the panel — read
+   first, top of the stack — since it's the number every other figure on
+   this panel (tier profit, editable-price profit, margin) is measured
+   against. Potential Profit (the editable-price summary further down) is
+   second-largest (teal-green, never neon); the per-tier prices and the
+   Margin badge stay smaller and calmer so neither competes with the hero.
 --------------------------------------------------------------------- */
 .wsp-result-money {
   display: flex;
@@ -824,10 +859,30 @@
   font-variant-numeric: tabular-nums;
 }
 
-.wsp-result-shopcost .wsp-result-money-value {
-  font-size: 22px;
+/* "Your Cost with Torays Boost" — the dominant hero figure, stacked
+   (label above value) rather than a left/right row like the smaller
+   figures below, so its own size can carry the full width of the card. */
+.wsp-result-shopcost-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--wsp-card-bg-hover);
+  border: 1px solid var(--wsp-card-border);
+}
+
+.wsp-result-shopcost-value {
+  font-size: 36px;
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
   color: var(--wsp-shopcost-text);
+}
+
+@media (min-width: 640px) {
+  .wsp-result-shopcost-value {
+    font-size: 42px;
+  }
 }
 
 .wsp-result-profit .wsp-result-money-value {
@@ -855,17 +910,20 @@
 
 /* ---------------------------------------------------------------------
    Price tiers — Silver (Competitive) / Purple (Recommended) / Gold (High
-   Profit). Shown only once a service has all three configured (see
-   hasTiers in WholesaleResultPanel.jsx) — a legacy service never renders
-   this group at all, so there is no empty/partial state to style here.
-   Gradients are the exact approved values; every card keeps the same
-   dark-navy card text color regardless of which gradient it sits on —
+   Profit), styled as real tactile buttons: rounded corners, a moderate
+   drop shadow that lifts on hover and compresses on press (the "press
+   effect"), a minimum 48px touch target. Shown only once a service has all
+   three configured (see hasTiers in WholesaleResultPanel.jsx) — a legacy
+   service never renders this group at all, so there is no empty/partial
+   state to style here. Gradients are the approved values — a light
+   metallic gray for Silver, a light professional violet for Purple, an
+   elegant (not bright-yellow) gold for Gold — every card keeps the same
+   dark-navy card text color regardless of which gradient it sits on,
    confirmed AA-safe against both stops of all three (each gradient stays
-   light-to-medium, nothing near-black to force a light-text scheme like
-   the wizard's own photo background needed). Color is never the only
-   signal: every card always shows its own icon + text label + price, and
-   the selected card adds a visible border/shadow/checkmark, never a
-   color-only change. */
+   light-to-medium, nothing near-black). Color is never the only signal:
+   every card always shows its own icon + text label + price + profit +
+   margin, and the selected card adds a visible border/shadow/checkmark,
+   never a color-only change. */
 .wsp-result-tier-group {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -876,14 +934,15 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  min-height: 44px;
-  padding: 10px 6px;
+  gap: 2px;
+  min-height: 48px;
+  padding: 12px 6px 10px;
   border-radius: 12px;
   border: 2px solid transparent;
   cursor: pointer;
   text-align: center;
   color: var(--wsp-card-text);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.55) inset, 0 3px 8px rgba(15, 25, 47, 0.18);
   transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
 }
 
@@ -897,6 +956,20 @@
 
 .wsp-result-tier-highProfit {
   background: linear-gradient(135deg, #fff4bf 0%, #d4af37 100%);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .wsp-result-tier-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.55) inset, 0 6px 14px rgba(15, 25, 47, 0.26);
+  }
+}
+
+/* Touch/click press feedback — a real button compresses, it doesn't just
+   change color. Works for a mouse click's momentary :active state too. */
+.wsp-result-tier-card:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.4) inset, 0 1px 3px rgba(15, 25, 47, 0.22);
 }
 
 .wsp-result-tier-top {
@@ -924,15 +997,34 @@
 }
 
 .wsp-result-tier-price {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+  margin-top: 1px;
 }
 
 @media (min-width: 640px) {
   .wsp-result-tier-price {
-    font-size: 17px;
+    font-size: 18px;
   }
+}
+
+/* Estimated shop profit at this tier's price — second in the stack, still
+   clearly a number of its own (never merged into the price line above). */
+.wsp-result-tier-profit {
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+/* Margin — smaller secondary text, the least prominent figure on the
+   card, exactly as specified. */
+.wsp-result-tier-margin {
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.65;
 }
 
 .wsp-result-tier-selected {
@@ -950,6 +1042,8 @@
   .wsp-result-tier-card {
     transition: none;
   }
+  .wsp-result-tier-card:hover,
+  .wsp-result-tier-card:active,
   .wsp-result-tier-selected {
     transform: none;
   }
@@ -1095,10 +1189,21 @@
   opacity: 0.8;
 }
 
+/* Correction pass: this used to stretch to the panel's full width (a long
+   bar). Spec calls for a rectangular, centered button — roughly 280-320px
+   wide, never a full-width bar even on the narrowest phone. min(300px,
+   100%) already caps at 300px on any wider viewport and only shrinks
+   below that on a screen too narrow to fit it (accounting for the panel's
+   own side padding, that's only the very narrowest phones), so it never
+   becomes an unnecessarily long bar. */
 .wsp-result-consult-another {
-  align-self: stretch;
+  align-self: center;
   justify-content: center;
+  width: min(300px, 100%);
+  min-height: 56px;
+  border-radius: 12px;
   margin-top: 4px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 6px 16px rgba(15, 30, 70, 0.35);
 }
 
 /* ---------------------------------------------------------------------
@@ -1200,21 +1305,24 @@
    320px up per the approved spec, widening at larger breakpoints instead
    of stretching 2 columns across a full desktop width.
 
-   Business-photo background: the wizard's own hero panel, distinct from
-   the PCB texture already covering `.wsp-scope` behind it — communicates
-   negotiation/technology/repair-shop/profitability (the source photo has
-   electronics on its left and a business handshake on its right). A flat
-   (same-alpha-both-stops) navy overlay darkens the whole panel enough
-   that every text node placed directly on it (never inside its own
-   opaque card — those stay unaffected, see .wsp-card-clickable and the
-   money-bearing panels further down) can use one solid near-white color
-   with a wide WCAG AA margin, rather than tuning per-element alpha
-   against a photo whose underlying luminance varies by region.
-   `background-attachment` stays `scroll` at every breakpoint (never
-   `fixed`): this is a small rounded, padded panel, not the full-viewport
-   backdrop `.wsp-scope` already uses that pattern for — `fixed` here
-   would look detached from its own rounded box as the page scrolls past
-   it, `scroll` is what keeps it reading as one stable, contained image.
+   Professional glass panel — correction pass: this panel used to carry
+   its OWN copy of the business photo (a second, separate image from the
+   one covering `.wsp-scope` behind it). It no longer has any
+   background-image at all: it is a translucent navy fill (backdrop-filter
+   blur included, same glassmorphism treatment `.wsp-card-clickable`
+   already established elsewhere in this file) that lets `.wsp-scope`'s
+   own photo show through from underneath, tinted and softly blurred,
+   rather than layering a second distinct image on top of it — "never show
+   the same image twice" and "no image inside the panel" both hold
+   literally, not just visually. The navy alpha here (0.72) is the exact
+   same value the old direct photo+overlay combination used for this
+   panel, chosen so the panel's own on-screen darkness — and therefore
+   every text/icon color and text-shadow already tuned against it below —
+   stays visually identical to the previously-approved look, even though
+   the mechanism producing it changed. Every text node placed directly on
+   this panel (never inside its own opaque card — those stay unaffected,
+   see .wsp-card-clickable and the money-bearing panels further down) can
+   keep using one solid near-white color with a wide WCAG AA margin.
 --------------------------------------------------------------------- */
 .wsp-wizard {
   position: relative;
@@ -1224,24 +1332,9 @@
   border-radius: 18px;
   padding: clamp(6px, 1.2vh, 16px) clamp(8px, 2.6vw, 16px);
   overflow: hidden;
-  background-image: linear-gradient(rgba(var(--wsp-navy-rgb), 0.72), rgba(var(--wsp-navy-rgb), 0.72)),
-    url("../assets/wholesale-wizard-background.webp");
-  background-size: cover, cover;
-  background-position: center, center;
-  background-repeat: no-repeat, no-repeat;
-  background-attachment: scroll, scroll;
-}
-
-/* Mobile: once the wizard's content stacks into a single column the panel
-   is often much taller than it is wide, so a centered `cover` zooms in
-   and crops toward the middle — losing both the electronics (left) and
-   handshake (right) focal points. Biasing right keeps the negotiation/
-   shop side (the more important half per spec) in frame instead of
-   centering on the empty space between the two. */
-@media (max-width: 767px) {
-  .wsp-wizard {
-    background-position: 78% center, 78% center;
-  }
+  background-color: rgba(var(--wsp-navy-rgb), 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .wsp-wizard-heading {

@@ -2,15 +2,7 @@ import { ChevronRight } from "lucide-react";
 import { wholesaleEquipmentIcon } from "../../lib/wholesaleIcons.js";
 import { useWholesaleLocale } from "../../i18n/WholesaleLocaleContext.jsx";
 import { translateCatalogLabel } from "../../lib/wholesaleCatalogI18n.js";
-import { playHoverTone } from "../../lib/wholesaleSound.js";
-
-/** True only on devices that support a real mouse hover — touch devices get
- *  no hover sound at all (there's no "entering" a card on a touch screen),
- *  they get a tone on tap/select instead. Re-checked at call time rather
- *  than cached, matching the CSS (hover: hover) gate this mirrors. */
-function isHoverCapable() {
-  return typeof window !== "undefined" && window.matchMedia?.("(hover: hover) and (pointer: fine)").matches;
-}
+import { wholesaleHoverProps } from "../../lib/wholesaleSound.js";
 
 /**
  * Large photo card for the top-level grid — reused for both a real
@@ -29,21 +21,12 @@ export function EquipmentTypeCard({ entity, onClick, featured = false }) {
   const { language } = useWholesaleLocale();
   const Icon = wholesaleEquipmentIcon(entity);
   const displayName = translateCatalogLabel(entity.name, language);
-
-  function handleEnter() {
-    if (isHoverCapable()) playHoverTone();
-  }
-  function handleClick() {
-    if (!isHoverCapable()) playHoverTone();
-    onClick();
-  }
+  const hoverProps = wholesaleHoverProps(onClick);
 
   return (
     <button
       type="button"
-      onClick={handleClick}
-      onMouseEnter={handleEnter}
-      onFocus={handleEnter}
+      {...hoverProps}
       className={`wsp-card wsp-card-clickable w-full text-left${featured ? " wsp-card-featured" : ""}`}
     >
       <span className="wsp-card-accent" aria-hidden="true" />

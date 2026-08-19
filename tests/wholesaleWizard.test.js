@@ -49,8 +49,8 @@ describe("WholesaleWizard.jsx: back navigation is a real stack, not a hardcoded 
     expect(wizardSrc).toMatch(/function goBack\(\) \{\s*\n\s*setScreenStack\(\(stack\) => \(stack\.length > 1 \? stack\.slice\(0, -1\) : stack\)\);/);
   });
 
-  it("every non-top screen renders exactly one Back button wired to goBack", () => {
-    expect((wizardSrc.match(/onClick=\{goBack\}/g) || []).length).toBe(3); // microsolderingGrid, model, fault
+  it("every non-top screen renders exactly one Back button wired to goBack (wrapped for the hover/tap sound)", () => {
+    expect((wizardSrc.match(/wholesaleHoverProps\(goBack\)/g) || []).length).toBe(3); // microsolderingGrid, model, fault
   });
 });
 
@@ -129,5 +129,20 @@ describe("WholesaleWizard.jsx: WizardSteps — Equipo/Modelo/Falla progress indi
     expect(wholesaleTranslations.en.wizard.stepEquipment).toBe("Device");
     expect(wholesaleTranslations.en.wizard.stepModel).toBe("Model");
     expect(wholesaleTranslations.en.wizard.stepIssue).toBe("Issue");
+  });
+});
+
+describe("WholesaleWizard.jsx: interactive hover/tap sound — Back buttons and the fault list", () => {
+  it("imports wholesaleHoverProps from the shared sound engine, never a hand-rolled hover/click handler", () => {
+    expect(wizardSrc).toContain('import { wholesaleHoverProps } from "../../lib/wholesaleSound.js";');
+  });
+
+  it("the fault list's own button is wired through wholesaleHoverProps, not a bare onClick — one tone on real entry/tap, never per mouse movement", () => {
+    expect(wizardSrc).toContain("wholesaleHoverProps(() => handleSelectFault(service))");
+    expect(wizardSrc).not.toMatch(/onClick=\{\(\) => handleSelectFault\(service\)\}/);
+  });
+
+  it("equipo/model grids reuse EquipmentTypeCard (which itself wires wholesaleHoverProps — see EquipmentTypeCard's own tests), never a second hover implementation duplicated in this file", () => {
+    expect(wizardSrc).not.toContain("playHoverTone");
   });
 });

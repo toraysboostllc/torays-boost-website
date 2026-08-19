@@ -98,8 +98,8 @@ describe("WholesaleResultPanel.jsx: breadcrumb summary and required disclaimers"
     expect(panelSrc).toContain('t("result.disclaimer")');
   });
 
-  it("the Consultar otro precio button calls onConsultAnother — no inline navigation/reset logic duplicated here", () => {
-    expect(panelSrc).toMatch(/onClick=\{onConsultAnother\}/);
+  it("the Consultar otro precio button calls onConsultAnother (wrapped for the hover/tap sound) — no inline navigation/reset logic duplicated here", () => {
+    expect(panelSrc).toMatch(/wholesaleHoverProps\(onConsultAnother\)/);
     expect(panelSrc).toContain('t("result.consultAnother")');
   });
 });
@@ -168,6 +168,40 @@ describe("WholesaleResultPanel.jsx: money hierarchy — distinct size/color per 
   });
 });
 
+describe("WholesaleResultPanel.jsx: correction pass — Torays Boost's own cost is now the dominant hero figure, read first", () => {
+  const cssSrc = readFileSync(join(root, "src/styles/wholesalePortal.css"), "utf8").replace(/\r\n?/g, "\n");
+
+  it("t(\"result.shopPrice\") and the price value are the very first thing rendered inside the money block — before the tier group and the editable hero", () => {
+    const moneyBlockStart = panelSrc.indexOf('className="wsp-result-money wsp-result-money-reveal"');
+    const shopPriceIdx = panelSrc.indexOf('t("result.shopPrice")');
+    const tierGroupIdx = panelSrc.indexOf("wsp-result-tier-group");
+    const editableHeroIdx = panelSrc.indexOf("wsp-result-money-hero-top");
+    expect(moneyBlockStart).toBeGreaterThan(-1);
+    expect(shopPriceIdx).toBeGreaterThan(moneyBlockStart);
+    expect(shopPriceIdx).toBeLessThan(tierGroupIdx);
+    expect(shopPriceIdx).toBeLessThan(editableHeroIdx);
+  });
+
+  it("renders the shop-cost figure in its own dedicated hero block, not the old left/right row", () => {
+    expect(panelSrc).toContain('<div className="wsp-result-shopcost-hero">');
+    expect(panelSrc).toContain('<span className="wsp-result-shopcost-value">');
+    expect(panelSrc).not.toContain('className="wsp-result-money-row wsp-result-shopcost"');
+  });
+
+  it("the shop-cost value's own font-size is strictly larger than every other money figure on the panel (the editable hero input, the profit row, the margin badge, and a tier's own price)", () => {
+    function firstFontSize(selector) {
+      const idx = cssSrc.indexOf(`${selector} {`);
+      const block = cssSrc.slice(idx, cssSrc.indexOf("}", idx));
+      return Number(block.match(/font-size:\s*(\d+)px/)[1]);
+    }
+    const shopCostSize = firstFontSize(".wsp-result-shopcost-value");
+    expect(shopCostSize).toBeGreaterThan(firstFontSize(".wsp-result-recommended-input"));
+    expect(shopCostSize).toBeGreaterThan(firstFontSize(".wsp-result-profit .wsp-result-money-value"));
+    expect(shopCostSize).toBeGreaterThan(firstFontSize(".wsp-result-margin-badge"));
+    expect(shopCostSize).toBeGreaterThan(firstFontSize(".wsp-result-tier-price"));
+  });
+});
+
 describe("WholesaleResultPanel.jsx: catalog names (equipo/model/service) are localized for display only, never mutated", () => {
   it("imports translateCatalogLabel and applies it to every catalog-sourced name in the breadcrumb", () => {
     expect(panelSrc).toContain(
@@ -217,7 +251,7 @@ describe("WholesaleResultPanel.jsx: Silver/Purple/Gold price tiers — shown onl
   it("clicking a tier card sets the editable input to that tier's exact price — selectTier writes straight into customerPriceInput, no intermediate rounding/formula", () => {
     expect(panelSrc).toContain("function selectTier(priceField) {");
     expect(panelSrc).toContain("setCustomerPriceInput(String(service[priceField]));");
-    expect(panelSrc).toContain("onClick={() => selectTier(tier.priceField)}");
+    expect(panelSrc).toContain("wholesaleHoverProps(() => selectTier(tier.priceField))");
   });
 
   it("activeTierKey classifies >= high_profit_price as High Profit BEFORE checking exact matches against Silver/Purple — the >= rule always wins on a tie", () => {
@@ -239,5 +273,140 @@ describe("WholesaleResultPanel.jsx: Silver/Purple/Gold price tiers — shown onl
 
   it("loss is still measured against fixed_price (Shop Cost) directly via computeFixedPricing's wholesalePrice param — tiers never change what counts as a loss", () => {
     expect(panelSrc).toContain("computeFixedPricing({ wholesalePrice: service.fixed_price, customerPrice })");
+  });
+});
+
+describe("WholesaleResultPanel.jsx: correction pass — each tier card now shows its own customer price, profit, and margin", () => {
+  it("computeTierPricing reuses computeFixedPricing/computeRangePricing, never a raw subtraction of tier fields", () => {
+    expect(panelSrc).toContain("function computeTierPricing(service, tierPrice) {");
+    expect(panelSrc).toMatch(/function computeTierPricing[\s\S]{0,200}computeFixedPricing|computeRangePricing/);
+    expect(panelSrc).not.toMatch(/tierPrice\s*-\s*service\.(fixed_price|price_min|price_max)/);
+  });
+
+  it("every tier card renders price, then profit (with the tierProfitLabel translation), then margin as a visually distinct smaller line — in that order", () => {
+    const cardBlock = panelSrc.slice(panelSrc.indexOf("PRICE_TIERS.map"), panelSrc.indexOf("wsp-result-money-hero-top"));
+    const priceIdx = cardBlock.indexOf("wsp-result-tier-price");
+    const profitIdx = cardBlock.indexOf("wsp-result-tier-profit");
+    const marginIdx = cardBlock.indexOf("wsp-result-tier-margin");
+    expect(priceIdx).toBeGreaterThan(-1);
+    expect(profitIdx).toBeGreaterThan(priceIdx);
+    expect(marginIdx).toBeGreaterThan(profitIdx);
+    expect(cardBlock).toContain('t("result.tierProfitLabel")');
+    expect(cardBlock).toContain("formatTierProfit(tierPricing, formatPrice)");
+    expect(cardBlock).toContain("formatTierMargin(tierPricing)");
+  });
+
+  it("every tier's profit and margin come from formatPrice/formatTierProfit — never a raw number interpolated without currency formatting", () => {
+    expect(panelSrc).not.toMatch(/\{tierPricing\.potentialProfit\}/);
+    expect(panelSrc).not.toContain("{tierPrice}"); // the raw number is never rendered bare — always through formatPrice(tierPrice)
+    expect(panelSrc).toContain("{formatPrice(tierPrice)}");
+  });
+
+  it("tier cards are wired through wholesaleHoverProps (mouse-only pointerenter + focus + tap-select), never a bare onClick", () => {
+    expect(panelSrc).toContain("wholesaleHoverProps(() => selectTier(tier.priceField))");
+    expect(panelSrc).not.toMatch(/onClick=\{\(\) => selectTier/);
+  });
+
+  it("the final action button is wired the same way, so 'Check another price' also gets the hover/tap tone", () => {
+    expect(panelSrc).toContain("wholesaleHoverProps(onConsultAnother)");
+  });
+});
+
+describe("WholesaleResultPanel.jsx: fallback — a service without complete tiers never renders the tier group, keeps the pre-tier single-price experience", () => {
+  it("hasTiers gates the entire tier block — false for a service missing even one of the three prices (the tested fallback shape for this task's verification)", () => {
+    // hasCompletePriceTiers itself is exhaustively tested in wholesaleMargin.test.js;
+    // this just confirms the panel's own gating expression is still exactly what
+    // decides whether the tier group (and therefore its hover-sound wiring) mounts.
+    expect(panelSrc).toMatch(/\{hasTiers && \(\s*<div className="wsp-result-tier-group"/);
+    expect(panelSrc).toContain("const hasTiers = hasCompletePriceTiers(service);");
+  });
+
+  it("a fallback (no-tiers) service still shows the editable hero price and the potential-profit/margin summary — the experience isn't blank", () => {
+    const afterTierGroup = panelSrc.slice(panelSrc.indexOf("{hasTiers && ("));
+    expect(afterTierGroup).toContain("wsp-result-money-hero");
+    expect(afterTierGroup).toContain('t("result.potentialProfit")');
+    expect(afterTierGroup).toContain('t("result.estimatedMargin")');
+  });
+});
+
+describe("wholesalePortal.css: tactile tier buttons — 48px minimum touch target, shadow + press effect, professional palette", () => {
+  const cssSrc = readFileSync(join(root, "src/styles/wholesalePortal.css"), "utf8").replace(/\r\n?/g, "\n");
+  const cardBlock = cssSrc.slice(cssSrc.indexOf(".wsp-result-tier-card {"), cssSrc.indexOf("}", cssSrc.indexOf(".wsp-result-tier-card {")));
+
+  it("min-height is at least 48px (WCAG minimum touch target)", () => {
+    const minHeight = Number(cardBlock.match(/min-height:\s*(\d+)px/)[1]);
+    expect(minHeight).toBeGreaterThanOrEqual(48);
+  });
+
+  it("has its own moderate drop shadow and a distinct :active press state (never color-change-only feedback)", () => {
+    expect(cardBlock).toMatch(/box-shadow:/);
+    expect(cssSrc).toMatch(/\.wsp-result-tier-card:active \{[\s\S]*?transform: translateY\(1px\)/);
+  });
+
+  it("has a hover lift gated behind (hover: hover) and (pointer: fine), so a touch tap never leaves a stuck hover state", () => {
+    expect(cssSrc).toMatch(/@media \(hover: hover\) and \(pointer: fine\) \{\s*\.wsp-result-tier-card:hover/);
+  });
+
+  it("border-radius stays a real rounded-button radius (>=10px, never a sharp rectangle)", () => {
+    const radius = Number(cardBlock.match(/border-radius:\s*(\d+)px/)[1]);
+    expect(radius).toBeGreaterThanOrEqual(10);
+  });
+
+  it("Silver is a light metallic gray gradient, never a colored/neon fill", () => {
+    const block = cssSrc.slice(cssSrc.indexOf(".wsp-result-tier-competitive {"), cssSrc.indexOf("}", cssSrc.indexOf(".wsp-result-tier-competitive {")));
+    expect(block).toMatch(/#f4f7fb|#aeb8c6/i);
+  });
+
+  it("Purple is a light professional violet, never a saturated/neon purple", () => {
+    const block = cssSrc.slice(cssSrc.indexOf(".wsp-result-tier-recommended {"), cssSrc.indexOf("}", cssSrc.indexOf(".wsp-result-tier-recommended {")));
+    expect(block).toMatch(/#f1eaff|#b99cff/i);
+  });
+
+  it("Gold is an elegant metallic gold, never a bright/pure yellow (#ffff00 or close to it)", () => {
+    const block = cssSrc.slice(cssSrc.indexOf(".wsp-result-tier-highProfit {"), cssSrc.indexOf("}", cssSrc.indexOf(".wsp-result-tier-highProfit {")));
+    expect(block).toMatch(/#fff4bf|#d4af37/i);
+    expect(block).not.toMatch(/#ffff00|#ffeb00|#fde100/i);
+  });
+
+  it("every tier card keeps the same dark-navy card text color regardless of which gradient it sits on — contrast is never gradient-dependent", () => {
+    expect(cardBlock).toContain("color: var(--wsp-card-text);");
+  });
+});
+
+describe("wholesalePortal.css: 'Check another price' is a fixed-width rectangular button, never a full-width bar", () => {
+  const cssSrc = readFileSync(join(root, "src/styles/wholesalePortal.css"), "utf8").replace(/\r\n?/g, "\n");
+  const block = cssSrc.slice(cssSrc.indexOf(".wsp-result-consult-another {"), cssSrc.indexOf("}", cssSrc.indexOf(".wsp-result-consult-another {")));
+
+  it("is centered (align-self: center), never stretched to the panel's full width", () => {
+    expect(block).toContain("align-self: center;");
+    expect(block).not.toContain("align-self: stretch;");
+  });
+
+  it("caps its width at 300px (within the approved 280-320px range) while still shrinking on the narrowest phones instead of overflowing", () => {
+    const widthMatch = block.match(/width:\s*min\((\d+)px,\s*100%\)/);
+    expect(widthMatch).not.toBeNull();
+    const capPx = Number(widthMatch[1]);
+    expect(capPx).toBeGreaterThanOrEqual(280);
+    expect(capPx).toBeLessThanOrEqual(320);
+  });
+
+  it("height is within the approved 54-58px range", () => {
+    const minHeight = Number(block.match(/min-height:\s*(\d+)px/)[1]);
+    expect(minHeight).toBeGreaterThanOrEqual(54);
+    expect(minHeight).toBeLessThanOrEqual(58);
+  });
+
+  it("border-radius is close to the approved ~12px", () => {
+    const radius = Number(block.match(/border-radius:\s*(\d+)px/)[1]);
+    expect(radius).toBeGreaterThanOrEqual(10);
+    expect(radius).toBeLessThanOrEqual(14);
+  });
+
+  it("the reset icon (RotateCcw) is still the first child, before the label text — icon-left, matching the approved spec", () => {
+    const btnIdx = panelSrc.indexOf('className="wsp-btn wsp-btn-primary wsp-result-consult-another"');
+    const iconIdx = panelSrc.indexOf("<RotateCcw", btnIdx);
+    const labelIdx = panelSrc.indexOf('t("result.consultAnother")', btnIdx);
+    expect(iconIdx).toBeGreaterThan(btnIdx);
+    expect(iconIdx).toBeLessThan(labelIdx);
   });
 });

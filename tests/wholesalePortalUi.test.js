@@ -200,28 +200,20 @@ describe("scope: no hardcoded or public Supabase Storage URLs anywhere in src/",
   });
 });
 
-describe("PCB background: local asset, imported once, no external/remote reference", () => {
-  it("the source PNG the user provided was actually converted — a wholesale-pcb-background.webp file exists on disk", () => {
-    // statSync throws if the file is missing — that failure IS the assertion.
-    const stat = statSync(join(root, "src/assets/wholesale-pcb-background.webp"));
-    expect(stat.isFile()).toBe(true);
-  });
-
-  it("the WebP asset is optimized into the ~300-400 KB target range, not just converted at default/lossless settings", () => {
-    const stat = statSync(join(root, "src/assets/wholesale-pcb-background.webp"));
-    const kb = stat.size / 1024;
-    expect(kb).toBeGreaterThan(50); // sanity floor — didn't get compressed into mush
-    expect(kb).toBeLessThanOrEqual(400);
-  });
-
-  it("wholesalePortal.css references the local asset via a relative url(), never a remote http(s) image host", () => {
+describe("Correction pass: the old PCB background is fully retired — no longer referenced anywhere in the stylesheet", () => {
+  // wholesale-pcb-background.webp is deliberately left on disk (deleting
+  // assets is a separate, unrequested housekeeping decision) but must never
+  // be wired into any CSS rule again — a real Preview screenshot showed the
+  // PCB and the business photo BOTH on screen at once (PCB around the
+  // wizard, photo boxed inside it), which is exactly the "two different
+  // photos on one screen" bug this correction removes.
+  it("wholesalePortal.css never references wholesale-pcb-background.webp", () => {
     const css = read("src/styles/wholesalePortal.css");
-    expect(css).toContain('url("../assets/wholesale-pcb-background.webp")');
-    expect(css).not.toMatch(/url\(\s*["']?https?:\/\//);
+    expect(css).not.toContain("wholesale-pcb-background.webp");
   });
 });
 
-describe("wholesalePortal.css: PCB background is cover/center/no-repeat, non-repeating, scoped, with a legibility overlay", () => {
+describe("wholesalePortal.css: the global business-photo background (.wsp-scope) is cover/center/no-repeat, non-repeating, scoped, with a legibility overlay", () => {
   const css = read("src/styles/wholesalePortal.css");
 
   it(".wsp-scope sets background-size: cover and background-position: center on every background layer", () => {
@@ -235,7 +227,7 @@ describe("wholesalePortal.css: PCB background is cover/center/no-repeat, non-rep
     expect(rule).toMatch(/background-repeat:\s*no-repeat,\s*no-repeat;/);
   });
 
-  it("layers a translucent overlay UNDER the text (a same-color-both-stops linear-gradient, driven by --wsp-overlay-rgb) on top of the PCB photo, so text stays legible over the busy circuit texture", () => {
+  it("layers a translucent overlay UNDER the text (a same-color-both-stops linear-gradient, driven by --wsp-overlay-rgb) on top of the business photo, so text stays legible over it", () => {
     const rule = css.match(/\.wsp-scope\s*\{[\s\S]*?\n\}/)[0];
     expect(rule).toContain(
       "background-image: linear-gradient(rgba(var(--wsp-overlay-rgb), 0.62), rgba(var(--wsp-overlay-rgb), 0.62)),"
@@ -280,7 +272,7 @@ describe("wholesalePortal.css: PCB background is cover/center/no-repeat, non-rep
   });
 });
 
-describe("Wizard business-photo background: local asset, imported once, no external/remote reference", () => {
+describe("The business photo: local asset, referenced exactly once, globally on .wsp-scope — never remotely, never duplicated onto .wsp-wizard", () => {
   it("the business photo the user provided was actually converted — a wholesale-wizard-background.webp file exists on disk", () => {
     const stat = statSync(join(root, "src/assets/wholesale-wizard-background.webp"));
     expect(stat.isFile()).toBe(true);
@@ -298,34 +290,27 @@ describe("Wizard business-photo background: local asset, imported once, no exter
     expect(css).toContain('url("../assets/wholesale-wizard-background.webp")');
     expect(css).not.toMatch(/url\(\s*["']?https?:\/\//);
   });
+
+  it("appears in exactly ONE url(...) reference in the whole stylesheet — the correction this describes is fixing exactly the bug where it appeared boxed inside .wsp-wizard AND (a different photo) covered .wsp-scope around it", () => {
+    const css = read("src/styles/wholesalePortal.css");
+    const matches = css.match(/url\("\.\.\/assets\/wholesale-wizard-background\.webp"\)/g) || [];
+    expect(matches).toHaveLength(1);
+  });
 });
 
-describe("wholesalePortal.css: .wsp-wizard's own business-photo panel — cover/position/no-fixed-on-mobile/legibility overlay", () => {
+describe("wholesalePortal.css: .wsp-wizard — correction pass, now an image-less translucent glass panel, never its own copy of the photo", () => {
   const css = read("src/styles/wholesalePortal.css");
   const wizardRule = css.match(/\.wsp-wizard\s*\{[\s\S]*?\n\}/)[0];
 
-  it("sets background-size: cover and background-position: center on every layer by default", () => {
-    expect(wizardRule).toMatch(/background-size:\s*cover,\s*cover;/);
-    expect(wizardRule).toMatch(/background-position:\s*center,\s*center;/);
+  it("has no background-image / url(...) of its own — the photo lives only on .wsp-scope now", () => {
+    expect(wizardRule).not.toContain("background-image");
+    expect(wizardRule).not.toContain("url(");
   });
 
-  it("never repeats the image and never uses background-attachment: fixed at any breakpoint", () => {
-    expect(wizardRule).toMatch(/background-repeat:\s*no-repeat,\s*no-repeat;/);
-    expect(wizardRule).toMatch(/background-attachment:\s*scroll,\s*scroll;/);
-    expect(css).not.toMatch(/\.wsp-wizard\s*\{[\s\S]*?background-attachment:\s*fixed/);
-    expect(css).not.toMatch(/@media[\s\S]*?\.wsp-wizard\s*\{[^}]*background-attachment:\s*fixed/);
-  });
-
-  it("layers a translucent navy overlay (driven by --wsp-navy-rgb) under the photo, mid-range alpha so the photo stays visible", () => {
-    expect(wizardRule).toContain(
-      "background-image: linear-gradient(rgba(var(--wsp-navy-rgb), 0.72), rgba(var(--wsp-navy-rgb), 0.72)),"
-    );
-    const alphas = [...wizardRule.matchAll(/rgba\(var\(--wsp-navy-rgb\),\s*([\d.]+)\)/g)].map((m) => Number(m[1]));
-    expect(alphas.length).toBeGreaterThan(0);
-    for (const alpha of alphas) {
-      expect(alpha).toBeGreaterThan(0.3);
-      expect(alpha).toBeLessThan(0.9);
-    }
+  it("uses a translucent navy background-color (--wsp-navy-rgb) plus a backdrop-filter blur — the 'glass' treatment, letting .wsp-scope's own photo show through from underneath rather than layering a second image on top", () => {
+    expect(wizardRule).toMatch(/background-color:\s*rgba\(var\(--wsp-navy-rgb\),\s*[\d.]+\);/);
+    expect(wizardRule).toMatch(/backdrop-filter:\s*blur\(\d+px\);/);
+    expect(wizardRule).toMatch(/-webkit-backdrop-filter:\s*blur\(\d+px\);/);
     // --wsp-navy-rgb must be the real split-out triplet of --wsp-navy, not an independently drifting value
     const navyHex = css.match(/--wsp-navy:\s*(#[0-9a-fA-F]{6})/)[1];
     const [r, g, b] = [navyHex.slice(1, 3), navyHex.slice(3, 5), navyHex.slice(5, 7)].map((h) => parseInt(h, 16));
@@ -333,12 +318,24 @@ describe("wholesalePortal.css: .wsp-wizard's own business-photo panel — cover/
     expect(navyRgb).toEqual([r, g, b]);
   });
 
-  it("biases background-position toward the right (negotiation/shop side) only below the 768px breakpoint, to avoid an awkward center-crop on tall narrow phones", () => {
-    const mobileOverride = css.match(/@media \(max-width: 767px\)\s*\{[\s\S]*?\.wsp-wizard\s*\{[\s\S]*?\n\s*\}/)[0];
-    expect(mobileOverride).toMatch(/background-position:\s*78% center,\s*78% center;/);
+  it("the glass alpha is mid-to-high (not near-opaque, not near-transparent) — dark enough for the existing white text tokens below to stay WCAG AA, translucent enough that .wsp-scope's photo is still recognizable behind it", () => {
+    const alpha = Number(wizardRule.match(/background-color:\s*rgba\(var\(--wsp-navy-rgb\),\s*([\d.]+)\);/)[1]);
+    expect(alpha).toBeGreaterThan(0.4);
+    expect(alpha).toBeLessThan(0.9);
   });
 
-  it("every text node that sits directly on the photo (heading/subtitle/step-label, never inside an opaque card) uses the same solid light color, not the page's dark-navy tokens", () => {
+  it("no longer carries its own background-position/repeat/attachment declarations — those only make sense for an element with its own background-image, which .wsp-wizard no longer has", () => {
+    expect(wizardRule).not.toContain("background-size");
+    expect(wizardRule).not.toContain("background-position");
+    expect(wizardRule).not.toContain("background-repeat");
+    expect(wizardRule).not.toContain("background-attachment");
+  });
+
+  it("no longer has its own narrow-width background-position override — that concern (biasing toward the business/negotiation side) moved to .wsp-scope, since .wsp-wizard has no image of its own to position", () => {
+    expect(css).not.toMatch(/@media \(max-width: 767px\)\s*\{\s*\.wsp-wizard\s*\{/);
+  });
+
+  it("every text node that sits directly on the panel (heading/subtitle/step-label, never inside an opaque card) still uses the same solid light color, not the page's dark-navy tokens — unaffected by the image-to-glass mechanism change", () => {
     const headingRule = css.match(/\.wsp-wizard-heading\s*\{[\s\S]*?\n\}/)[0];
     const subtitleRule = css.match(/\.wsp-wizard-subtitle\s*\{[\s\S]*?\n\}/)[0];
     const labelRule = css.match(/\n\.wsp-wizard-step-label\s*\{[\s\S]*?\n\}/)[0];
@@ -348,7 +345,7 @@ describe("wholesalePortal.css: .wsp-wizard's own business-photo panel — cover/
     }
   });
 
-  it("the Microsoldering banner has its own opaque card-style backing now that it sits directly on the photo, not the old barely-there translucent tint", () => {
+  it("the Microsoldering banner keeps its own opaque card-style backing, unaffected by this round", () => {
     const bannerRule = css.match(/\.wsp-wizard-microsoldering-banner\s*\{[\s\S]*?\n\}/)[0];
     expect(bannerRule).toMatch(/background:\s*var\(--wsp-card-bg\);/);
     expect(bannerRule).not.toMatch(/rgba\(59, 130, 246, 0\.08\)/);
@@ -703,23 +700,26 @@ describe("wholesalePortal.css: price-tier cards — exact approved Silver/Purple
     expect(rule).toMatch(/grid-template-columns:\s*repeat\(3, 1fr\)/);
   });
 
-  it("each tier card meets the 44px touch-target floor and gets a keyboard focus-visible ring", () => {
+  it("each tier card meets (and exceeds, per the tactile-redesign spec's 48px minimum) the touch-target floor, and gets a keyboard focus-visible ring", () => {
     const cardRule = css.match(/\.wsp-result-tier-card\s*\{[\s\S]*?\n\}/)[0];
-    expect(cardRule).toMatch(/min-height:\s*44px/);
+    const minHeight = Number(cardRule.match(/min-height:\s*(\d+)px/)[1]);
+    expect(minHeight).toBeGreaterThanOrEqual(48);
     const focusRule = css.match(/\.wsp-result-tier-card:focus-visible\s*\{[\s\S]*?\n\}/)[0];
     expect(focusRule).toMatch(/outline:/);
   });
 
-  it("the selected tier gets a real border/shadow change, not just a color swap, and that change is skipped under prefers-reduced-motion", () => {
+  it("the selected tier gets a real border/shadow change, not just a color swap, and that change (plus the tactile-redesign's own hover/active transforms) is skipped under prefers-reduced-motion", () => {
     const selectedRule = css.match(/\.wsp-result-tier-selected\s*\{[\s\S]*?\n\}/)[0];
     expect(selectedRule).toMatch(/border-color:/);
     expect(selectedRule).toMatch(/box-shadow:/);
     expect(selectedRule).toMatch(/transform:/);
     const mediaStart = css.indexOf("@media (prefers-reduced-motion: reduce)", css.indexOf(".wsp-result-tier-selected"));
-    const mediaBlock = css.slice(mediaStart, mediaStart + 200);
-    expect(mediaBlock).toContain(".wsp-result-tier-card");
+    const mediaBlock = css.slice(mediaStart, css.indexOf("\n}\n", mediaStart) + 3);
+    expect(mediaBlock).toContain(".wsp-result-tier-card {");
     expect(mediaBlock).toContain("transition: none;");
-    expect(mediaBlock).toContain(".wsp-result-tier-selected");
+    expect(mediaBlock).toContain(".wsp-result-tier-card:hover,");
+    expect(mediaBlock).toContain(".wsp-result-tier-card:active,");
+    expect(mediaBlock).toContain(".wsp-result-tier-selected {");
     expect(mediaBlock).toContain("transform: none;");
   });
 });

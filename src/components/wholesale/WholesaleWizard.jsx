@@ -3,6 +3,7 @@ import { ArrowLeft, Check, Cpu } from "lucide-react";
 import { useWholesaleLocale } from "../../i18n/WholesaleLocaleContext.jsx";
 import { buildWholesaleWizardCatalog } from "../../lib/wholesaleWizardCatalog.js";
 import { translateCatalogLabel } from "../../lib/wholesaleCatalogI18n.js";
+import { wholesaleHoverProps } from "../../lib/wholesaleSound.js";
 import { EquipmentTypeCard } from "./EquipmentTypeCard.jsx";
 import { WholesaleProgressPanel } from "./WholesaleProgressPanel.jsx";
 import { WholesaleResultPanel } from "./WholesaleResultPanel.jsx";
@@ -155,7 +156,7 @@ export function WholesaleWizard({ equipmentTypes, microsoldering }) {
 
       {screen === "microsolderingGrid" && (
         <>
-          <button type="button" onClick={goBack} className="wsp-btn wsp-btn-ghost wsp-wizard-back">
+          <button type="button" {...wholesaleHoverProps(goBack)} className="wsp-btn wsp-btn-ghost wsp-wizard-back">
             <ArrowLeft size={16} />
             {t("wizard.back")}
           </button>
@@ -185,7 +186,7 @@ export function WholesaleWizard({ equipmentTypes, microsoldering }) {
 
       {screen === "model" && selectedEquipo && (
         <>
-          <button type="button" onClick={goBack} className="wsp-btn wsp-btn-ghost wsp-wizard-back">
+          <button type="button" {...wholesaleHoverProps(goBack)} className="wsp-btn wsp-btn-ghost wsp-wizard-back">
             <ArrowLeft size={16} />
             {t("wizard.back")}
           </button>
@@ -200,7 +201,7 @@ export function WholesaleWizard({ equipmentTypes, microsoldering }) {
 
       {screen === "fault" && selectedModel && (
         <>
-          <button type="button" onClick={goBack} className="wsp-btn wsp-btn-ghost wsp-wizard-back">
+          <button type="button" {...wholesaleHoverProps(goBack)} className="wsp-btn wsp-btn-ghost wsp-wizard-back">
             <ArrowLeft size={16} />
             {t("wizard.back")}
           </button>
@@ -211,7 +212,11 @@ export function WholesaleWizard({ equipmentTypes, microsoldering }) {
             <ul className="wsp-wizard-fault-list">
               {selectedModel.services.map((service) => (
                 <li key={service.id}>
-                  <button type="button" className="wsp-wizard-fault-item" onClick={() => handleSelectFault(service)}>
+                  <button
+                    type="button"
+                    className="wsp-wizard-fault-item"
+                    {...wholesaleHoverProps(() => handleSelectFault(service))}
+                  >
                     {translateCatalogLabel(service.name, language)}
                   </button>
                 </li>

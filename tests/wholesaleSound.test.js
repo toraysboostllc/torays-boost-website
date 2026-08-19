@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { shouldPlayTone } from "../src/lib/wholesaleSound.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const root = join(__dirname, "..");
+const read = (relPath) => readFileSync(join(root, relPath), "utf8").replace(/\r\n?/g, "\n");
 
 /**
  * This project's test environment has no `window`/DOM global at all (see
@@ -151,5 +158,79 @@ describe("playHoverTone / playChime / primeAudioContext: never throw, mute is al
     setSoundEnabled(false);
     playChime();
     expect(audioCtorSpy).not.toHaveBeenCalled(); // muted: never even constructs a context
+  });
+});
+
+describe("isPointerHoverCapable / wholesaleHoverProps: shared hover/tap wiring for every wizard control", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("isPointerHoverCapable is false with no window at all (SSR/build-time safety)", async () => {
+    const { isPointerHoverCapable } = await import("../src/lib/wholesaleSound.js");
+    expect(isPointerHoverCapable()).toBe(false);
+  });
+
+  it("isPointerHoverCapable reflects the (hover: hover) and (pointer: fine) media query", async () => {
+    const fakeWindow = createFakeWindow();
+    fakeWindow.matchMedia = (query) => ({ matches: query === "(hover: hover) and (pointer: fine)" });
+    vi.stubGlobal("window", fakeWindow);
+    const { isPointerHoverCapable } = await import("../src/lib/wholesaleSound.js");
+    expect(isPointerHoverCapable()).toBe(true);
+  });
+
+  it("wholesaleHoverProps() with no onActivate returns only onPointerEnter/onFocus — no onClick prop to wire", async () => {
+    const { wholesaleHoverProps } = await import("../src/lib/wholesaleSound.js");
+    const props = wholesaleHoverProps();
+    expect(typeof props.onPointerEnter).toBe("function");
+    expect(typeof props.onFocus).toBe("function");
+    expect(props.onClick).toBeUndefined();
+  });
+
+  it("wholesaleHoverProps(onActivate) always calls onActivate on click, muted or not, hover-capable or not — sound is decorative, never gates the real action", async () => {
+    vi.stubGlobal("window", createFakeWindow());
+    const { wholesaleHoverProps } = await import("../src/lib/wholesaleSound.js");
+    let calls = 0;
+    const props = wholesaleHoverProps(() => calls++);
+    props.onClick();
+    props.onClick();
+    expect(calls).toBe(2);
+  });
+
+  it("onPointerEnter never throws for a real mouse entry, a touch entry, or a synthetic event with no pointerType at all", async () => {
+    vi.stubGlobal("window", createFakeWindow());
+    const { wholesaleHoverProps } = await import("../src/lib/wholesaleSound.js");
+    const props = wholesaleHoverProps();
+    expect(() => props.onPointerEnter({ pointerType: "mouse" })).not.toThrow();
+    expect(() => props.onPointerEnter({ pointerType: "touch" })).not.toThrow();
+    expect(() => props.onPointerEnter({ pointerType: "pen" })).not.toThrow();
+    expect(() => props.onPointerEnter({})).not.toThrow();
+    expect(() => props.onFocus()).not.toThrow();
+  });
+
+  it("every call returns brand-new plain functions, never a cached/shared handler — this is what lets React's own synthetic-event delegation replace the listener cleanly on every rerender instead of accumulating duplicates", async () => {
+    const { wholesaleHoverProps } = await import("../src/lib/wholesaleSound.js");
+    const first = wholesaleHoverProps(() => {});
+    const second = wholesaleHoverProps(() => {});
+    expect(first.onPointerEnter).not.toBe(second.onPointerEnter);
+    expect(first.onClick).not.toBe(second.onClick);
+  });
+});
+
+describe("No manual addEventListener anywhere in the sound-wired wizard files — every hover/click listener goes through JSX props (onPointerEnter/onFocus/onClick), so React owns listener attach/detach and a rerender can never accumulate a duplicate raw DOM listener", () => {
+  const files = [
+    "src/lib/wholesaleSound.js",
+    "src/components/wholesale/EquipmentTypeCard.jsx",
+    "src/components/wholesale/WholesaleWizard.jsx",
+    "src/components/wholesale/WholesaleResultPanel.jsx",
+    "src/components/wholesale/WholesaleLocaleSelector.jsx",
+    "src/pages/WholesalePrices.jsx",
+  ];
+
+  it.each(files)("%s never calls addEventListener directly", (relPath) => {
+    expect(read(relPath)).not.toContain("addEventListener");
   });
 });
