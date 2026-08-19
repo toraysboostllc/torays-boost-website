@@ -9,10 +9,12 @@ import { useWholesaleLocale } from "../../i18n/WholesaleLocaleContext.jsx";
  * surrounding theme, so it reads clearly on both without a dark/light
  * variant of its own.
  *
- * Country and currency are informational only today — United States/USD
- * are the only supported values (src/lib/wholesaleLocale.js), so they
- * render as plain chips, never a dropdown offering options that don't
- * actually work yet. Only language is a real, immediate toggle.
+ * Country is informational only — USA is the only supported value
+ * (src/lib/wholesaleLocale.js), so it renders as a plain chip (flag +
+ * "USA"), never a dropdown offering options that don't actually work yet.
+ * Currency stays USD internally and prices keep formatting with a "$"
+ * prefix everywhere else in the portal — it's just not surfaced as its
+ * own chip here anymore. Only language is a real, immediate toggle.
  */
 export function WholesaleLocaleSelector({ className = "" }) {
   const { language, setLanguage, t } = useWholesaleLocale();
@@ -41,10 +43,6 @@ export function WholesaleLocaleSelector({ className = "" }) {
           Español
         </button>
       </div>
-      <span className="wsp-locale-divider" aria-hidden="true" />
-      <span className="wsp-locale-chip" title={t("localeSelector.currencyLabel")}>
-        {t("localeSelector.currencyValue")}
-      </span>
     </div>
   );
 }

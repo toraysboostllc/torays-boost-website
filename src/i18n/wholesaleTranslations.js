@@ -18,9 +18,7 @@ export const wholesaleTranslations = {
     localeSelector: {
       countryLabel: "Country",
       languageLabel: "Language",
-      currencyLabel: "Currency",
-      countryValue: "United States",
-      currencyValue: "USD",
+      countryValue: "USA",
     },
     login: {
       title: "Shop Login",
@@ -92,9 +90,7 @@ export const wholesaleTranslations = {
     localeSelector: {
       countryLabel: "País",
       languageLabel: "Idioma",
-      currencyLabel: "Moneda",
-      countryValue: "Estados Unidos",
-      currencyValue: "USD",
+      countryValue: "USA",
     },
     login: {
       title: "Acceso de Taller",

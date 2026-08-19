@@ -10,14 +10,16 @@ const read = (relPath) => readFileSync(join(root, relPath), "utf8").replace(/\r\
 const selectorSrc = read("src/components/wholesale/WholesaleLocaleSelector.jsx");
 const cssSrc = read("src/styles/wholesalePortal.css");
 
-describe("WholesaleLocaleSelector.jsx: country/currency are informational, only language is a real toggle", () => {
+const enDict = read("src/i18n/wholesaleTranslations.js");
+
+describe("WholesaleLocaleSelector.jsx: country is informational (flag + USA, no currency chip), only language is a real toggle", () => {
   it("renders exactly 2 language buttons (English/Español), no dropdown", () => {
     expect((selectorSrc.match(/<button/g) || []).length).toBe(2);
     expect(selectorSrc).toMatch(/>\s*English\s*</);
     expect(selectorSrc).toMatch(/>\s*Español\s*</);
   });
 
-  it("never renders a <select> — country/currency are plain chips, not a picker offering non-working options", () => {
+  it("never renders a <select> — country is a plain chip, not a picker offering non-working options", () => {
     expect(selectorSrc).not.toMatch(/<select/);
   });
 
@@ -30,14 +32,44 @@ describe("WholesaleLocaleSelector.jsx: country/currency are informational, only 
     expect(selectorSrc).toContain('setLanguage("es")');
   });
 
-  it("reads every label through t(), never a hardcoded English/Spanish string for country/currency", () => {
+  it("reads the country label through t(), never a hardcoded string", () => {
     expect(selectorSrc).toContain('t("localeSelector.countryValue")');
-    expect(selectorSrc).toContain('t("localeSelector.currencyValue")');
+  });
+
+  it("renders the US flag emoji next to the country chip", () => {
+    expect(selectorSrc).toContain("🇺🇸");
+  });
+
+  it("no longer renders a currency chip or its translation key — USD stays internal only", () => {
+    expect(selectorSrc).not.toContain("currencyValue");
+    expect(selectorSrc).not.toContain("currencyLabel");
+  });
+
+  it("renders exactly one divider now that the currency chip/separator is gone", () => {
+    expect((selectorSrc.match(/wsp-locale-divider/g) || []).length).toBe(1);
   });
 
   it("imports useWholesaleLocale from the Wholesale-scoped context, never the public useLanguage()", () => {
     expect(selectorSrc).toContain('from "../../i18n/WholesaleLocaleContext.jsx"');
     expect(selectorSrc).not.toMatch(/useLanguage/);
+  });
+});
+
+describe("wholesaleTranslations.js: locale selector dictionary shows USA/English/Español, never United States/USD", () => {
+  it("countryValue is the short, fixed 'USA' label in both languages — not the long country name", () => {
+    expect(enDict).toMatch(/countryValue:\s*"USA"/);
+    const esBlock = enDict.slice(enDict.indexOf("es: {"));
+    expect(esBlock).toMatch(/countryValue:\s*"USA"/);
+  });
+
+  it("never contains the long-form 'United States' or 'Estados Unidos' as a display value anymore", () => {
+    expect(enDict).not.toMatch(/countryValue:\s*"United States"/);
+    expect(enDict).not.toMatch(/countryValue:\s*"Estados Unidos"/);
+  });
+
+  it("no longer defines currencyValue/currencyLabel keys — USD is not surfaced as its own chip", () => {
+    expect(enDict).not.toContain("currencyValue");
+    expect(enDict).not.toContain("currencyLabel");
   });
 });
 
