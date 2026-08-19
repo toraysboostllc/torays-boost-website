@@ -55,6 +55,24 @@ with raw as (
     (select count(*) from pg_constraint c join pg_class t on t.oid = c.conrelid join pg_namespace n on n.oid = t.relnamespace where n.nspname = 'public' and t.relname = 'wholesale_services' and c.conname = 'wholesale_services_high_profit_price_check') as high_profit_check_exists,
     (select count(*) from pg_constraint c join pg_class t on t.oid = c.conrelid join pg_namespace n on n.oid = t.relnamespace where n.nspname = 'public' and t.relname = 'wholesale_services' and c.conname = 'wholesale_services_price_tiers_check') as tiers_order_check_exists,
     (select pg_get_constraintdef(c.oid) from pg_constraint c join pg_class t on t.oid = c.conrelid join pg_namespace n on n.oid = t.relnamespace where n.nspname = 'public' and t.relname = 'wholesale_services' and c.conname = 'wholesale_services_price_tiers_check') as tiers_order_check_def,
+    -- Same definition, but with every parenthesis and "::text" cast marker
+    -- stripped and collapsed to single spaces — Postgres re-serializes a
+    -- CHECK expression through its own parser/deparser when a constraint
+    -- is added, which legitimately wraps sub-expressions in parentheses
+    -- (e.g. "(competitive_price IS NULL) AND (high_profit_price IS NULL)"
+    -- instead of the single unparenthesized run this file's condition was
+    -- originally written as) and appends an explicit type cast to string
+    -- literals ("'fixed'::text"). Neither changes the meaning of the
+    -- constraint. Matching against this normalized form instead of the raw
+    -- pg_get_constraintdef() output means this check verifies the actual
+    -- boolean semantics Postgres installed, not the exact byte layout of
+    -- however Postgres's deparser happens to print it back.
+    (select regexp_replace(regexp_replace(regexp_replace(coalesce(pg_get_constraintdef(c.oid), ''), '::text', '', 'g'), '[()]', ' ', 'g'), '\s+', ' ', 'g') from pg_constraint c join pg_class t on t.oid = c.conrelid join pg_namespace n on n.oid = t.relnamespace where n.nspname = 'public' and t.relname = 'wholesale_services' and c.conname = 'wholesale_services_price_tiers_check') as tiers_order_check_def_normalized,
+    -- convalidated=false would mean the constraint exists but Postgres has
+    -- not actually confirmed every existing row satisfies it (the NOT
+    -- VALID / VALIDATE CONSTRAINT two-step) — this migration never uses
+    -- NOT VALID, so this must be true.
+    (select c.convalidated from pg_constraint c join pg_class t on t.oid = c.conrelid join pg_namespace n on n.oid = t.relnamespace where n.nspname = 'public' and t.relname = 'wholesale_services' and c.conname = 'wholesale_services_price_tiers_check') as tiers_order_check_validated,
 
     -- v1: name + exact original signature, counted independently of v2.
     (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'wholesale_update_service_full') as v1_name_matches,
@@ -133,16 +151,44 @@ checks as (
 
   union all
 
+  -- Matched against tiers_order_check_def_normalized (parens stripped,
+  -- "::text" casts stripped, whitespace collapsed — see its definition in
+  -- the raw CTE above), never against the raw pg_get_constraintdef()
+  -- output, so this never breaks on Postgres's own legitimate re-
+  -- parenthesization or added type casts when it deparses the installed
+  -- expression. Each inequality accepts either textual direction of the
+  -- same relationship (e.g. "competitive_price > fixed_price" or
+  -- "fixed_price < competitive_price") since both mean the same thing.
   select 4, 'tier_order_check_definition',
     case
-      when tiers_order_check_def like '%competitive_price IS NULL AND high_profit_price IS NULL%'
-        and tiers_order_check_def like '%pricing_type = ''fixed''%'
-        and tiers_order_check_def like '%competitive_price > fixed_price%'
-        and tiers_order_check_def like '%recommended_price >= competitive_price%'
-        and tiers_order_check_def like '%high_profit_price >= recommended_price%'
+      when tiers_order_check_def_normalized like '%competitive_price IS NULL AND high_profit_price IS NULL%'
+        and tiers_order_check_def_normalized like '%pricing_type = ''fixed''%'
+        and tiers_order_check_def_normalized like '%fixed_price IS NOT NULL%'
+        and tiers_order_check_def_normalized like '%competitive_price IS NOT NULL%'
+        and tiers_order_check_def_normalized like '%recommended_price IS NOT NULL%'
+        and tiers_order_check_def_normalized like '%high_profit_price IS NOT NULL%'
+        and (
+          tiers_order_check_def_normalized like '%competitive_price > fixed_price%'
+          or tiers_order_check_def_normalized like '%fixed_price < competitive_price%'
+        )
+        and (
+          tiers_order_check_def_normalized like '%recommended_price >= competitive_price%'
+          or tiers_order_check_def_normalized like '%competitive_price <= recommended_price%'
+        )
+        and (
+          tiers_order_check_def_normalized like '%high_profit_price >= recommended_price%'
+          or tiers_order_check_def_normalized like '%recommended_price <= high_profit_price%'
+        )
+        and tiers_order_check_validated is true
       then 'PASS' else 'FAIL'
     end,
-    coalesce('installed definition: ' || tiers_order_check_def, 'constraint not found — see tier_check_constraints_present')
+    case
+      when tiers_order_check_def is null then 'constraint not found — see tier_check_constraints_present'
+      else 'installed definition: ' || tiers_order_check_def
+        || ' — normalized for comparison: ' || tiers_order_check_def_normalized
+        || ' — convalidated=' || tiers_order_check_validated
+        || ' — expect all 6 required components present (legacy-null branch, pricing_type=''fixed'', all 4 non-null checks, and the 3 ordering inequalities in either textual direction) and convalidated=true'
+    end
   from raw
 
   union all

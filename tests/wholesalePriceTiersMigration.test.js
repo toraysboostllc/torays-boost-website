@@ -519,6 +519,162 @@ describe("verify file", () => {
   });
 });
 
+describe("verify file: tier_order_check_definition — tolerant of Postgres's own re-parenthesization/casts, not a false FAIL on a correct constraint", () => {
+  // Real-world false-FAIL this describes fixing: after the migration ran
+  // for real, Supabase reported a genuine PASS on every other check, but
+  // this one specific check FAILed — not because the installed constraint
+  // was wrong, but because Postgres's own deparser (pg_get_constraintdef)
+  // re-serializes a CHECK expression with its own parenthesization
+  // ("(competitive_price IS NULL) AND (high_profit_price IS NULL)" instead
+  // of a single unparenthesized run) and appends an explicit "::text" cast
+  // to the 'fixed' string literal — neither changes the constraint's
+  // meaning, but the OLD naive substring match against the raw
+  // pg_get_constraintdef() output broke on the added parenthesis between
+  // "NULL)" and "(high_profit_price". This is the exact real definition
+  // Supabase reported back.
+  const REAL_INSTALLED_DEFINITION =
+    "CHECK ((((competitive_price IS NULL) AND (high_profit_price IS NULL)) OR ((pricing_type = 'fixed'::text) AND (fixed_price IS NOT NULL) AND (competitive_price IS NOT NULL) AND (recommended_price IS NOT NULL) AND (high_profit_price IS NOT NULL) AND (competitive_price > fixed_price) AND (recommended_price >= competitive_price) AND (high_profit_price >= recommended_price))))";
+
+  it("the raw CTE normalizes the definition by stripping '::text' casts and parentheses, then collapsing whitespace — never matching the un-normalized pg_get_constraintdef() output directly", () => {
+    expect(verify).toContain("tiers_order_check_def_normalized");
+    const idx = verify.indexOf("tiers_order_check_def_normalized,");
+    const declLine = verify.slice(verify.lastIndexOf("(select regexp_replace", idx), idx);
+    expect(declLine).toContain("'::text', '', 'g'");
+    expect(declLine).toContain("'[()]', ' ', 'g'");
+    expect(declLine).toContain("'\\s+', ' ', 'g'");
+  });
+
+  it("also reads convalidated from pg_constraint, and check 4 requires it to be true", () => {
+    expect(verify).toContain("tiers_order_check_validated");
+    expect(verify).toContain("c.convalidated");
+    const checkIdx = verify.indexOf("'tier_order_check_definition'");
+    const checkBlock = verify.slice(checkIdx, verify.indexOf("then 'PASS'", checkIdx));
+    expect(checkBlock).toContain("tiers_order_check_validated is true");
+  });
+
+  it("check 4's LIKE patterns are matched against the normalized field, never the raw tiers_order_check_def", () => {
+    const checkIdx = verify.indexOf("'tier_order_check_definition'");
+    const checkBlock = verify.slice(checkIdx, verify.indexOf("then 'PASS'", checkIdx));
+    // Every LIKE in the condition block must target the normalized column.
+    const likeSubjects = [...checkBlock.matchAll(/(\w+)\s+like\s+'%/g)].map((m) => m[1]);
+    expect(likeSubjects.length).toBeGreaterThan(0);
+    for (const subject of likeSubjects) {
+      expect(subject).toBe("tiers_order_check_def_normalized");
+    }
+  });
+
+  it("each of the 3 ordering inequalities accepts either textual direction (Postgres could print either), never only one", () => {
+    const checkIdx = verify.indexOf("'tier_order_check_definition'");
+    const checkBlock = verify.slice(checkIdx, verify.indexOf("then 'PASS'", checkIdx));
+    expect(checkBlock).toContain("competitive_price > fixed_price");
+    expect(checkBlock).toContain("fixed_price < competitive_price");
+    expect(checkBlock).toContain("recommended_price >= competitive_price");
+    expect(checkBlock).toContain("competitive_price <= recommended_price");
+    expect(checkBlock).toContain("high_profit_price >= recommended_price");
+    expect(checkBlock).toContain("recommended_price <= high_profit_price");
+  });
+
+  // Re-implements the exact normalization + matching logic from the SQL in
+  // JS so the real installed definition Supabase reported (and deliberate
+  // mutations of it) can be evaluated directly — a text match against the
+  // SQL file proves the right fields/patterns are referenced, but only
+  // actually running the logic proves the real fixture now produces PASS
+  // and that broken variants still correctly produce FAIL. Keep this in
+  // sync by hand with the SQL CASE expression if that logic ever changes.
+  function normalize(def) {
+    return def.replace(/::text/g, "").replace(/[()]/g, " ").replace(/\s+/g, " ");
+  }
+  function evaluatesToPass(def, validated) {
+    const n = normalize(def);
+    const has = (s) => n.includes(s);
+    return Boolean(
+      has("competitive_price IS NULL AND high_profit_price IS NULL") &&
+        has("pricing_type = 'fixed'") &&
+        has("fixed_price IS NOT NULL") &&
+        has("competitive_price IS NOT NULL") &&
+        has("recommended_price IS NOT NULL") &&
+        has("high_profit_price IS NOT NULL") &&
+        (has("competitive_price > fixed_price") || has("fixed_price < competitive_price")) &&
+        (has("recommended_price >= competitive_price") || has("competitive_price <= recommended_price")) &&
+        (has("high_profit_price >= recommended_price") || has("recommended_price <= high_profit_price")) &&
+        validated === true
+    );
+  }
+
+  it("FIXTURE — the exact real installed definition Supabase reported produces PASS (with convalidated=true)", () => {
+    expect(evaluatesToPass(REAL_INSTALLED_DEFINITION, true)).toBe(true);
+  });
+
+  it("the same fixture with convalidated=false is FAIL, even though the expression text is identical", () => {
+    expect(evaluatesToPass(REAL_INSTALLED_DEFINITION, false)).toBe(false);
+  });
+
+  describe("negative cases: the verifier did not become permissive — each missing/reversed relation still fails", () => {
+    const MUTATIONS = [
+      {
+        name: "legacy-null branch missing (only 'high_profit_price IS NULL' present, not both)",
+        def: REAL_INSTALLED_DEFINITION.replace("(competitive_price IS NULL) AND (high_profit_price IS NULL)", "(high_profit_price IS NULL)"),
+      },
+      {
+        name: "pricing_type = 'fixed' missing entirely",
+        def: REAL_INSTALLED_DEFINITION.replace("(pricing_type = 'fixed'::text) AND ", ""),
+      },
+      {
+        name: "fixed_price IS NOT NULL missing",
+        def: REAL_INSTALLED_DEFINITION.replace("(fixed_price IS NOT NULL) AND ", ""),
+      },
+      {
+        name: "competitive_price IS NOT NULL missing",
+        def: REAL_INSTALLED_DEFINITION.replace("(competitive_price IS NOT NULL) AND ", ""),
+      },
+      {
+        name: "recommended_price IS NOT NULL missing",
+        def: REAL_INSTALLED_DEFINITION.replace("(recommended_price IS NOT NULL) AND ", ""),
+      },
+      {
+        name: "high_profit_price IS NOT NULL missing",
+        def: REAL_INSTALLED_DEFINITION.replace("(high_profit_price IS NOT NULL) AND ", ""),
+      },
+      {
+        name: "competitive > fixed relation missing entirely",
+        def: REAL_INSTALLED_DEFINITION.replace("(competitive_price > fixed_price) AND ", ""),
+      },
+      {
+        name: "competitive > fixed REVERSED to competitive < fixed (wrong direction, not just a different spelling of the same relation)",
+        def: REAL_INSTALLED_DEFINITION.replace("(competitive_price > fixed_price)", "(competitive_price < fixed_price)"),
+      },
+      {
+        name: "recommended >= competitive relation missing entirely",
+        def: REAL_INSTALLED_DEFINITION.replace("(recommended_price >= competitive_price) AND ", ""),
+      },
+      {
+        name: "recommended >= competitive REVERSED to recommended <= competitive",
+        def: REAL_INSTALLED_DEFINITION.replace("(recommended_price >= competitive_price)", "(recommended_price <= competitive_price) AND (recommended_price != competitive_price)"),
+      },
+      {
+        name: "high_profit >= recommended relation missing entirely",
+        def: REAL_INSTALLED_DEFINITION.replace(" AND (high_profit_price >= recommended_price)", ""),
+      },
+      {
+        name: "high_profit >= recommended REVERSED to high_profit <= recommended",
+        def: REAL_INSTALLED_DEFINITION.replace("(high_profit_price >= recommended_price)", "(high_profit_price <= recommended_price) AND (high_profit_price != recommended_price)"),
+      },
+    ];
+
+    it.each(MUTATIONS)("$name → FAIL", ({ def }) => {
+      expect(evaluatesToPass(def, true)).toBe(false);
+    });
+  });
+
+  it("sanity: the equivalent textual form (competitive_price <= recommended_price instead of recommended_price >= competitive_price) still PASSES — proves the 'either direction' acceptance actually works, not just the exact fixture spelling", () => {
+    const equivalentSpelling = REAL_INSTALLED_DEFINITION.replace(
+      "(recommended_price >= competitive_price)",
+      "(competitive_price <= recommended_price)"
+    );
+    expect(evaluatesToPass(equivalentSpelling, true)).toBe(true);
+  });
+});
+
 describe("rollback file: non-destructive path only ever drops v2, v1 is never referenced", () => {
   it("is wrapped in an explicit transaction and never runs automatically (not referenced by any script/test)", () => {
     const lines = rollback.split("\n").map((l) => l.trim()).filter(Boolean);
