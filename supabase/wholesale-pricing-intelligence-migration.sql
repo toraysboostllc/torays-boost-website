@@ -11,10 +11,16 @@
 -- wholesale_services (recommended_price, target_margin_percent), four new
 -- nullable columns on wholesale_price_history (so the SAME audit table can
 -- also record a pricing-intelligence change, not a second audit table), and
--- one new RPC (wholesale_update_service_pricing_intelligence) — a SIBLING of
--- the existing wholesale_update_service_price RPC, not a change to it. That
--- RPC's signature, behavior, and every existing call site are untouched by
--- this file.
+-- a hardened wholesale_update_portal_settings RPC. The existing
+-- wholesale_update_service_price RPC's signature, behavior, and every
+-- existing call site are untouched by this file. Saving a service's
+-- recommended_price/target_margin_percent is done exclusively through
+-- wholesale_update_service_full (wholesale-service-atomic-save-migration.sql)
+-- — no sibling RPC for those two columns exists in this file; an earlier
+-- draft of this migration briefly introduced one
+-- (wholesale_update_service_pricing_intelligence) but it was audited as
+-- fully disconnected from the UI after wholesale_update_service_full
+-- shipped, and removed before this migration ever ran in production.
 --
 -- Deliberately NOT in this file (owner's explicit decision, see the
 -- conversation this migration was approved in): no new equipment types for
@@ -97,8 +103,8 @@ alter table wholesale_services add constraint wholesale_services_target_margin_p
 --    reusing changed_by/changed_at rather than introducing a parallel table.
 --    A row written by wholesale_update_service_price (existing RPC) leaves
 --    these four columns null; a row written by
---    wholesale_update_service_pricing_intelligence (new RPC, step 5) leaves
---    old_pricing_type/old_fixed_price/etc. null instead — never both
+--    wholesale_update_service_full (wholesale-service-atomic-save-migration.sql)
+--    leaves old_pricing_type/old_fixed_price/etc. null instead — never both
 --    populated by the same call, and never required to be.
 -- ----------------------------------------------------------------------------
 alter table wholesale_price_history add column if not exists old_recommended_price numeric(10, 2);
@@ -114,90 +120,24 @@ alter table wholesale_price_history add column if not exists new_target_margin_p
 -- ----------------------------------------------------------------------------
 
 -- ----------------------------------------------------------------------------
--- 5. Atomic pricing-intelligence update + audit trail — a SIBLING of
---    wholesale_update_service_price, same security shape (admin existence
---    check against `profiles` with the caller's server-resolved id, SELECT
+-- 5. Atomic portal-settings update — admin-check/no-op-guard shape (SELECT
 --    ... FOR UPDATE row lock for correct concurrent-edit ordering, no-op
---    guard so an unchanged resubmit writes no history row, SECURITY INVOKER
---    since only service_role — which already bypasses RLS — is ever granted
---    EXECUTE). Never touches pricing_type/fixed_price/price_min/price_max/
---    currency — those stay exclusively wholesale_update_service_price's job.
---    p_recommended_price / p_target_margin_percent may each independently be
---    NULL (clearing a manual override / per-service margin override back to
---    "use the global default").
--- ----------------------------------------------------------------------------
-create or replace function wholesale_update_service_pricing_intelligence(
-  p_service_id uuid,
-  p_admin_id uuid,
-  p_recommended_price numeric,
-  p_target_margin_percent numeric
-)
-returns text -- 'updated' or 'unchanged'
-language plpgsql
-security invoker
-set search_path = public, pg_temp
-as $$
-declare
-  v_old wholesale_services%rowtype;
-begin
-  if not exists (
-    select 1 from profiles where id = p_admin_id and role = 'admin' and status = 'approved'
-  ) then
-    raise exception 'invalid_admin';
-  end if;
-
-  select * into v_old
-    from wholesale_services
-    where id = p_service_id
-    for update;
-  if not found then
-    raise exception 'service_not_found';
-  end if;
-
-  if p_recommended_price is not null and p_recommended_price < 0 then
-    raise exception 'invalid_recommended_price';
-  end if;
-
-  if p_target_margin_percent is not null
-     and (p_target_margin_percent < 0 or p_target_margin_percent >= 100) then
-    raise exception 'invalid_target_margin_percent';
-  end if;
-
-  if v_old.recommended_price is not distinct from p_recommended_price
-     and v_old.target_margin_percent is not distinct from p_target_margin_percent
-  then
-    return 'unchanged';
-  end if;
-
-  update wholesale_services
-    set recommended_price = p_recommended_price,
-        target_margin_percent = p_target_margin_percent,
-        updated_at = now()
-    where id = p_service_id;
-
-  insert into wholesale_price_history (
-    service_id, changed_by,
-    old_recommended_price, new_recommended_price,
-    old_target_margin_percent, new_target_margin_percent
-  ) values (
-    p_service_id, p_admin_id,
-    v_old.recommended_price, p_recommended_price,
-    v_old.target_margin_percent, p_target_margin_percent
-  );
-
-  return 'updated';
-end;
-$$;
-
-revoke execute on function wholesale_update_service_pricing_intelligence(uuid, uuid, numeric, numeric) from public, anon, authenticated;
-grant execute on function wholesale_update_service_pricing_intelligence(uuid, uuid, numeric, numeric) to service_role;
-
--- ----------------------------------------------------------------------------
--- 6. Atomic portal-settings update — same admin-check/no-op-guard shape as
---    step 5, for the single wholesale_portal_settings row. No history table
---    for this one (it's a global config row, not a per-service price) —
---    updated_by/updated_at on the row itself is the audit trail, matching
+--    guard so an unchanged resubmit writes nothing, SECURITY INVOKER since
+--    only service_role — which already bypasses RLS — is ever granted
+--    EXECUTE), for the single wholesale_portal_settings row. No history
+--    table for this one (it's a global config row, not a per-service price)
+--    — updated_by/updated_at on the row itself is the audit trail, matching
 --    what DESK's admin UI needs to show ("last changed by X on date").
+--    Every non-numeric-checked parameter is explicitly NULL-checked before
+--    use (p_rounding_rule / p_sales_visible / p_sales_status /
+--    p_sales_entry_blocked) — `x not in (...)` and `x is not distinct from`
+--    both silently evaluate to NULL/false-like outcomes for a NULL input in
+--    Postgres rather than raising, so a NULL that slips past the caller
+--    would otherwise reach the UPDATE and either write NULL into a NOT NULL
+--    column (raising a generic not-null-violation with no clear message) or,
+--    for the boolean flags, simply fail to no-op correctly. The IF NOT FOUND
+--    check after the row lock exists so this function can never claim
+--    'updated' when the singleton row is somehow missing.
 -- ----------------------------------------------------------------------------
 create or replace function wholesale_update_portal_settings(
   p_admin_id uuid,
@@ -226,15 +166,26 @@ begin
     raise exception 'invalid_default_target_margin_percent';
   end if;
 
-  if p_rounding_rule not in ('none', 'nearest_1', 'nearest_5', 'charm_99') then
+  if p_rounding_rule is null or p_rounding_rule not in ('none', 'nearest_1', 'nearest_5', 'charm_99') then
     raise exception 'invalid_rounding_rule';
   end if;
 
-  if p_sales_status not in ('maintenance', 'active') then
+  if p_sales_visible is null then
+    raise exception 'invalid_sales_visible';
+  end if;
+
+  if p_sales_status is null or p_sales_status not in ('maintenance', 'active') then
     raise exception 'invalid_sales_status';
   end if;
 
+  if p_sales_entry_blocked is null then
+    raise exception 'invalid_sales_entry_blocked';
+  end if;
+
   select * into v_old from wholesale_portal_settings where id = 1 for update;
+  if not found then
+    raise exception 'settings_row_missing';
+  end if;
 
   if v_old.default_target_margin_percent is not distinct from p_default_target_margin_percent
      and v_old.rounding_rule is not distinct from p_rounding_rule

@@ -22,9 +22,8 @@ begin;
 
 -- Reverse order of creation.
 
--- 1. The two new RPCs.
+-- 1. The new RPC.
 drop function if exists wholesale_update_portal_settings(uuid, numeric, text, boolean, text, boolean);
-drop function if exists wholesale_update_service_pricing_intelligence(uuid, uuid, numeric, numeric);
 
 -- 2. The four wholesale_price_history columns. Any recorded
 --    pricing-intelligence history rows lose these values permanently — the

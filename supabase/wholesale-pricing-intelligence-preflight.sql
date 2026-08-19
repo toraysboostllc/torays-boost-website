@@ -6,12 +6,28 @@
 -- wholesale-images-preflight.sql. Paste this whole file into the SQL Editor
 -- and run it once.
 --
--- Entirely read-only: only SELECT/WITH, nothing that inserts, updates,
--- deletes, alters, creates, drops, or calls any RPC/stored function. Never
--- reads a shop name, code hash, device/session token hash, cookie value, or
--- API/service-role key — this file only ever touches
--- wholesale_portal_settings, wholesale_services, wholesale_price_history,
--- and profiles (existence-only, via pg_constraint, never row contents).
+-- Metadata-only, on purpose: every check here reads exclusively from
+-- information_schema.tables, information_schema.columns, and pg_proc
+-- joined to pg_namespace. It never reads a single row out of
+-- wholesale_services, wholesale_price_history, wholesale_portal_settings,
+-- or profiles. That's required, not just a style choice: before this
+-- migration has ever run, wholesale_services.recommended_price and
+-- .target_margin_percent do not exist yet. A query that references those
+-- columns directly (even inside a WHERE, even if it would touch zero rows)
+-- fails at parse/plan time with "column does not exist" — Postgres
+-- resolves every column name in a query before it ever considers whether a
+-- row would match — so this file never references them as real columns,
+-- only ever as quoted text compared against a metadata table's own
+-- column-name field. Row-count verification of those two columns (how many
+-- services already have a manual override) belongs in
+-- wholesale-pricing-intelligence-verify.sql, which only ever runs AFTER
+-- the migration has added them — never here.
+--
+-- Every information_schema.tables / information_schema.columns check is
+-- scoped to table_schema = 'public' (never a schema-less match that could
+-- silently pick up a same-named object elsewhere), and every pg_proc check
+-- joins pg_namespace and restricts to nspname = 'public' for the same
+-- reason.
 --
 -- Order of operations:
 --   1. Run this file. Read the check_name/status/details rows, and the
@@ -21,24 +37,86 @@
 --      read the flagged row(s) yourself and decide — never treat it as an
 --      automatic go-ahead. FAIL means fix what's flagged first.
 --   3. Run wholesale-pricing-intelligence-verify.sql afterward to confirm it
---      landed.
+--      landed (including the recommended_price/target_margin_percent row
+--      counts this file deliberately does not compute).
 -- ============================================================================
 
 with raw as (
   select
-    exists (select 1 from information_schema.tables where table_name = 'wholesale_portal_settings') as settings_table_exists,
-    exists (select 1 from information_schema.columns where table_name = 'wholesale_services' and column_name = 'recommended_price') as services_has_recommended_price,
-    exists (select 1 from information_schema.columns where table_name = 'wholesale_services' and column_name = 'target_margin_percent') as services_has_target_margin_percent,
-    exists (select 1 from information_schema.columns where table_name = 'wholesale_price_history' and column_name = 'old_recommended_price') as history_has_pricing_intelligence_columns,
-    exists (select 1 from pg_proc where proname = 'wholesale_update_service_pricing_intelligence') as rpc_pricing_intelligence_exists,
-    exists (select 1 from pg_proc where proname = 'wholesale_update_portal_settings') as rpc_portal_settings_exists,
-    exists (select 1 from pg_proc where proname = 'wholesale_update_service_price') as existing_price_rpc_exists,
-    exists (select 1 from information_schema.tables where table_name = 'wholesale_services') as services_table_exists,
-    exists (select 1 from information_schema.tables where table_name = 'wholesale_price_history') as history_table_exists,
-    exists (select 1 from information_schema.tables where table_name = 'profiles') as profiles_table_exists,
-    (select count(*) from wholesale_services) as total_services,
-    (select count(*) from wholesale_services where recommended_price is not null) as services_with_manual_recommended_price,
-    (select count(*) from wholesale_services where target_margin_percent is not null) as services_with_target_margin
+    exists (
+      select 1 from information_schema.tables
+      where table_schema = 'public' and table_name = 'wholesale_services'
+    ) as services_table_exists,
+    exists (
+      select 1 from information_schema.tables
+      where table_schema = 'public' and table_name = 'wholesale_price_history'
+    ) as history_table_exists,
+    exists (
+      select 1 from information_schema.tables
+      where table_schema = 'public' and table_name = 'profiles'
+    ) as profiles_table_exists,
+    exists (
+      select 1 from information_schema.tables
+      where table_schema = 'public' and table_name = 'wholesale_portal_settings'
+    ) as settings_table_exists,
+    exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'wholesale_services' and column_name = 'recommended_price'
+    ) as services_has_recommended_price,
+    exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'wholesale_services' and column_name = 'target_margin_percent'
+    ) as services_has_target_margin_percent,
+    -- The 4 pricing-intelligence history columns, checked individually —
+    -- `derived` (below) turns these into TWO separate flags, never one
+    -- ambiguous aggregate: history_has_all_pricing_intelligence_columns
+    -- (AND of all 4 — required for "fully applied") and
+    -- history_has_any_pricing_intelligence_column (OR of all 4 — its
+    -- NEGATION is required for "nothing exists yet"). A single combined
+    -- flag can't distinguish "0 of 4 exist" from "1, 2, or 3 of 4 exist"
+    -- from whichever side of an AND/OR you pick, which is exactly the bug
+    -- this split fixes: a partial state must satisfy NEITHER PASS branch.
+    exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'wholesale_price_history' and column_name = 'old_recommended_price'
+    ) as history_has_old_recommended_price,
+    exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'wholesale_price_history' and column_name = 'new_recommended_price'
+    ) as history_has_new_recommended_price,
+    exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'wholesale_price_history' and column_name = 'old_target_margin_percent'
+    ) as history_has_old_target_margin_percent,
+    exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'wholesale_price_history' and column_name = 'new_target_margin_percent'
+    ) as history_has_new_target_margin_percent,
+    exists (
+      select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.proname = 'wholesale_update_portal_settings'
+    ) as rpc_portal_settings_exists,
+    exists (
+      select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.proname = 'wholesale_update_service_price'
+    ) as existing_price_rpc_exists
+),
+derived as (
+  select
+    raw.*,
+    (
+      history_has_old_recommended_price
+      and history_has_new_recommended_price
+      and history_has_old_target_margin_percent
+      and history_has_new_target_margin_percent
+    ) as history_has_all_pricing_intelligence_columns,
+    (
+      history_has_old_recommended_price
+      or history_has_new_recommended_price
+      or history_has_old_target_margin_percent
+      or history_has_new_target_margin_percent
+    ) as history_has_any_pricing_intelligence_column
+  from raw
 ),
 checks as (
   select 1 as ord, 'prerequisite_tables_exist' as check_name,
@@ -50,7 +128,7 @@ checks as (
         || ', wholesale_price_history=' || history_table_exists || ', profiles=' || profiles_table_exists
         || ') — run wholesale-migration.sql and wholesale-navigation-migration.sql first'
     end as details
-  from raw
+  from derived
 
   union all
 
@@ -60,44 +138,38 @@ checks as (
       then 'wholesale_update_service_price already exists — this migration adds a SIBLING function, never modifies this one'
       else 'wholesale_update_service_price was not found — expected from wholesale-navigation-migration.sql, investigate before proceeding'
     end
-  from raw
+  from derived
 
   union all
 
   select 3, 'already_applied',
     case
       when settings_table_exists and services_has_recommended_price and services_has_target_margin_percent
-        and history_has_pricing_intelligence_columns and rpc_pricing_intelligence_exists and rpc_portal_settings_exists
+        and history_has_all_pricing_intelligence_columns and rpc_portal_settings_exists
         then 'PASS'
       when not settings_table_exists and not services_has_recommended_price and not services_has_target_margin_percent
-        and not history_has_pricing_intelligence_columns and not rpc_pricing_intelligence_exists and not rpc_portal_settings_exists
+        and not history_has_any_pricing_intelligence_column and not rpc_portal_settings_exists
         then 'PASS'
       else 'REVIEW REQUIRED'
     end,
     case
       when settings_table_exists and services_has_recommended_price and services_has_target_margin_percent
-        and history_has_pricing_intelligence_columns and rpc_pricing_intelligence_exists and rpc_portal_settings_exists
+        and history_has_all_pricing_intelligence_columns and rpc_portal_settings_exists
         then 'every object already present — migration already ran, safe to re-run, it is idempotent'
       when not settings_table_exists and not services_has_recommended_price and not services_has_target_margin_percent
-        and not history_has_pricing_intelligence_columns and not rpc_pricing_intelligence_exists and not rpc_portal_settings_exists
+        and not history_has_any_pricing_intelligence_column and not rpc_portal_settings_exists
         then 'none of the new objects exist yet — expected state before running the migration for the first time'
       else 'partial state — settings_table=' || settings_table_exists
         || ', services.recommended_price=' || services_has_recommended_price
         || ', services.target_margin_percent=' || services_has_target_margin_percent
-        || ', history_columns=' || history_has_pricing_intelligence_columns
-        || ', rpc_pricing_intelligence=' || rpc_pricing_intelligence_exists
+        || ', history.old_recommended_price=' || history_has_old_recommended_price
+        || ', history.new_recommended_price=' || history_has_new_recommended_price
+        || ', history.old_target_margin_percent=' || history_has_old_target_margin_percent
+        || ', history.new_target_margin_percent=' || history_has_new_target_margin_percent
         || ', rpc_portal_settings=' || rpc_portal_settings_exists
         || ' — investigate before running the migration, a prior run may have failed partway through'
     end
-  from raw
-
-  union all
-
-  select 4, 'existing_services_untouched', 'PASS',
-    'total services=' || total_services || ', with manual recommended_price=' || services_with_manual_recommended_price
-      || ', with target_margin_percent override=' || services_with_target_margin
-      || ' (both counts expected 0 on an environment where this feature has never been used yet — this migration never sets either column on an existing row)'
-  from raw
+  from derived
 ),
 overall as (
   select
