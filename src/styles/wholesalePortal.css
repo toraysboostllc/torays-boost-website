@@ -39,20 +39,14 @@
  */
 
 .wsp-scope {
-  /* Correction pass: the previous round's overlay (rgba(9,15,32,.82), a
-     near-opaque near-black navy) read as ~100% dark mode — the PCB was
-     barely visible and every token below it was tuned for light-on-dark.
-     This pass flips the whole page to a light blue-gray reading, while
-     keeping the PCB photo itself, the card bezel/shadow/red-accent/hover
-     treatment, and every button (which intentionally KEEPS its dark XP
-     gradient — buttons never sit on a light background in this UI, so
-     their own tokens are untouched below) exactly as approved. */
-  --wsp-page-bg: #d7e1f0;
-  /* RGB triplet of --wsp-page-bg, split out so the translucent overlay
-     below can reference it via rgba(var(--wsp-overlay-rgb), alpha) instead
-     of duplicating the literal numbers — keeps the two values impossible
-     to drift apart. */
-  --wsp-overlay-rgb: 215, 225, 240;
+  /* Correction pass: the page background reads as light blue-gray overall
+     while keeping the card bezel/shadow/red-accent/hover treatment, and
+     every button (which intentionally KEEPS its dark XP gradient —
+     buttons never sit on a light background in this UI, so their own
+     tokens are untouched below) exactly as approved. That light-page
+     impression now comes entirely from the surrounding chrome (cards,
+     text tokens) — see the background-image comment further down for why
+     the photo itself no longer carries any tint of its own. */
   --wsp-surface: #1e2c4e;
   --wsp-surface2: #16223d;
   --wsp-surface3: #2a3b66;
@@ -141,32 +135,29 @@
   font-family: "Inter", sans-serif;
 
   /* THE single global background for the whole authenticated portal —
-     business photo (electronics on the left, negotiation/shop on the
-     right) with a translucent LIGHT blue-gray tint layered on top (same
-     flat-color-both-stops linear-gradient trick as before). Composited
-     over the photo, this mid-alpha light tint produces a medium blue-gray
-     page tone that reads clearly as "not dark mode" while keeping the
-     photo visible — deliberately a shade darker than the white/ice-blue
-     cards sitting on top of it, and deliberately lighter than a page that
-     would force light-on-dark content directly on .wsp-scope (the header
-     row, greeting, and badges all sit right on this background, outside
-     any card). `cover`/`no-repeat` on both layers, one value per layer
-     since there are two backgrounds stacked here — `cover` alone already
-     guarantees no tiling/repetition regardless of viewport size.
+     the business photo (electronics on the left, negotiation/shop on the
+     right), and NOTHING else. Correction pass: a translucent gradient
+     tint used to sit on top of the photo here, stacked into this same
+     background-image property — removed entirely. The
+     photo must render with its own original colors, contrast, and
+     sharpness, exactly as exported, with no gradient/opacity/filter/
+     blend-mode/pseudo-element altering it anywhere; the only translucency
+     in this screen now lives on .wsp-wizard's own glass panel further
+     down, never on the photo itself. `cover`/`no-repeat` guarantee no
+     stretching, distortion, or tiling regardless of viewport size.
      background-position defaults to `center` here (desktop/tablet widths
      are wide enough that `cover` shows both the electronics on the left
      and the negotiation/shop side on the right); narrower widths override
      this below to keep the business side in frame instead. */
-  background-image: linear-gradient(rgba(var(--wsp-overlay-rgb), 0.62), rgba(var(--wsp-overlay-rgb), 0.62)),
-    url("../assets/wholesale-wizard-background.webp");
-  background-size: cover, cover;
-  background-position: center, center;
-  background-repeat: no-repeat, no-repeat;
+  background-image: url("../assets/wholesale-wizard-background.webp");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   /* Mobile default: scroll (never `fixed` — repainting a fixed background on
      every scroll frame is what jank/stutters on phones; matches the exact
      same pattern already used for the main site's body background in
      src/styles/index.css). Desktop/tablet opt back into `fixed` below. */
-  background-attachment: scroll, scroll;
+  background-attachment: scroll;
 }
 
 /* Mobile/narrow: once the page's own content area is narrower than it is
@@ -178,13 +169,13 @@
    alone, now applied to the full-screen background instead. */
 @media (max-width: 767px) {
   .wsp-scope {
-    background-position: 78% center, 78% center;
+    background-position: 78% center;
   }
 }
 
 @media (min-width: 768px) {
   .wsp-scope {
-    background-attachment: fixed, fixed;
+    background-attachment: fixed;
   }
 }
 

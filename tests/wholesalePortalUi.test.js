@@ -213,62 +213,54 @@ describe("Correction pass: the old PCB background is fully retired — no longer
   });
 });
 
-describe("wholesalePortal.css: the global business-photo background (.wsp-scope) is cover/center/no-repeat, non-repeating, scoped, with a legibility overlay", () => {
+describe("wholesalePortal.css: the global business-photo background (.wsp-scope) is cover/center/no-repeat, non-repeating, scoped, and correction pass — carries NO tint/overlay of its own anymore", () => {
   const css = read("src/styles/wholesalePortal.css");
 
-  it(".wsp-scope sets background-size: cover and background-position: center on every background layer", () => {
+  it(".wsp-scope's background-image is the photo url() and ONLY the photo — no linear-gradient (or any other image/function) layered with it", () => {
     const rule = css.match(/\.wsp-scope\s*\{[\s\S]*?\n\}/)[0];
-    expect(rule).toMatch(/background-size:\s*cover,\s*cover;/);
-    expect(rule).toMatch(/background-position:\s*center,\s*center;/);
+    expect(rule).toMatch(/background-image:\s*url\("\.\.\/assets\/wholesale-wizard-background\.webp"\);/);
+    expect(rule).not.toContain("linear-gradient");
+    expect(rule).not.toContain("radial-gradient");
   });
 
-  it("never repeats the background image (background-repeat: no-repeat on every layer)", () => {
+  it("sets background-size: cover and background-position: center — a single value each, no comma-separated second layer (there is only one layer now)", () => {
     const rule = css.match(/\.wsp-scope\s*\{[\s\S]*?\n\}/)[0];
-    expect(rule).toMatch(/background-repeat:\s*no-repeat,\s*no-repeat;/);
+    expect(rule).toMatch(/background-size:\s*cover;/);
+    expect(rule).toMatch(/background-position:\s*center;/);
+    expect(rule).not.toMatch(/background-size:\s*cover,/);
+    expect(rule).not.toMatch(/background-position:\s*center,/);
   });
 
-  it("layers a translucent overlay UNDER the text (a same-color-both-stops linear-gradient, driven by --wsp-overlay-rgb) on top of the business photo, so text stays legible over it", () => {
+  it("never repeats the background image (background-repeat: no-repeat, single layer)", () => {
     const rule = css.match(/\.wsp-scope\s*\{[\s\S]*?\n\}/)[0];
-    expect(rule).toContain(
-      "background-image: linear-gradient(rgba(var(--wsp-overlay-rgb), 0.62), rgba(var(--wsp-overlay-rgb), 0.62)),"
-    );
-    expect(rule).toMatch(/rgba\(var\(--wsp-overlay-rgb\),\s*0\.62\).*\n?\s*url\(/);
+    expect(rule).toMatch(/background-repeat:\s*no-repeat;/);
+    expect(rule).not.toMatch(/background-repeat:\s*no-repeat,/);
   });
 
-  it("the overlay is a LIGHT blue-gray, not a dark one — Preview feedback: the previous round read as ~100% dark mode", () => {
-    const overlayRgb = css.match(/--wsp-overlay-rgb:\s*([\d, ]+);/)[1].split(",").map((n) => Number(n.trim()));
-    const sum = overlayRgb.reduce((a, b) => a + b, 0);
-    expect(sum).toBeGreaterThan(600); // e.g. 215+225+240 — a light tint, nowhere near the old rgba(9,15,32) dark one
-    // --wsp-overlay-rgb must actually be the split-out triplet of --wsp-page-bg, not an independently drifting value
-    const pageBgHex = css.match(/--wsp-page-bg:\s*(#[0-9a-fA-F]{6})/)[1];
-    const [r, g, b] = [pageBgHex.slice(1, 3), pageBgHex.slice(3, 5), pageBgHex.slice(5, 7)].map((h) => parseInt(h, 16));
-    expect(overlayRgb).toEqual([r, g, b]);
+  it("correction pass: --wsp-overlay-rgb and --wsp-page-bg (the old tint tokens) are fully removed — not just unused, gone", () => {
+    expect(css).not.toContain("--wsp-overlay-rgb");
+    expect(css).not.toContain("--wsp-page-bg");
   });
 
-  it("the overlay's alpha is mid-range (not near-opaque) — the PCB must stay clearly visible through it, not be hidden by it", () => {
-    const alphas = [...css.matchAll(/rgba\(var\(--wsp-overlay-rgb\),\s*([\d.]+)\)/g)].map((m) => Number(m[1]));
-    expect(alphas.length).toBeGreaterThan(0);
-    for (const alpha of alphas) {
-      expect(alpha).toBeGreaterThan(0.3);
-      expect(alpha).toBeLessThan(0.8);
-    }
-  });
-
-  it("never lightens via the `opacity` CSS property on .wsp-scope or its content — only via background-image layer alpha", () => {
+  it("never applies opacity, filter, background-blend-mode, or a ::before/::after pseudo-element to .wsp-scope — nothing may alter the photo's own colors/contrast/sharpness", () => {
     const scopeRule = css.match(/\.wsp-scope\s*\{[\s\S]*?\n\}/)[0];
     expect(scopeRule).not.toMatch(/(?<!background-)opacity:/);
+    expect(scopeRule).not.toContain("filter:");
+    expect(css).not.toContain("background-blend-mode");
+    expect(css).not.toContain(".wsp-scope::before");
+    expect(css).not.toContain(".wsp-scope::after");
   });
 
-  it("the background lives ONLY on .wsp-scope — WholesaleLogin.jsx (the only other wholesale page) never applies this class, so the login screen never shows the PCB background", () => {
+  it("the background lives ONLY on .wsp-scope — WholesaleLogin.jsx (the only other wholesale page) never applies this class, so the login screen never shows this background", () => {
     const loginSrc = read("src/pages/WholesaleLogin.jsx");
     expect(loginSrc).not.toContain("wsp-scope");
   });
 
   it("never uses background-attachment: fixed on mobile — scroll by default, fixed only from the 768px breakpoint up, mirroring index.css's existing pattern for the exact same jank reason", () => {
     const scopeRule = css.match(/\.wsp-scope\s*\{[\s\S]*?\n\}/)[0];
-    expect(scopeRule).toMatch(/background-attachment:\s*scroll,\s*scroll;/);
+    expect(scopeRule).toMatch(/background-attachment:\s*scroll;/);
     const desktopOverride = css.match(/@media \(min-width: 768px\)\s*\{[\s\S]*?\.wsp-scope\s*\{[\s\S]*?\n\s*\}/)[0];
-    expect(desktopOverride).toMatch(/background-attachment:\s*fixed,\s*fixed;/);
+    expect(desktopOverride).toMatch(/background-attachment:\s*fixed;/);
   });
 });
 
@@ -391,25 +383,14 @@ describe("wholesalePortal.css: .wsp-card-clickable moderate glass effect — sco
   });
 });
 
-describe("wholesalePortal.css: page tone — medium-light blue-gray, darker than the cards but not dark-mode-dark", () => {
+describe("wholesalePortal.css: page tone — correction pass, no longer a token-driven tint at all; the page's own visual tone is whatever the unaltered photo itself renders as", () => {
   const css = read("src/styles/wholesalePortal.css");
   const luminanceOf = (hex) => {
     const n = parseInt(hex.slice(1), 16);
     return ((n >> 16) & 255) + ((n >> 8) & 255) + (n & 255);
   };
 
-  it("--wsp-page-bg is light overall (a blue-gray, not a near-black navy)", () => {
-    const pageHex = css.match(/--wsp-page-bg:\s*(#[0-9a-fA-F]{6})/)[1];
-    expect(luminanceOf(pageHex)).toBeGreaterThan(500); // #101a30 (old dark value) sums to 26 — nowhere close
-  });
-
-  it("--wsp-page-bg is still darker than --wsp-card-bg — 'el fondo debe ser mas oscuro que las ventanas'", () => {
-    const pageHex = css.match(/--wsp-page-bg:\s*(#[0-9a-fA-F]{6})/)[1];
-    const cardHex = css.match(/--wsp-card-bg:\s*(#[0-9a-fA-F]{6})/)[1];
-    expect(luminanceOf(pageHex)).toBeLessThan(luminanceOf(cardHex));
-  });
-
-  it("page-level text (--wsp-text-strong, --wsp-text-soft — the h1 title, shop name, section labels) is now dark navy, matching a light page", () => {
+  it("page-level text (--wsp-text-strong, --wsp-text-soft — the h1 title, shop name, section labels) is dark navy, still legible directly on the unaltered photo", () => {
     const strongHex = css.match(/--wsp-text-strong:\s*(#[0-9a-fA-F]{6})/)[1];
     const softHex = css.match(/--wsp-text-soft:\s*(#[0-9a-fA-F]{6})/)[1];
     expect(luminanceOf(strongHex)).toBeLessThan(300); // dark navy, not the old near-white #f4f6ff (sum ~753)
@@ -425,18 +406,16 @@ describe("wholesalePortal.css: page tone — medium-light blue-gray, darker than
   });
 });
 
-describe("wholesalePortal.css: cards are white/ice-blue — lighter than the (now light-toned) PCB page background", () => {
+describe("wholesalePortal.css: cards are white/ice-blue — a clear opaque 'window' regardless of what the unaltered photo behind them looks like", () => {
   const css = read("src/styles/wholesalePortal.css");
 
-  it("--wsp-card-bg is a light hex, distinct from and lighter than --wsp-page-bg/--wsp-surface", () => {
+  it("--wsp-card-bg is a genuinely light hex, distinct from --wsp-surface", () => {
     const bgHex = css.match(/--wsp-card-bg:\s*(#[0-9a-fA-F]{6})/)[1];
-    const pageHex = css.match(/--wsp-page-bg:\s*(#[0-9a-fA-F]{6})/)[1];
     const luminanceOf = (hex) => {
       const n = parseInt(hex.slice(1), 16);
       return ((n >> 16) & 255) + ((n >> 8) & 255) + (n & 255);
     };
-    expect(luminanceOf(bgHex)).toBeGreaterThan(luminanceOf(pageHex));
-    expect(luminanceOf(bgHex)).toBeGreaterThan(600); // genuinely light, not just "less dark"
+    expect(luminanceOf(bgHex)).toBeGreaterThan(600); // genuinely light
   });
 
   it("the photo-less placeholder box (.wsp-card-photo / .wsp-category-photo) is light ice-blue, not the old dark navy gradient", () => {

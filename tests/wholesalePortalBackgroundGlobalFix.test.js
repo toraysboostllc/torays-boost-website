@@ -40,14 +40,16 @@ describe("wholesalePortal.css: the business photo is the SINGLE global backgroun
     expect(matches).toHaveLength(1);
   });
 
-  it("uses background-size: cover (no tiling/repetition possible) and background-repeat: no-repeat explicitly", () => {
-    expect(scopeBlock).toMatch(/background-size:\s*cover,\s*cover/);
-    expect(scopeBlock).toMatch(/background-repeat:\s*no-repeat,\s*no-repeat/);
+  it("uses background-size: cover (no tiling/repetition possible) and background-repeat: no-repeat explicitly — a single layer now, no comma-separated second value", () => {
+    expect(scopeBlock).toMatch(/background-size:\s*cover;/);
+    expect(scopeBlock).toMatch(/background-repeat:\s*no-repeat;/);
+    expect(scopeBlock).not.toMatch(/background-size:\s*cover,/);
+    expect(scopeBlock).not.toMatch(/background-repeat:\s*no-repeat,/);
   });
 
   it("never uses background-attachment: fixed on mobile — scroll is the base declaration, fixed only applies inside a min-width:768px query", () => {
-    expect(scopeBlock).toMatch(/background-attachment:\s*scroll,\s*scroll/);
-    const fixedIdx = cssSrc.indexOf("background-attachment: fixed, fixed;");
+    expect(scopeBlock).toMatch(/background-attachment:\s*scroll;/);
+    const fixedIdx = cssSrc.indexOf("background-attachment: fixed;");
     expect(fixedIdx).toBeGreaterThan(-1);
     const precedingMediaIdx = cssSrc.lastIndexOf("@media", fixedIdx);
     const mediaLine = cssSrc.slice(precedingMediaIdx, cssSrc.indexOf("{", precedingMediaIdx));
@@ -58,11 +60,19 @@ describe("wholesalePortal.css: the business photo is the SINGLE global backgroun
     const narrowIdx = cssSrc.indexOf("@media (max-width: 767px)");
     const narrowBlock = cssSrc.slice(narrowIdx, cssSrc.indexOf("}\n}", narrowIdx) + 3);
     expect(narrowBlock).toContain(".wsp-scope");
-    expect(narrowBlock).toMatch(/background-position:\s*78% center,\s*78% center/);
+    expect(narrowBlock).toMatch(/background-position:\s*78% center;/);
   });
 
   it("the default (wide-viewport) position is centered, showing both the electronics (left) and negotiation/shop (right) sides", () => {
-    expect(scopeBlock).toMatch(/background-position:\s*center,\s*center/);
+    expect(scopeBlock).toMatch(/background-position:\s*center;/);
+  });
+
+  it("no gradient, opacity, filter, or blend-mode alters the photo's own colors — the photo must render exactly as exported", () => {
+    expect(scopeBlock).not.toContain("linear-gradient(");
+    expect(scopeBlock).not.toContain("radial-gradient(");
+    expect(scopeBlock).not.toContain("filter:");
+    expect(scopeBlock).not.toMatch(/(?<!background-)opacity:/);
+    expect(cssSrc).not.toContain("background-blend-mode");
   });
 });
 
