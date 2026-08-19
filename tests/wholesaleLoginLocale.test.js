@@ -31,8 +31,8 @@ describe("WholesaleLogin.jsx: locale selector added, auth logic untouched", () =
     expect(loginSrc).toContain('t("login.pendingDefault")');
   });
 
-  it("handleSubmit still calls the exact same wholesaleLogin(shopName, code) with no new arguments", () => {
-    expect(loginSrc).toContain("const result = await wholesaleLogin(shopName.trim(), code.trim());");
+  it("handleSubmit still calls wholesaleLogin(shopName, code) with exactly 2 arguments — code now normalized, not just trimmed", () => {
+    expect(loginSrc).toContain("const result = await wholesaleLogin(shopName.trim(), normalizeShopCode(code));");
   });
 
   it("navigation on success is unchanged: still navigate('/wholesale/prices')", () => {

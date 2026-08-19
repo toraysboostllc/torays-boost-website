@@ -23,6 +23,7 @@ import {
   setPrivateHeaders,
   randomToken,
   sha256Hex,
+  normalizeShopCode,
   getShopByName,
   updateShop,
   findDeviceByTokenHash,
@@ -75,7 +76,7 @@ export default async function handler(req, res) {
     body = {};
   }
   const shopName = typeof body.shopName === "string" ? body.shopName.trim() : "";
-  const code = typeof body.code === "string" ? body.code : "";
+  const code = normalizeShopCode(body.code);
   const ip = clientIp(req);
   const userAgent = req.headers["user-agent"] || null;
   const incomingCookies = parse(req.headers.cookie || "");
@@ -89,7 +90,23 @@ export default async function handler(req, res) {
     return;
   }
 
-  const shop = await getShopByName(env, shopName).catch(() => null);
+  // A genuine failure reaching/querying Supabase here (network error, bad
+  // config, an expired/invalid service key) must NEVER be reported as
+  // "invalid credentials" — that would tell an admin their code is wrong
+  // when the real problem is the server. Only a successful query that
+  // genuinely found no matching row means "no such shop"; any exception is
+  // its own distinct, safe operational error. The caught error itself is
+  // never logged or returned — it can carry Supabase's raw response detail
+  // (see rest()'s own thrown message), which has no business in a log line
+  // or a client response.
+  let shop;
+  try {
+    shop = await getShopByName(env, shopName);
+  } catch {
+    console.error("wholesale-login: shop lookup failed (Supabase unreachable or misconfigured)");
+    res.status(503).json({ error: "service_unavailable", message: "Service temporarily unavailable. Please try again shortly." });
+    return;
+  }
   if (!shop) {
     res.status(401).json({ error: "invalid_credentials", message: INVALID_MSG });
     return;

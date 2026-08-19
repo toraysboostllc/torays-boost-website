@@ -107,6 +107,124 @@ describe("wholesale-login: incorrect code", () => {
   });
 });
 
+describe("wholesale-login: code normalization (trim + uppercase) matches DESK's stored hash", () => {
+  it.each([
+    ["SECRET123", "exact match"],
+    ["secret123", "lowercase"],
+    ["SeCrEt123", "mixed case"],
+    ["  SECRET123  ", "external whitespace"],
+    ["  secret123  ", "lowercase with external whitespace"],
+  ])("authenticates with %s (%s)", async (submittedCode) => {
+    const shop = seedShop();
+    seedApprovedDevice(shop.id, "known-device-token");
+    const req = mockReq({
+      method: "POST",
+      body: { shopName: "Acme Repair", code: submittedCode },
+      headers: { cookie: "ws_device=known-device-token" },
+    });
+    const res = mockRes();
+    await loginHandler(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.status).toBe("ok");
+  });
+
+  it("still rejects a code containing characters other than letters/numbers — never matches any real hash", async () => {
+    seedShop();
+    const req = mockReq({ method: "POST", body: { shopName: "Acme Repair", code: "SECRET-123!" } });
+    const res = mockRes();
+    await loginHandler(req, res);
+    expect(res.statusCode).toBe(401);
+    expect(res.body.message).toBe("Invalid shop name or code.");
+  });
+
+  it("an all-whitespace code normalizes to empty and is rejected as a missing field (400), not a credentials failure", async () => {
+    seedShop();
+    const req = mockReq({ method: "POST", body: { shopName: "Acme Repair", code: "   " } });
+    const res = mockRes();
+    await loginHandler(req, res);
+    expect(res.statusCode).toBe(400);
+  });
+});
+
+describe("wholesale-login: unknown shop and wrong code stay indistinguishable", () => {
+  it("produce byte-for-byte identical error responses", async () => {
+    seedShop();
+    const resUnknownShop = mockRes();
+    await loginHandler(mockReq({ method: "POST", body: { shopName: "Nonexistent Shop", code: "whatever1" } }), resUnknownShop);
+
+    const resWrongCode = mockRes();
+    await loginHandler(mockReq({ method: "POST", body: { shopName: "Acme Repair", code: "wrongcode1" } }), resWrongCode);
+
+    expect(resUnknownShop.statusCode).toBe(resWrongCode.statusCode);
+    expect(resUnknownShop.body).toEqual(resWrongCode.body);
+  });
+});
+
+describe("wholesale-login: a genuine Supabase failure is never reported as invalid credentials", () => {
+  it("returns 503 service_unavailable (not 401) when the shop-lookup fetch itself fails (network error)", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new Error("ECONNREFUSED 10.0.0.1:5432 — internal-db-host.example"))));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const req = mockReq({ method: "POST", body: { shopName: "Acme Repair", code: "SECRET123" } });
+    const res = mockRes();
+    await loginHandler(req, res);
+
+    expect(res.statusCode).toBe(503);
+    expect(res.body.error).toBe("service_unavailable");
+    expect(res.body.message).not.toMatch(/invalid/i);
+
+    errorSpy.mockRestore();
+  });
+
+  it("returns 503 (not 401) when Supabase answers the shop lookup with a non-2xx status", async () => {
+    vi.stubGlobal("fetch", async (url, options) => {
+      const u = new URL(url);
+      if (u.pathname === "/rest/v1/wholesale_shops") {
+        return {
+          ok: false,
+          status: 500,
+          text: async () => "internal Supabase detail: connection string postgres://user:pass@host/db, table wholesale_shops",
+          json: async () => ({}),
+        };
+      }
+      return fake.fakeFetch(url, options);
+    });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const req = mockReq({ method: "POST", body: { shopName: "Acme Repair", code: "SECRET123" } });
+    const res = mockRes();
+    await loginHandler(req, res);
+
+    expect(res.statusCode).toBe(503);
+    expect(res.body.error).toBe("service_unavailable");
+    errorSpy.mockRestore();
+  });
+
+  it("never leaks the underlying error detail, URL, or credentials into the JSON response or server logs", async () => {
+    const secretDetail = "postgres://admin:s3cr3tPass@internal-db.example.com/wholesale — service_role JWT eyJhbGciOiJIUzI1NiJ9";
+    vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new Error(secretDetail))));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const req = mockReq({ method: "POST", body: { shopName: "Acme Repair", code: "SECRET123" } });
+    const res = mockRes();
+    await loginHandler(req, res);
+
+    const responseText = JSON.stringify(res.body);
+    expect(responseText).not.toContain(secretDetail);
+    expect(responseText).not.toContain("postgres://");
+    expect(responseText).not.toContain("service_role");
+
+    for (const call of errorSpy.mock.calls) {
+      const logged = call.join(" ");
+      expect(logged).not.toContain(secretDetail);
+      expect(logged).not.toContain("postgres://");
+      expect(logged).not.toContain("s3cr3tPass");
+    }
+
+    errorSpy.mockRestore();
+  });
+});
+
 describe("wholesale-login: rate limiting", () => {
   it("locks the shop after 5 failed attempts, rejecting even the correct code", async () => {
     const shop = seedShop();

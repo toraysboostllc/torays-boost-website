@@ -6,6 +6,7 @@ import { Card } from "../components/ui/Card.jsx";
 import { Button } from "../components/ui/Button.jsx";
 import { useSEO } from "../lib/seo.js";
 import { wholesaleLogin } from "../lib/wholesaleAuth.js";
+import { normalizeShopCode } from "../lib/wholesaleCode.js";
 import { WholesaleLocaleProvider, useWholesaleLocale } from "../i18n/WholesaleLocaleContext.jsx";
 import { WholesaleLocaleSelector } from "../components/wholesale/WholesaleLocaleSelector.jsx";
 import loginCollageBg from "../assets/wholesale-login-collage.webp";
@@ -45,7 +46,7 @@ function WholesaleLoginContent() {
     setStatus("loading");
     setMessage("");
 
-    const result = await wholesaleLogin(shopName.trim(), code.trim());
+    const result = await wholesaleLogin(shopName.trim(), normalizeShopCode(code));
 
     if (result.ok) {
       navigate("/wholesale/prices");
@@ -101,9 +102,12 @@ function WholesaleLoginContent() {
               required
               type="password"
               autoComplete="off"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
               maxLength={128}
               value={code}
-              onChange={(e) => setCode(e.target.value)}
+              onChange={(e) => setCode(normalizeShopCode(e.target.value))}
               className="rounded-xl border border-torays-line bg-torays-surface-alt px-4 py-3 text-torays-text focus:outline-none focus:ring-2 focus:ring-torays-red/50"
             />
           </label>

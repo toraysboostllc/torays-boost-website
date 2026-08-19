@@ -10,8 +10,23 @@
 import crypto from "node:crypto";
 import { resolveRecommendedPrice } from "./wholesaleMargin.js";
 
+/** `SUPABASE_URL` must be the bare project origin (e.g.
+ *  "https://xxxx.supabase.co") — every caller in this file appends its own
+ *  "/rest/v1/..." or "/storage/v1/..." path on top of it. Strips exactly the
+ *  trailing slash(es) a misconfigured env var commonly has, and rejects a
+ *  value that already ends in "/rest/v1" outright (rather than silently
+ *  producing a broken "/rest/v1/rest/v1/..." URL) — treated the same as a
+ *  missing value, since either way this function is not safely configured.
+ *  Returns `null` on anything invalid; never throws itself. */
+export function normalizeSupabaseUrl(raw) {
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim().replace(/\/+$/, "");
+  if (!trimmed || /\/rest\/v1$/i.test(trimmed)) return null;
+  return trimmed;
+}
+
 export function getEnv() {
-  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SUPABASE_URL = normalizeSupabaseUrl(process.env.SUPABASE_URL);
   // SUPABASE_SECRET_KEY is Supabase's modern replacement for the legacy
   // service_role JWT — same bypass-RLS privilege, new key format. Prefer it
   // when present; SUPABASE_SERVICE_ROLE_KEY stays supported as a fallback
@@ -21,6 +36,17 @@ export function getEnv() {
     throw new Error("not_configured");
   }
   return { SUPABASE_URL, SERVICE_KEY };
+}
+
+/** Matches api/wholesale-admin.js's normalizeShopCode() in the DESK repo
+ *  byte-for-byte on purpose — DESK trims and uppercases a shop's access code
+ *  before hashing it at creation/regeneration time, so an incoming login
+ *  attempt MUST be normalized the exact same way before bcrypt.compare(), or
+ *  a code typed in a different case or with stray whitespace would wrongly
+ *  fail to match its own hash. The two repos share no code (see this file's
+ *  own header), so this is a deliberate duplicate, not an import. */
+export function normalizeShopCode(raw) {
+  return typeof raw === "string" ? raw.trim().toUpperCase() : "";
 }
 
 /**

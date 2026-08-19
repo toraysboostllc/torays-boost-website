@@ -57,7 +57,7 @@ describe("WholesaleLogin: repair collage background", () => {
 
   it("does not alter the form, auth call, or portal behavior — same fields, same wholesaleLogin() call, same navigation on success", () => {
     expect(loginSrc).toContain('import { wholesaleLogin } from "../lib/wholesaleAuth.js"');
-    expect(loginSrc).toContain("await wholesaleLogin(shopName.trim(), code.trim())");
+    expect(loginSrc).toContain("await wholesaleLogin(shopName.trim(), normalizeShopCode(code))");
     expect(loginSrc).toContain('navigate("/wholesale/prices")');
     expect(loginSrc).toContain('type="password"');
     expect(loginSrc).toContain('type="text"');
