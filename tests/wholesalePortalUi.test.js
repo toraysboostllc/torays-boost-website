@@ -298,7 +298,7 @@ describe("The business photo: local asset, referenced exactly once, globally on 
   });
 });
 
-describe("wholesalePortal.css: .wsp-wizard — correction pass, now an image-less translucent glass panel, never its own copy of the photo", () => {
+describe("wholesalePortal.css: .wsp-wizard — second correction pass, a LIGHT ice-blue glass panel (the first pass's dark navy glass was rejected as an unapproved dark rectangle), still image-less, never its own copy of the photo", () => {
   const css = read("src/styles/wholesalePortal.css");
   const wizardRule = css.match(/\.wsp-wizard\s*\{[\s\S]*?\n\}/)[0];
 
@@ -307,24 +307,35 @@ describe("wholesalePortal.css: .wsp-wizard — correction pass, now an image-les
     expect(wizardRule).not.toContain("url(");
   });
 
-  it("uses a translucent navy background-color (--wsp-navy-rgb) plus a backdrop-filter blur — the 'glass' treatment, letting .wsp-scope's own photo show through from underneath rather than layering a second image on top", () => {
-    expect(wizardRule).toMatch(/background-color:\s*rgba\(var\(--wsp-navy-rgb\),\s*[\d.]+\);/);
+  it("uses a translucent LIGHT ice-blue background-color (--wsp-wizard-glass-rgb, its own dedicated token) plus a backdrop-filter blur — the photo still shows through from underneath rather than a second image layered on top", () => {
+    expect(wizardRule).toMatch(/background-color:\s*rgba\(var\(--wsp-wizard-glass-rgb\),\s*[\d.]+\);/);
     expect(wizardRule).toMatch(/backdrop-filter:\s*blur\(\d+px\);/);
     expect(wizardRule).toMatch(/-webkit-backdrop-filter:\s*blur\(\d+px\);/);
-    // --wsp-navy-rgb must be the real split-out triplet of --wsp-navy, not an independently drifting value
-    const navyHex = css.match(/--wsp-navy:\s*(#[0-9a-fA-F]{6})/)[1];
-    const [r, g, b] = [navyHex.slice(1, 3), navyHex.slice(3, 5), navyHex.slice(5, 7)].map((h) => parseInt(h, 16));
-    const navyRgb = css.match(/--wsp-navy-rgb:\s*([\d, ]+);/)[1].split(",").map((n) => Number(n.trim()));
-    expect(navyRgb).toEqual([r, g, b]);
+    expect(css).toMatch(/--wsp-wizard-glass-rgb:\s*[\d, ]+;/);
   });
 
-  it("the glass alpha is mid-to-high (not near-opaque, not near-transparent) — dark enough for the existing white text tokens below to stay WCAG AA, translucent enough that .wsp-scope's photo is still recognizable behind it", () => {
-    const alpha = Number(wizardRule.match(/background-color:\s*rgba\(var\(--wsp-navy-rgb\),\s*([\d.]+)\);/)[1]);
-    expect(alpha).toBeGreaterThan(0.4);
-    expect(alpha).toBeLessThan(0.9);
+  it("never reuses --wsp-navy-rgb (the old dark glass token) anywhere in the panel rule — the dark rectangle is gone, not just retinted", () => {
+    expect(wizardRule).not.toContain("--wsp-navy-rgb");
+    expect(wizardRule).not.toContain("--wsp-navy)");
   });
 
-  it("no longer carries its own background-position/repeat/attachment declarations — those only make sense for an element with its own background-image, which .wsp-wizard no longer has", () => {
+  it("the glass alpha is inside the approved 55-65% range — light and airy, not a dark or heavy tint", () => {
+    const alpha = Number(wizardRule.match(/background-color:\s*rgba\(var\(--wsp-wizard-glass-rgb\),\s*([\d.]+)\);/)[1]);
+    expect(alpha).toBeGreaterThanOrEqual(0.55);
+    expect(alpha).toBeLessThanOrEqual(0.65);
+  });
+
+  it("has a thin near-white border and a soft (low-intensity) drop shadow — its own edge without becoming a solid opaque card", () => {
+    expect(wizardRule).toMatch(/border:\s*1px solid rgba\(255,\s*255,\s*255,\s*[\d.]+\);/);
+    const boxShadowLine = wizardRule.match(/box-shadow:\s*(.+);/)[1];
+    expect(boxShadowLine).toBeTruthy();
+    // "soft" — the shadow's own alpha stays low, never a heavy/dark drop shadow
+    const shadowAlphas = [...boxShadowLine.matchAll(/rgba\([\d.,\s]+?,\s*([\d.]+)\)/g)].map((m) => Number(m[1]));
+    expect(shadowAlphas.length).toBeGreaterThan(0);
+    expect(shadowAlphas.every((a) => a <= 0.5)).toBe(true);
+  });
+
+  it("no longer carries its own background-position/repeat/attachment declarations — those only make sense for an element with its own background-image, which .wsp-wizard still doesn't have", () => {
     expect(wizardRule).not.toContain("background-size");
     expect(wizardRule).not.toContain("background-position");
     expect(wizardRule).not.toContain("background-repeat");
@@ -335,13 +346,24 @@ describe("wholesalePortal.css: .wsp-wizard — correction pass, now an image-les
     expect(css).not.toMatch(/@media \(max-width: 767px\)\s*\{\s*\.wsp-wizard\s*\{/);
   });
 
-  it("every text node that sits directly on the panel (heading/subtitle/step-label, never inside an opaque card) still uses the same solid light color, not the page's dark-navy tokens — unaffected by the image-to-glass mechanism change", () => {
+  it("every text node that sits directly on the panel (heading/subtitle/step-label, never inside an opaque card) flips to dark navy card-text tokens now that the panel itself is light — never the old light-on-dark scheme", () => {
+    const headingRule = css.match(/\.wsp-wizard-heading\s*\{[\s\S]*?\n\}/)[0];
+    const subtitleRule = css.match(/\.wsp-wizard-subtitle\s*\{[\s\S]*?\n\}/)[0];
+    const labelRule = css.match(/\n\.wsp-wizard-step-label\s*\{[\s\S]*?\n\}/)[0];
+    expect(headingRule).toMatch(/color:\s*var\(--wsp-card-text\);/);
+    expect(subtitleRule).toMatch(/color:\s*var\(--wsp-card-text-soft\);/);
+    expect(labelRule).toMatch(/color:\s*var\(--wsp-card-text\);/);
+    for (const rule of [headingRule, subtitleRule, labelRule]) {
+      expect(rule).not.toMatch(/color:\s*var\(--wsp-btn-text\);/);
+    }
+  });
+
+  it("the same three text nodes use a LIGHT halo (not a dark drop shadow) — the old dark-shadow-on-light-text scheme is fully retired", () => {
     const headingRule = css.match(/\.wsp-wizard-heading\s*\{[\s\S]*?\n\}/)[0];
     const subtitleRule = css.match(/\.wsp-wizard-subtitle\s*\{[\s\S]*?\n\}/)[0];
     const labelRule = css.match(/\n\.wsp-wizard-step-label\s*\{[\s\S]*?\n\}/)[0];
     for (const rule of [headingRule, subtitleRule, labelRule]) {
-      expect(rule).toMatch(/color:\s*var\(--wsp-btn-text\);/);
-      expect(rule).not.toMatch(/color:\s*var\(--wsp-text-(strong|soft)\);/);
+      expect(rule).toMatch(/text-shadow:\s*0 1px 2px rgba\(255,\s*255,\s*255,/);
     }
   });
 

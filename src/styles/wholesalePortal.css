@@ -70,10 +70,13 @@
   --wsp-blue-tint: #1b2745;
   --wsp-blue-tint-strong: #2e4785;
   --wsp-navy: #0b1730;
-  /* RGB triplet of --wsp-navy, same split-out trick as --wsp-overlay-rgb
-     above — lets the wizard business-photo background below build its
-     translucent overlay via rgba(var(--wsp-navy-rgb), alpha). */
-  --wsp-navy-rgb: 11, 23, 48;
+  /* Light ice-blue glass tint for .wsp-wizard (second correction pass —
+     replaces the dark navy glass, which read as an unapproved dark
+     rectangle behind the cards). Deliberately its own dedicated token
+     rather than reusing --wsp-card-bg's RGB, even though the two are
+     close in hue, so the wizard panel's glass alpha can keep moving
+     independently of the opaque card background it sits behind/above. */
+  --wsp-wizard-glass-rgb: 230, 241, 253;
   --wsp-red: #f0525e;
 
   /* Money-hierarchy colors (result panel) — each figure gets its own
@@ -1305,24 +1308,25 @@
    320px up per the approved spec, widening at larger breakpoints instead
    of stretching 2 columns across a full desktop width.
 
-   Professional glass panel — correction pass: this panel used to carry
-   its OWN copy of the business photo (a second, separate image from the
-   one covering `.wsp-scope` behind it). It no longer has any
-   background-image at all: it is a translucent navy fill (backdrop-filter
-   blur included, same glassmorphism treatment `.wsp-card-clickable`
-   already established elsewhere in this file) that lets `.wsp-scope`'s
-   own photo show through from underneath, tinted and softly blurred,
-   rather than layering a second distinct image on top of it — "never show
-   the same image twice" and "no image inside the panel" both hold
-   literally, not just visually. The navy alpha here (0.72) is the exact
-   same value the old direct photo+overlay combination used for this
-   panel, chosen so the panel's own on-screen darkness — and therefore
-   every text/icon color and text-shadow already tuned against it below —
-   stays visually identical to the previously-approved look, even though
-   the mechanism producing it changed. Every text node placed directly on
-   this panel (never inside its own opaque card — those stay unaffected,
-   see .wsp-card-clickable and the money-bearing panels further down) can
-   keep using one solid near-white color with a wide WCAG AA margin.
+   Professional glass panel — second correction pass: the first pass
+   (translucent NAVY fill, dark glass) was rejected as an unapproved dark
+   rectangle sitting behind the cards. This panel still has NO
+   background-image of its own (never a second copy of `.wsp-scope`'s
+   photo — that rule from the first pass still holds), but the tint is now
+   light ice-blue instead of dark navy: `--wsp-wizard-glass-rgb` at 0.6
+   alpha (inside the requested 55-65% range), so the photo underneath
+   reads as a bright, airy blur rather than a dark tinted panel. A thin
+   near-white border and a soft (not heavy) drop shadow give the panel its
+   own edge without turning it into a solid opaque card — the photo must
+   still be visible through it. Because the panel itself is light now,
+   every text node placed directly on it (heading, subtitle, step labels —
+   never inside their own opaque card, see .wsp-card-clickable and the
+   money-bearing panels further down, which are unaffected by this) flips
+   from near-white to dark navy (var(--wsp-card-text)), with a soft LIGHT
+   halo (not a dark drop shadow) behind it for the same purpose the old
+   dark shadow served: staying legible over whatever part of the photo is
+   showing through, regardless of how light or dark that specific region
+   is.
 --------------------------------------------------------------------- */
 .wsp-wizard {
   position: relative;
@@ -1332,26 +1336,28 @@
   border-radius: 18px;
   padding: clamp(6px, 1.2vh, 16px) clamp(8px, 2.6vw, 16px);
   overflow: hidden;
-  background-color: rgba(var(--wsp-navy-rgb), 0.72);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background-color: rgba(var(--wsp-wizard-glass-rgb), 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 8px 24px rgba(15, 25, 47, 0.16), 0 1px 0 rgba(255, 255, 255, 0.5) inset;
 }
 
 .wsp-wizard-heading {
   font-family: "Space Grotesk", sans-serif;
   font-size: clamp(13px, 3.4vw, 17px);
   font-weight: 700;
-  /* Sits directly on the photo background above, not inside a card — see
-     the .wsp-wizard comment for why this is a single solid light color
-     rather than a tuned-per-region one. */
-  color: var(--wsp-btn-text);
-  text-shadow: 0 1px 3px rgba(5, 10, 25, 0.55);
+  /* Sits directly on the panel's light glass tint, not inside a card —
+     see the .wsp-wizard comment above for why this is dark navy with a
+     light halo rather than the old light-on-dark scheme. */
+  color: var(--wsp-card-text);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.65);
 }
 
 .wsp-wizard-subtitle {
   font-size: clamp(10px, 2.8vw, 13px);
-  color: var(--wsp-btn-text);
-  text-shadow: 0 1px 3px rgba(5, 10, 25, 0.55);
+  color: var(--wsp-card-text-soft);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.65);
 }
 
 /* No-scroll spec: on phone-width viewports the subtitle is the one purely
@@ -1431,12 +1437,12 @@
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
 }
 
-/* Label text below each circle floats directly on the wizard's photo
-   background (no opaque backing of its own), so — like the heading/
-   subtitle above — every state uses the same solid light color; only
+/* Label text below each circle floats directly on the wizard's light glass
+   tint (no opaque backing of its own), so — like the heading/subtitle
+   above — every state uses the same solid dark-navy color; only
    font-weight distinguishes upcoming/active/done. */
 .wsp-wizard-step-active .wsp-wizard-step-label {
-  color: var(--wsp-btn-text);
+  color: var(--wsp-card-text);
   font-weight: 700;
 }
 
@@ -1455,13 +1461,13 @@
   margin-top: clamp(3px, 1vh, 6px);
   font-size: clamp(10px, 2.6vw, 11px);
   font-weight: 600;
-  color: var(--wsp-btn-text);
+  color: var(--wsp-card-text);
   text-align: center;
-  text-shadow: 0 1px 2px rgba(5, 10, 25, 0.5);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.6);
 }
 
 .wsp-wizard-step-done .wsp-wizard-step-label {
-  color: var(--wsp-btn-text);
+  color: var(--wsp-card-text);
   font-weight: 700;
 }
 

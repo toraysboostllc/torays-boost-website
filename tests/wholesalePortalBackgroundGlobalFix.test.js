@@ -81,8 +81,9 @@ describe("wholesalePortal.css: .wsp-wizard is an image-less translucent glass pa
     expect(wizardBlock).not.toContain(".webp");
   });
 
-  it("uses a translucent navy background-color instead, reusing the existing --wsp-navy-rgb token", () => {
-    expect(wizardBlock).toMatch(/background-color:\s*rgba\(var\(--wsp-navy-rgb\),\s*0\.\d+\)/);
+  it("uses a translucent LIGHT ice-blue background-color (--wsp-wizard-glass-rgb) — the dark navy glass from the first correction pass was rejected as an unapproved dark rectangle", () => {
+    expect(wizardBlock).toMatch(/background-color:\s*rgba\(var\(--wsp-wizard-glass-rgb\),\s*0\.\d+\)/);
+    expect(wizardBlock).not.toContain("--wsp-navy-rgb");
   });
 
   it("applies a backdrop-filter blur — the 'glass' treatment that lets the global photo show through, softened, from underneath", () => {
