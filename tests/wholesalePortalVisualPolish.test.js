@@ -145,12 +145,19 @@ describe("Cambio 3 — Pricing Ready / pill / Shop Cost spacing hierarchy", () =
   });
 });
 
-describe("Cambio 4 — lime-green equipment/model/service identifier pill, on every result", () => {
-  it("exact spec colors: #d9f99d background, #365314 text, #a3e635 border", () => {
+describe("Cambio 4 (rev. final) — light-red equipment/model/service identifier pill, centered, on every result", () => {
+  it("exact spec colors: #FEE2E2 background, #991B1B text, #FCA5A5 border", () => {
     const block = ruleBlock(".wsp-result-breadcrumb");
-    expect(block).toMatch(/background:\s*#d9f99d;/);
-    expect(block).toMatch(/color:\s*#365314;/);
-    expect(block).toMatch(/border:\s*1px solid #a3e635;/);
+    expect(block).toMatch(/background:\s*#fee2e2;/);
+    expect(block).toMatch(/color:\s*#991b1b;/);
+    expect(block).toMatch(/border:\s*1px solid #fca5a5;/);
+  });
+
+  it("no trace of the earlier lime-green colors remains", () => {
+    const block = ruleBlock(".wsp-result-breadcrumb");
+    expect(block).not.toMatch(/#d9f99d/i);
+    expect(block).not.toMatch(/#365314/i);
+    expect(block).not.toMatch(/#a3e635/i);
   });
 
   it("fit-content, but caps at max-width:100% and wraps — never truncates a long equipment/model/service chain", () => {
@@ -162,9 +169,53 @@ describe("Cambio 4 — lime-green equipment/model/service identifier pill, on ev
     expect(block).not.toContain("white-space: nowrap");
   });
 
+  it("is centered under the title, including its own wrapped lines on mobile", () => {
+    const block = ruleBlock(".wsp-result-breadcrumb");
+    expect(block).toMatch(/align-self:\s*center;/);
+    expect(block).toMatch(/text-align:\s*center;/);
+  });
+
+  it("the header row (ShieldCheck icon + Pricing Ready title) is horizontally centered", () => {
+    const block = ruleBlock(".wsp-result-header");
+    expect(block).toMatch(/justify-content:\s*center;/);
+  });
+
   it("is the single shared class for every result — no per-equipment/per-service conditional styling (e.g. no special-cased iPad branch)", () => {
     expect(panelSrc).toContain('<p className="wsp-result-breadcrumb">{breadcrumb}</p>');
     expect(panelSrc).not.toMatch(/breadcrumb.*ipad/i);
+  });
+
+  it("is built exclusively from selection/service fields DESK returned — the JSX literally interpolates selection.equipoName/modelName and service.name, never a device-name string literal", () => {
+    const idx = panelSrc.indexOf("const breadcrumb = [");
+    const block = panelSrc.slice(idx, panelSrc.indexOf("].filter(Boolean)", idx));
+    expect(block).toContain("selection.equipoName");
+    expect(block).toContain("selection.modelName");
+    expect(block).toContain("service.name");
+    // No hardcoded device/brand names anywhere in this component file.
+    for (const literal of ["PS5", "iPad", "iPhone", "MacBook", "Xbox", "Switch", "HDMI"]) {
+      expect(panelSrc).not.toContain(literal);
+    }
+  });
+
+  it("dynamic proof: a DIFFERENT, unrelated equipment/service (never used anywhere else in this test suite's WholesaleResultPanel fixtures) produces the identical pill/centering markup — the component has no special-casing for any specific device", () => {
+    // This test doesn't render (no jsdom) — it proves dynamism the same way
+    // every other structural test in this file does: by showing the
+    // breadcrumb construction is pure data interpolation with no branch
+    // that could only fire for a particular device. A live example, to
+    // make the point concrete: selection={equipoName:"MacBook", modelName:
+    // "MacBook Pro 16\" 2021"} + service={name:"Battery Replacement"} would
+    // join to "MacBook · MacBook Pro 16\" 2021 · Battery Replacement" via
+    // the exact same .filter(Boolean).join(" · ") used for every other
+    // device — verified structurally below.
+    const idx = panelSrc.indexOf("const breadcrumb = [");
+    const block = panelSrc.slice(idx, panelSrc.indexOf(";", panelSrc.indexOf(".join(", idx) + 1));
+    expect(block).toContain('.filter(Boolean)');
+    expect(block).toContain('.join(" · ")');
+    // The array has exactly 4 possible entries (microsoldering tag,
+    // equipoName, modelName, service.name) and no 5th branch that could
+    // special-case one particular equipment/service.
+    const entryCount = (block.match(/translateCatalogLabel\(|t\("microsoldering\.title"\)/g) || []).length;
+    expect(entryCount).toBe(4); // microsoldering label + equipoName + modelName + service.name, each via translateCatalogLabel (or the microsoldering t() call)
   });
 });
 

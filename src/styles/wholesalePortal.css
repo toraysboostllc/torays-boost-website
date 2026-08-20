@@ -842,6 +842,7 @@
 .wsp-result-header {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
 }
 
@@ -864,24 +865,31 @@
   color: var(--wsp-card-text);
 }
 
-/* Equipment/Model/Service identifier pill — same lime-green treatment on
+/* Equipment/Model/Service identifier pill — same light-red treatment on
    EVERY result (never conditional on which equipment/service it names; the
    breadcrumb text itself is the only thing that varies, per the no-
-   hardcoding rule). Colors are exact values from the approved spec, chosen
-   for WCAG AA contrast (#365314 on #D9F99D is well past 4.5:1). */
+   hardcoding rule — built from selection.equipoName/modelName + service.name,
+   whatever DESK actually returns, never a literal device string). Colors
+   are exact values from the approved spec, chosen for WCAG AA contrast
+   (#991B1B on #FEE2E2 is well past 4.5:1). Centered under the title via
+   align-self on the flex-column panel — width:fit-content/max-width:100%/
+   overflow-wrap keep it hugging its own content and wrapping to multiple
+   lines on mobile instead of ever truncating. */
 .wsp-result-breadcrumb {
   font-size: clamp(10.5px, 2.6vw, 13px);
   font-weight: 600;
   line-height: 1.35;
-  color: #365314;
+  color: #991b1b;
   padding: 4px 10px;
   border-radius: 8px;
-  background: #d9f99d;
-  border: 1px solid #a3e635;
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
   width: fit-content;
   max-width: 100%;
   overflow-wrap: break-word;
   margin-top: 5px;
+  align-self: center;
+  text-align: center;
 }
 
 .wsp-result-diagnostic-note {
