@@ -77,7 +77,7 @@ describe("shouldPlayTone: the pure gate every actual tone-play goes through", ()
   });
 });
 
-describe("Sound preference: persisted (localStorage), default OFF (opt-in)", () => {
+describe("Sound preference: persisted (localStorage), default ON for new users", () => {
   beforeEach(() => {
     vi.resetModules();
   });
@@ -85,17 +85,31 @@ describe("Sound preference: persisted (localStorage), default OFF (opt-in)", () 
     vi.unstubAllGlobals();
   });
 
-  it("defaults to disabled when nothing was ever stored", async () => {
+  it("defaults to ENABLED when nothing was ever stored (storage key absent)", async () => {
     vi.stubGlobal("window", createFakeWindow());
     const { isSoundEnabled } = await import("../src/lib/wholesaleSound.js");
-    expect(isSoundEnabled()).toBe(false);
+    expect(isSoundEnabled()).toBe(true);
   });
 
-  it("reads a previously-saved 'true' preference back on module load", async () => {
+  it("reads a previously-saved 'true' preference back on module load — still enabled", async () => {
     vi.stubGlobal("window", createFakeWindow({ torays_wholesale_sound_enabled: "true" }));
     const { isSoundEnabled, SOUND_STORAGE_KEY } = await import("../src/lib/wholesaleSound.js");
     expect(SOUND_STORAGE_KEY).toBe("torays_wholesale_sound_enabled");
     expect(isSoundEnabled()).toBe(true);
+  });
+
+  it("reads a previously-saved 'false' preference back on module load — respects the shop's explicit mute", async () => {
+    vi.stubGlobal("window", createFakeWindow({ torays_wholesale_sound_enabled: "false" }));
+    const { isSoundEnabled } = await import("../src/lib/wholesaleSound.js");
+    expect(isSoundEnabled()).toBe(false);
+  });
+
+  it("never auto-persists the ON default during initialization — reading the preference must not write anything back to storage", async () => {
+    const fakeWindow = createFakeWindow();
+    vi.stubGlobal("window", fakeWindow);
+    const { isSoundEnabled, SOUND_STORAGE_KEY } = await import("../src/lib/wholesaleSound.js");
+    expect(isSoundEnabled()).toBe(true);
+    expect(fakeWindow.localStorage.getItem(SOUND_STORAGE_KEY)).toBeNull();
   });
 
   it("setSoundEnabled(true/false) both flips the in-memory flag AND writes the new value to localStorage", async () => {
@@ -158,6 +172,33 @@ describe("playHoverTone / playChime / primeAudioContext: never throw, mute is al
     setSoundEnabled(false);
     playChime();
     expect(audioCtorSpy).not.toHaveBeenCalled(); // muted: never even constructs a context
+  });
+
+  it("zero autoplay on module load — importing the module (the ON-by-default path) never constructs an AudioContext or plays a tone on its own", async () => {
+    const fakeWindow = createFakeWindow(); // no stored preference: module loads ON
+    const audioCtorSpy = vi.fn(() => ({ state: "suspended", resume: () => Promise.resolve(), createOscillator: vi.fn(), createGain: vi.fn() }));
+    fakeWindow.AudioContext = audioCtorSpy;
+    vi.stubGlobal("window", fakeWindow);
+    const { isSoundEnabled } = await import("../src/lib/wholesaleSound.js");
+    expect(isSoundEnabled()).toBe(true); // confirms this really is the ON-by-default path
+    expect(audioCtorSpy).not.toHaveBeenCalled(); // yet nothing constructed/played a sound just from import
+  });
+
+  it("first user interaction unlocks (resumes) the AudioContext even when it doesn't produce an audible tone — playHoverTone() always attempts resume() on a suspended context", async () => {
+    const fakeWindow = createFakeWindow();
+    const resumeSpy = vi.fn(() => Promise.resolve());
+    fakeWindow.AudioContext = vi.fn(() => ({
+      state: "suspended",
+      resume: resumeSpy,
+      createOscillator: () => ({ type: "", frequency: { value: 0 }, connect: vi.fn(), start: vi.fn(), stop: vi.fn() }),
+      createGain: () => ({ gain: { setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() }, connect: vi.fn() }),
+      currentTime: 0,
+    }));
+    vi.stubGlobal("window", fakeWindow);
+    const { isSoundEnabled, playHoverTone } = await import("../src/lib/wholesaleSound.js");
+    expect(isSoundEnabled()).toBe(true); // default ON — no need to touch the Sound button first
+    playHoverTone(); // simulates the shop's very first hover/focus/tap anywhere in the portal
+    expect(resumeSpy).toHaveBeenCalledTimes(1);
   });
 });
 

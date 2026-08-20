@@ -9,6 +9,40 @@ const read = (relPath) => readFileSync(join(root, relPath), "utf8").replace(/\r\
 
 const moduleSrc = read("src/components/wholesale/WholesaleSalesModule.jsx");
 const cssSrc = read("src/styles/wholesalePortal.css");
+const pageSrc = read("src/pages/WholesalePrices.jsx");
+const wizardSrc = read("src/components/wholesale/WholesaleWizard.jsx");
+
+describe("Adenda 8 — Sales module hidden ONLY on the narrowest phones while the price result screen is showing, never on any other screen or wider breakpoint", () => {
+  it("WholesaleWizard reports its current screen via an onScreenChange callback, called from a useEffect keyed on the screen value", () => {
+    expect(wizardSrc).toContain("onScreenChange }");
+    const idx = wizardSrc.indexOf("useEffect(() => {\n    onScreenChange?.(screen);");
+    expect(idx).toBeGreaterThan(-1);
+    const block = wizardSrc.slice(idx, wizardSrc.indexOf("}, [", idx) + 40);
+    expect(block).toContain("[screen, onScreenChange]");
+  });
+
+  it("WholesalePrices.jsx tracks the wizard's screen and passes onScreenChange down", () => {
+    expect(pageSrc).toContain('const [wizardScreen, setWizardScreen] = useState("top");');
+    expect(pageSrc).toContain("onScreenChange={setWizardScreen}");
+  });
+
+  it("the Sales module is wrapped in a conditional class applied ONLY when wizardScreen === 'result' — every other screen renders it with no wrapper class at all", () => {
+    const idx = pageSrc.indexOf("<WholesaleSalesModule");
+    const surrounding = pageSrc.slice(idx - 200, idx);
+    expect(surrounding).toContain('wizardScreen === "result" ? "wsp-sales-hide-on-narrow-result" : undefined');
+  });
+
+  it("the CSS hide rule is scoped to <=379px (covers 320x568 and 375x667; 390x844 and up are untouched) and targets ONLY the conditional wrapper class, never .wsp-sales-module directly (which would hide it on every screen, not just the result screen)", () => {
+    const idx = cssSrc.indexOf(".wsp-sales-hide-on-narrow-result");
+    expect(idx).toBeGreaterThan(-1);
+    const mediaStart = cssSrc.lastIndexOf("@media (max-width:", idx);
+    expect(cssSrc.slice(mediaStart, mediaStart + 40)).toContain("@media (max-width: 379px)");
+    const rule = cssSrc.slice(idx, cssSrc.indexOf("}", idx) + 1);
+    expect(rule).toContain("display: none;");
+    // Never a bare rule on .wsp-sales-module itself outside this scoped wrapper class.
+    expect(cssSrc).not.toMatch(/@media \(max-width: 379px\)\s*\{\s*\.wsp-sales-module\s*\{/);
+  });
+});
 
 describe("WholesaleSalesModule.jsx: visible but not functional, entirely DESK-driven", () => {
   it("renders nothing at all when salesModule.visible is false", () => {

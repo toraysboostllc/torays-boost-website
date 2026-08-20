@@ -158,17 +158,27 @@ export function WholesaleResultPanel({ selection, service, onConsultAnother }) {
                         <span className="wsp-result-tier-name">{t(tier.nameKey)}</span>
                         {tier.badgeKey && <span className="wsp-result-tier-badge">{t(tier.badgeKey)}</span>}
                       </div>
-                      <div className="wsp-result-tier-row">
+                      {/* The price the SHOP charges ITS customer — the number
+                          a shop owner needs to recognize instantly with a
+                          customer standing in front of them, so it gets its
+                          own dominant treatment (wsp-result-tier-price-value),
+                          much larger than profit/margin below. */}
+                      <div className="wsp-result-tier-price">
                         <span className="wsp-result-tier-row-label">{t("result.tierCustomerEstimateLabel")}</span>
-                        <span className="wsp-result-tier-row-value">{formatPrice(tierPrice)}</span>
+                        <span className="wsp-result-tier-price-value">{formatPrice(tierPrice)}</span>
                       </div>
-                      <div className="wsp-result-tier-row">
-                        <span className="wsp-result-tier-row-label">{t("result.tierEstimatedProfitLabel")}</span>
-                        <span className="wsp-result-tier-row-value">{formatTierProfit(tierPricing, formatPrice)}</span>
-                      </div>
-                      <div className="wsp-result-tier-row">
-                        <span className="wsp-result-tier-row-label">{t("result.tierMarginLabel")}</span>
-                        <span className="wsp-result-tier-row-value">{formatTierMargin(tierPricing)}</span>
+                      {/* Profit/margin — secondary information, deliberately
+                          smaller than the price above so they never compete
+                          with it visually. */}
+                      <div className="wsp-result-tier-secondary">
+                        <div className="wsp-result-tier-secondary-item">
+                          <span className="wsp-result-tier-row-label">{t("result.tierEstimatedProfitLabel")}</span>
+                          <span className="wsp-result-tier-profit-value">{formatTierProfit(tierPricing, formatPrice)}</span>
+                        </div>
+                        <div className="wsp-result-tier-secondary-item">
+                          <span className="wsp-result-tier-row-label">{t("result.tierMarginLabel")}</span>
+                          <span className="wsp-result-tier-margin-value">{formatTierMargin(tierPricing)}</span>
+                        </div>
                       </div>
                     </div>
                   );
@@ -199,6 +209,20 @@ export function WholesaleResultPanel({ selection, service, onConsultAnother }) {
 
           {isRange && <p className="wsp-result-range-note">{t("result.rangeNote")}</p>}
         </>
+      )}
+
+      {/* DESK-authored guidance for this specific service (reuses the
+          existing wholesale_services.notes column — see Adenda 8 diagnosis:
+          already customer-facing at the API layer, no schema change). Plain
+          text interpolation only (React auto-escapes) — never
+          dangerouslySetInnerHTML. Only the heading is translated; the
+          content is shown exactly as DESK saved it, in whichever language
+          the admin wrote it. Renders nothing at all (no empty block) when
+          there's no recommendation set. */}
+      {service.notes?.trim() && (
+        <p className="wsp-result-recommendation">
+          <strong>{t("result.recommendationHeading")}</strong> {service.notes}
+        </p>
       )}
 
       <p className="wsp-result-keep-customer-note">{t("result.keepCustomerNote")}</p>

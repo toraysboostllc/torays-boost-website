@@ -30,14 +30,20 @@ let lastPlayedAt = 0;
 const listeners = new Set();
 
 function readStoredPreference() {
-  if (typeof window === "undefined") return false;
+  if (typeof window === "undefined") return true;
   try {
     const raw = window.localStorage.getItem(SOUND_STORAGE_KEY);
-    // Default OFF (opt-in) — a professional B2B tool used repeatedly by shop
-    // staff should never make noise on its own the very first time it loads.
-    return raw === "true";
+    // Default ON — a new shop should hear the tone/chime out of the box.
+    // Only an explicit "false" is respected as muted; an absent key, a
+    // stored "true", or any corrupted value all fall back to ON, never
+    // silently to OFF. This is safe from an autoplay standpoint regardless
+    // of the default: playHoverTone()/playChime() still no-op until the
+    // browser actually resumes the AudioContext after a real user gesture
+    // (see shouldPlayTone() and the module header above) — the *preference*
+    // starting ON never bypasses that gate.
+    return raw !== "false";
   } catch {
-    return false;
+    return true;
   }
 }
 

@@ -696,11 +696,14 @@ describe("wholesalePortal.css: price-tier cards — exact approved Silver/Purple
     expect(rule).toMatch(/color:\s*var\(--wsp-card-text\);/);
   });
 
-  it("the tier group is a single column on narrow phones (full-width read-only panels) and 3 columns from 640px up — never forced into 3 cramped columns on the smallest screens now that each card carries 3 labeled rows", () => {
+  it("the tier group is ALWAYS 3 columns, at every width — Adenda 8's font-size-minimum redesign: 3 short cards side by side (narrow columns) fits the required 36px Shop Cost / 24-26px price / >=13px profit-margin floors without scrolling, where 3 cards stacked full-width (the old design) could not", () => {
     const rule = css.match(/\.wsp-result-tier-group\s*\{[\s\S]*?\n\}/)[0];
-    expect(rule).toMatch(/grid-template-columns:\s*1fr;/);
+    expect(rule).toMatch(/grid-template-columns:\s*repeat\(3, 1fr\);/);
+    // The 640px+ override now only widens the gap, not the column count —
+    // 3 columns is unconditional, so this block still exists but no longer
+    // needs to (re)declare grid-template-columns.
     const desktopRule = css.match(/@media \(min-width: 640px\)\s*\{\s*\.wsp-result-tier-group\s*\{[\s\S]*?\n\s*\}/)[0];
-    expect(desktopRule).toMatch(/grid-template-columns:\s*repeat\(3, 1fr\)/);
+    expect(desktopRule).toMatch(/gap:\s*10px/);
   });
 
   it("correction pass: no selection/press/focus affordances at all — cursor: default (never pointer), no :active press state, no :focus-visible ring, since the cards are plain read-only <div>s, never buttons", () => {

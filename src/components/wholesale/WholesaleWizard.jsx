@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check, Cpu } from "lucide-react";
 import { useWholesaleLocale } from "../../i18n/WholesaleLocaleContext.jsx";
 import { buildWholesaleWizardCatalog } from "../../lib/wholesaleWizardCatalog.js";
@@ -59,7 +59,7 @@ function WizardSteps({ equipoDone, modeloDone, fallaDone, t }) {
  * component never fetches anything itself. Screen history is a simple stack
  * (push forward, pop on Back) instead of hardcoding a back-target per screen.
  */
-export function WholesaleWizard({ equipmentTypes, microsoldering }) {
+export function WholesaleWizard({ equipmentTypes, microsoldering, onScreenChange }) {
   const { t, language } = useWholesaleLocale();
 
   const topEquipoList = useMemo(() => buildWholesaleWizardCatalog(equipmentTypes), [equipmentTypes]);
@@ -70,6 +70,15 @@ export function WholesaleWizard({ equipmentTypes, microsoldering }) {
 
   const [screenStack, setScreenStack] = useState(["top"]);
   const screen = screenStack[screenStack.length - 1];
+
+  // Lets the parent page know which screen is showing — used only to
+  // conditionally hide the (unrelated) Torays Boost Sales module below the
+  // wizard on the narrowest phones while the result screen is active (see
+  // WholesalePrices.jsx). Purely presentational; the wizard itself doesn't
+  // need or use this value.
+  useEffect(() => {
+    onScreenChange?.(screen);
+  }, [screen, onScreenChange]);
   const [isMicrosoldering, setIsMicrosoldering] = useState(false);
   const [selectedEquipo, setSelectedEquipo] = useState(null);
   const [selectedModel, setSelectedModel] = useState(null);

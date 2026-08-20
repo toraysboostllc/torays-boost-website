@@ -181,7 +181,105 @@ describe("WholesaleResultPanel.jsx: money hierarchy — Shop Cost is the dominan
     expect(shopCostSize).toBeGreaterThan(firstFontSize(".wsp-result-recommended-value"));
     expect(shopCostSize).toBeGreaterThan(firstFontSize(".wsp-result-profit .wsp-result-money-value"));
     expect(shopCostSize).toBeGreaterThan(firstFontSize(".wsp-result-margin-badge"));
-    expect(shopCostSize).toBeGreaterThan(firstFontSize(".wsp-result-tier-row-value"));
+    expect(shopCostSize).toBeGreaterThan(firstFontSize(".wsp-result-tier-price-value"));
+    expect(shopCostSize).toBeGreaterThan(firstFontSize(".wsp-result-tier-profit-value"));
+    expect(shopCostSize).toBeGreaterThan(firstFontSize(".wsp-result-tier-margin-value"));
+  });
+
+  it("within a tier card, the customer-estimate price is the dominant figure — strictly larger than that same card's own profit and margin figures", () => {
+    function firstFontSize(selector) {
+      const idx = cssSrc.indexOf(`${selector} {`);
+      const block = cssSrc.slice(idx, cssSrc.indexOf("}", idx));
+      const decl = block.match(/font-size:\s*([^;]+);/)[1];
+      const sizes = [...decl.matchAll(/(\d+(?:\.\d+)?)px/g)].map((m) => Number(m[1]));
+      return Math.max(...sizes);
+    }
+    const priceSize = firstFontSize(".wsp-result-tier-price-value");
+    expect(priceSize).toBeGreaterThan(firstFontSize(".wsp-result-tier-profit-value"));
+    expect(priceSize).toBeGreaterThan(firstFontSize(".wsp-result-tier-margin-value"));
+    expect(priceSize).toBeGreaterThan(firstFontSize(".wsp-result-tier-row-label"));
+  });
+
+  /**
+   * Adenda 8, Part A, item 2 — exact hard minimums the user specified,
+   * verified against real getComputedStyle() values in-browser at all 6
+   * breakpoints (320x568, 375x667, 390x844, 768x1024, 1024x768, 1440x900):
+   * Shop Cost 36px mobile / 42px desktop (flat, never vh-scaled down);
+   * Customer Estimate 24px <375px, 26px 375-639px, 33px >=640px (flat,
+   * width-tiered, never vh-scaled down); Profit >=13px and Margin >=13px
+   * at every width (flat 15px/14px, unconditional — no mobile-only shrink
+   * exists anymore). These are the SAME literal declarations the browser
+   * used to produce the verified table, not independent duplicated values.
+   */
+  it("Shop Cost is a flat 36px on mobile / 42px on desktop — never vh-scaled below 36", () => {
+    const idx = cssSrc.indexOf(".wsp-result-shopcost-value {");
+    const block = cssSrc.slice(idx, cssSrc.indexOf("}", idx));
+    expect(block).toMatch(/font-size:\s*36px;/);
+    expect(block).not.toContain("clamp(");
+    const desktopIdx = cssSrc.indexOf("@media (min-width: 640px) {\n  .wsp-result-shopcost-value {");
+    const desktopBlock = cssSrc.slice(desktopIdx, cssSrc.indexOf("}", desktopIdx));
+    expect(desktopBlock).toMatch(/font-size:\s*42px;/);
+  });
+
+  it("Customer Estimate price is flat and width-tiered: 24px base (<375px), 26px from 375px, 33px from 640px — never a vh clamp that could shrink it on a short viewport", () => {
+    const baseIdx = cssSrc.indexOf(".wsp-result-tier-price-value {");
+    const baseBlock = cssSrc.slice(baseIdx, cssSrc.indexOf("}", baseIdx));
+    expect(baseBlock).toMatch(/font-size:\s*24px;/);
+    expect(baseBlock).not.toContain("clamp(");
+    const mid = cssSrc.indexOf("@media (min-width: 375px) {\n  .wsp-result-tier-price-value {");
+    expect(cssSrc.slice(mid, cssSrc.indexOf("}", mid))).toMatch(/font-size:\s*26px;/);
+    const desktop = cssSrc.indexOf("@media (min-width: 640px) {\n  .wsp-result-tier-price-value {");
+    expect(cssSrc.slice(desktop, cssSrc.indexOf("}", desktop))).toMatch(/font-size:\s*33px;/);
+  });
+
+  it("Profit and Margin values are a flat >=13px at EVERY width — no media-query override anywhere shrinks them below the floor", () => {
+    function allDeclaredSizes(selector) {
+      const sizes = [];
+      let idx = cssSrc.indexOf(`${selector} {`);
+      while (idx !== -1) {
+        const block = cssSrc.slice(idx, cssSrc.indexOf("}", idx));
+        const m = block.match(/font-size:\s*(\d+(?:\.\d+)?)px;/);
+        if (m) sizes.push(Number(m[1]));
+        idx = cssSrc.indexOf(`${selector} {`, idx + 1);
+      }
+      return sizes;
+    }
+    const profitSizes = allDeclaredSizes(".wsp-result-tier-profit-value");
+    const marginSizes = allDeclaredSizes(".wsp-result-tier-margin-value");
+    expect(profitSizes.length).toBeGreaterThan(0);
+    expect(marginSizes.length).toBeGreaterThan(0);
+    for (const v of profitSizes) expect(v).toBeGreaterThanOrEqual(13);
+    for (const v of marginSizes) expect(v).toBeGreaterThanOrEqual(13);
+    // and no clamp() anywhere for these two selectors (a clamp could hide a
+    // sub-13px floor at some untested viewport height)
+    expect(cssSrc).not.toMatch(/\.wsp-result-tier-profit-value\s*\{[^}]*clamp\(/);
+    expect(cssSrc).not.toMatch(/\.wsp-result-tier-margin-value\s*\{[^}]*clamp\(/);
+  });
+
+  it("the recommendation is a flat, non-clamped 14px with a fixed line-height — never reduced by a vh clamp", () => {
+    const idx = cssSrc.indexOf(".wsp-result-recommendation {");
+    const block = cssSrc.slice(idx, cssSrc.indexOf("}", idx));
+    expect(block).toMatch(/font-size:\s*14px;/);
+    expect(block).toMatch(/line-height:\s*1\.4;/);
+    expect(block).not.toContain("clamp(");
+  });
+
+  it("the Check Another Price button never drops below the 44px minimum touch target at any width", () => {
+    const baseIdx = cssSrc.indexOf(".wsp-result-consult-another {");
+    const baseBlock = cssSrc.slice(baseIdx, cssSrc.indexOf("}", baseIdx));
+    expect(baseBlock).toMatch(/min-height:\s*56px;/);
+    const narrowIdx = cssSrc.indexOf("@media (max-width: 359px) {\n  .wsp-result-consult-another {");
+    const narrowBlock = cssSrc.slice(narrowIdx, cssSrc.indexOf("}", narrowIdx));
+    expect(narrowBlock).toMatch(/min-height:\s*44px;/);
+  });
+
+  it("desktop (>=640px) tier price value is exactly within the 30-34px spec range — the mobile floor above never applies past that breakpoint", () => {
+    const idx = cssSrc.indexOf("@media (min-width: 640px) {\n  .wsp-result-tier-price-value {");
+    expect(idx).toBeGreaterThan(-1);
+    const block = cssSrc.slice(idx, cssSrc.indexOf("}", idx));
+    const value = Number(block.match(/font-size:\s*(\d+(?:\.\d+)?)px/)[1]);
+    expect(value).toBeGreaterThanOrEqual(30);
+    expect(value).toBeLessThanOrEqual(34);
   });
 
   it("wraps the money block in a one-shot reveal animation class", () => {

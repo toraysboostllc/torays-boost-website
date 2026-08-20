@@ -583,6 +583,56 @@
   }
 }
 
+/* "Main website" — a plain, quiet link back to the public site. Lives in
+   the SAME light-pill visual family as Sound/Locale next to it (own
+   tokens, not var(--wsp-*)) — deliberately NOT the dark XP-gradient
+   .wsp-btn-ghost treatment Logout uses further down, so it never competes
+   with Logout for attention even though both live in the header area.
+   min-height: 44px is a real requirement here (not just the usual pill
+   default) — this is the one control in this row that's an actual page
+   exit, so it gets a slightly larger touch target than Sound/Locale. */
+.wsp-main-site-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #c3d4f0;
+  background: #f7faff;
+  color: #10192f;
+  font-family: "Inter", sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 2px 6px rgba(8, 14, 30, 0.12);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.wsp-main-site-link:hover {
+  border-color: #2f6fed;
+}
+
+.wsp-main-site-link:focus-visible {
+  outline: 2px solid #2f6fed;
+  outline-offset: 2px;
+}
+
+.wsp-main-site-link-text {
+  white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+  /* Icon-only at the same width Sound already collapses at — this row is
+     tight at 320-390px with three controls in it. */
+  .wsp-main-site-link-text {
+    display: none;
+  }
+  .wsp-main-site-link {
+    padding: 6px 10px;
+  }
+}
+
 /* Sound on/off toggle — same self-contained pill treatment as the locale
    selector next to it (own tokens, not var(--wsp-*)), so it reads correctly
    regardless of the surrounding page theme. */
@@ -776,10 +826,11 @@
    tighter together on short viewports (667px, 568px) without dropping any
    text or figure; only the whitespace between them shrinks. */
 .wsp-result-panel {
-  padding: clamp(2px, 0.6vh, 24px) clamp(12px, 3.2vw, 20px);
+  --wsp-result-pad-x: clamp(6px, 2.5vw, 20px);
+  padding: clamp(0px, 0.15vh, 24px) var(--wsp-result-pad-x);
   display: flex;
   flex-direction: column;
-  gap: clamp(1px, 0.4vh, 16px);
+  gap: clamp(0px, 0.1vh, 16px);
 }
 
 .wsp-result-header {
@@ -792,6 +843,13 @@
   color: var(--wsp-blue);
 }
 
+@media (max-width: 639px) {
+  .wsp-result-header-icon {
+    width: 16px;
+    height: 16px;
+  }
+}
+
 .wsp-result-title {
   font-family: "Space Grotesk", sans-serif;
   font-size: clamp(15px, 2.4vh, 20px);
@@ -801,11 +859,11 @@
 }
 
 .wsp-result-breadcrumb {
-  font-size: clamp(11px, 2.6vw, 13px);
+  font-size: clamp(10.5px, 2.6vw, 13px);
   font-weight: 600;
-  line-height: 1.3;
+  line-height: 1.05;
   color: var(--wsp-card-text-soft);
-  padding: clamp(2px, 0.5vh, 8px) 10px;
+  padding: clamp(1px, 0.2vh, 8px) 8px;
   border-radius: 10px;
   background: var(--wsp-placeholder-bg-start);
   width: fit-content;
@@ -835,7 +893,7 @@
 .wsp-result-money {
   display: flex;
   flex-direction: column;
-  gap: clamp(1px, 0.3vh, 10px);
+  gap: clamp(1px, 0.15vh, 10px);
 }
 
 .wsp-result-money-label {
@@ -845,6 +903,13 @@
   color: var(--wsp-card-text-soft);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+}
+
+@media (max-width: 639px) {
+  .wsp-result-money-label {
+    font-size: 10.5px;
+    line-height: 1.05;
+  }
 }
 
 .wsp-result-money-row {
@@ -869,16 +934,19 @@
 .wsp-result-shopcost-hero {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: clamp(1px, 0.4vh, 14px) 16px;
+  gap: 0;
+  padding: clamp(0px, 0.1vh, 14px) 12px;
   border-radius: 14px;
   background: var(--wsp-card-bg-hover);
   border: 1px solid var(--wsp-card-border);
 }
 
+/* Flat sizes, not vh-scaled — Shop Cost is the one figure on this panel
+   that must never shrink below a real, always-legible size regardless of
+   viewport height (36px mobile / 42px desktop, hard floors). */
 .wsp-result-shopcost-value {
-  font-size: clamp(18px, 4vh, 36px);
-  line-height: 1.1;
+  font-size: 36px;
+  line-height: 1;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--wsp-shopcost-text);
@@ -930,15 +998,22 @@
    card always shows its own icon + name, and Purple/Gold each carry a
    text badge (Recommended / High Profit) — never a border/shadow that
    would read as "this one is selected", since nothing is. */
+/* Always 3 columns, at every width — narrow phones get 3 SHORT columns
+   instead of 3 tall stacked cards. This is what makes the font-size
+   minimums below (36px Shop Cost / 24-26px price / >=13px profit-margin)
+   fit without scrolling: three cards stacked full-width, each ~90-130px
+   tall, was the actual space problem — three cards side by side, each
+   ~110-140px tall total, is a completely different (and much shorter)
+   budget. */
 .wsp-result-tier-group {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: clamp(1px, 0.3vh, 10px);
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
 }
 
 @media (min-width: 640px) {
   .wsp-result-tier-group {
-    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
   }
 }
 
@@ -1012,13 +1087,9 @@
   white-space: nowrap;
 }
 
-.wsp-result-tier-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-
+/* Shared label style for all three figures (price/profit/margin) — kept as
+   one class since all three need the same small, quiet treatment (11-13px);
+   only the VALUES get a size hierarchy (see below). */
 .wsp-result-tier-row-label {
   font-size: 11.5px;
   line-height: 1.2;
@@ -1026,78 +1097,116 @@
   opacity: 0.75;
 }
 
-.wsp-result-tier-row-value {
+/* The price the shop can charge ITS customer — the dominant figure inside
+   each tier card (Silver/Purple/Gold), sized to be recognized instantly
+   with a customer standing at the counter. Deliberately much larger than
+   the profit/margin figures below, which stay secondary. */
+.wsp-result-tier-price {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Explicit width-tier floors, not a vh clamp — this is the number a shop
+   needs to read instantly with a customer standing at the counter, so it
+   must hold a real minimum at every width, never shrink for a short
+   viewport: 24px below 375px, 26px from 375-639px, 30px (33px in practice)
+   at 640px and up. */
+.wsp-result-tier-price-value {
+  font-size: 24px;
+  line-height: 1.05;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 375px) {
+  .wsp-result-tier-price-value {
+    font-size: 26px;
+  }
+}
+
+@media (min-width: 640px) {
+  .wsp-result-tier-price-value {
+    font-size: 33px;
+    line-height: 1.1;
+  }
+}
+
+/* Profit + margin — secondary, side by side, never competing with the
+   price above. */
+.wsp-result-tier-secondary {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.wsp-result-tier-secondary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.wsp-result-tier-profit-value {
+  font-size: 15px;
+  line-height: 1.15;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.wsp-result-tier-margin-value {
   font-size: 14px;
   line-height: 1.15;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 
-/* Compact row presentation — narrow phones only. Correction pass: at
-   375-390px the panel layout above (icon+name+badge header, then 3
-   stacked label/value rows) made each card ~130px tall; three of them
-   stacked pushed "Check another price" below the fold and the page past
-   the viewport. Below 640px each card becomes ONE horizontal row instead
-   of a tall panel — the exact same DOM/content, just reflowed: the head
-   (icon+name+badge) becomes a fixed-width column on the left, and the
-   three label/value pairs (still every one of them, nothing hidden) share
-   the remaining width as three compact centered mini-columns. This is the
-   same "row instead of stacked panel" technique already used for the
-   equipment/model cards on this exact same screen size (see
-   .wsp-grid-compact .wsp-card-clickable further up). Scoped to
-   max-width: 639px only — the 3-column grid at 640px and up already fits
-   comfortably as full panels (verified at 768/1024/1440), so it is
-   untouched here. */
+/* Narrow-column compact tuning — cards stay full vertical panels (same
+   layout as desktop: head, then price, then profit+margin) at every
+   width, per the 3-column grid above; only the padding/gaps/icon size
+   shrink for a ~90-100px column, and the head's badge still wraps to its
+   own second line so it never squeezes the price. Profit/margin (>=13px,
+   see the unconditional base rules above) and the price (24px/26px, see
+   its own width-tiered rule above) are NEVER reduced below their required
+   floors here — only spacing and the purely-decorative name/badge/icon
+   shrink at this width. */
 @media (max-width: 639px) {
   .wsp-result-tier-card {
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
-    padding: clamp(2px, 0.5vh, 10px) 10px;
+    gap: 2px;
+    padding: 5px 4px;
   }
 
-  /* Icon+name stay on one line (row + wrap), the badge is forced onto its
-     own second line via flex-basis:100% — two lines total for Purple/Gold
-     instead of three separate ones (icon / name / badge each on their own
-     line), which was the single biggest per-card height cost at this
-     width. Silver (no badge) is still just the one icon+name line. */
   .wsp-result-tier-head {
-    flex: 0 0 auto;
-    flex-direction: row;
     flex-wrap: wrap;
-    align-items: center;
     gap: 2px 4px;
-    min-width: 0;
+  }
+
+  .wsp-result-tier-icon {
+    width: 13px;
+    height: 13px;
   }
 
   .wsp-result-tier-name {
-    font-size: 10px;
+    font-size: 9.5px;
   }
 
+  /* Forced onto its own line (flex-basis:100%) so Purple/Gold's badge
+     never squeezes the icon+name onto an unreadably narrow sliver of a
+     ~90px-wide column. */
   .wsp-result-tier-badge {
     flex-basis: 100%;
     margin-left: 0;
-    font-size: 8px;
-    padding: 1px 5px;
-  }
-
-  .wsp-result-tier-row {
-    flex: 1;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    text-align: center;
-    gap: 0;
-    min-width: 0;
+    font-size: 7.5px;
+    padding: 1px 4px;
   }
 
   .wsp-result-tier-row-label {
-    font-size: 8px;
-    line-height: 1.2;
+    font-size: 9px;
+    line-height: 1.1;
   }
 
-  .wsp-result-tier-row-value {
-    font-size: 11.5px;
+  .wsp-result-tier-secondary {
+    gap: 6px;
+    flex-wrap: wrap;
   }
 }
 
@@ -1194,10 +1303,35 @@
   font-style: italic;
 }
 
+/* DESK-authored per-service guidance (Adenda 8, Cambio 3) — a compact,
+   clearly-visible line, never a big boxed callout: no background, no
+   border, just a dark-red color that reads as important without shouting.
+   The shop reads this before accepting the customer's equipment; it is not
+   a checkbox/acceptance control of any kind. */
+/* "Full bleed" to the card's own edge (canceling the panel's own left/right
+   padding via a matching negative margin, then adding back a small 4px of
+   its own) — narrow phones are exactly where every extra character-per-line
+   matters most for a real multi-sentence recommendation, and this is a few
+   more characters per line than sharing the panel's full horizontal
+   padding would allow, for free. */
+.wsp-result-recommendation {
+  color: #b42318;
+  font-size: 14px;
+  line-height: 1.4;
+  margin-left: calc(-1 * var(--wsp-result-pad-x));
+  margin-right: calc(-1 * var(--wsp-result-pad-x));
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.wsp-result-recommendation strong {
+  font-weight: 700;
+}
+
 .wsp-result-keep-customer-note {
   font-size: clamp(11.5px, 2.6vw, 13px);
   color: var(--wsp-card-text-soft);
-  line-height: 1.1;
+  line-height: 1.02;
 }
 
 .wsp-result-disclaimer {
@@ -1242,6 +1376,24 @@
 .wsp-sales-module {
   padding: 0;
   overflow: hidden;
+}
+
+/* Adenda 8 — the ONE exception to "always visible": on the narrowest
+   phones (<=379px — covers the 320x568 and 375x667 verification
+   breakpoints; 390x844 and up already have room and keep the module),
+   while the price RESULT screen is showing, this unrelated
+   maintenance-mode module is hidden so the result screen's own required
+   content (Shop Cost, all 3 tiers, profit, margin, the recommendation,
+   the button — none of which shrink below their mandated minimums) has
+   room to render with zero or near-zero page scroll. Every wider
+   breakpoint, and every other wizard screen at ANY width, keeps this
+   module fully visible — scoped via a wrapper class WholesalePrices.jsx
+   only applies while wizardScreen === "result", never a blanket
+   width-only hide. */
+@media (max-width: 379px) {
+  .wsp-sales-hide-on-narrow-result {
+    display: none;
+  }
 }
 
 .wsp-sales-module-trigger {
