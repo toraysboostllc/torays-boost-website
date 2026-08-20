@@ -8,11 +8,12 @@
 -- torays-boost-pro-legal-framework.md, which requires a *documented
 -- procedure* (not just contract language) to exist before real publication.
 --
--- Additive follow-up to wholesale-legal-migration.sql. Run in the same
--- Supabase project's SQL Editor, AFTER that file has already run at least
--- once (this file references wholesale_legal_documents/wholesale_legal_
--- acceptances only to explicitly document that it never touches them, not
--- as a hard dependency for its own objects).
+-- Run in the same Supabase project's SQL Editor, AFTER
+-- wholesale-retention-preflight.sql has returned OVERALL STATUS = PASS.
+-- Independent of wholesale-legal-migration.sql (no foreign key or other hard
+-- dependency on wholesale_legal_documents/wholesale_legal_acceptances) —
+-- this file only needs wholesale_access_log and profiles, both already
+-- created by earlier migrations.
 --
 -- ----------------------------------------------------------------------------
 -- WHAT THIS PROCEDURE TOUCHES, AND WHAT IT NEVER TOUCHES — read this first
@@ -23,10 +24,13 @@
 -- `created_at`, and its `shop_id`/`device_id` linkage are ALWAYS preserved,
 -- so the security/audit trail ("what happened, when, to which shop") stays
 -- intact — only the two fields that are actually personal/identifying data
--- (IP address, user-agent string) are cleared.
+-- (IP address, user-agent string) are cleared. No `DELETE` statement of any
+-- kind appears anywhere in this file.
 --
 -- NEVER touches, by construction (grep this file for the three table names
--- below — none of them ever appears after UPDATE/DELETE in this file):
+-- below — none of them ever appears after UPDATE/DELETE/INSERT in this
+-- file's function body; wholesale-retention-verify.sql proves this
+-- functionally, not just by grep):
 --   - wholesale_legal_documents  (published legal text — already immutable
 --     via trg_wholesale_legal_documents_immutability; this procedure adds
 --     no new way around that guard)
@@ -44,7 +48,10 @@
 -- ----------------------------------------------------------------------------
 -- wholesale_run_data_retention() takes p_retention_days as a REQUIRED
 -- argument with no default value in the function signature — every call
--- must supply it explicitly. Torays Boost has not set a business or legal
+-- must supply it explicitly. It is validated to be a whole number strictly
+-- between 1 and RETENTION_DAYS_HARD_MAX (3650 — a ten-year sanity ceiling
+-- against a typo like an extra zero, not a business decision about what the
+-- real period should be). Torays Boost has not set a business or legal
 -- retention period for access-log IP/user-agent data; per the internal note
 -- already on record (torays-boost-pro-legal-framework.md, Section 12, point
 -- 7), that number is a decision for a Florida-licensed attorney, not a
@@ -54,24 +61,37 @@
 -- number is chosen.
 --
 -- ----------------------------------------------------------------------------
--- DRY-RUN MODE AND THE OPERATION LOG
+-- DRY-RUN MODE, IDEMPOTENCY, AND THE OPERATION LOG
 -- ----------------------------------------------------------------------------
 -- p_dry_run defaults to TRUE (the only default in this function — a safety
 -- default, not a retention-period default). In dry-run mode, the function
 -- counts exactly which rows WOULD be anonymized and returns/logs that count
--- WITHOUT writing anything to wholesale_access_log itself. Every call —
--- dry-run or real — inserts exactly one row into the new
--- wholesale_retention_runs audit table below, so there is a permanent,
--- append-only record of every time this procedure ran, by whom, with what
--- parameters, and what it did or would have done. That audit table is
--- itself never touched by the retention logic (it only ever grows).
+-- WITHOUT writing anything to wholesale_access_log itself — no UPDATE
+-- statement executes on that table on the dry-run path at all, making it
+-- read-only in practice, not merely "harmless in effect."
+--
+-- Every call — dry-run or real, successful or rejected by validation —
+-- either inserts exactly one row into wholesale_retention_runs (on a
+-- successful validated call) or raises an exception and inserts nothing (on
+-- a rejected call: invalid admin, invalid retention_days). There is no path
+-- where the function silently does nothing without either succeeding or
+-- raising. wholesale_retention_runs is itself append-only (its own trigger,
+-- section 2 below) — the permanent record of every run can never be edited
+-- or deleted after the fact, by any caller, including service_role.
+--
+-- Re-running with the same p_retention_days is idempotent in effect: a row
+-- already anonymized by a prior real run (ip and user_agent both already
+-- null) is excluded from a later call's rows_matched count, so
+-- rows_matched reflects real remaining work each time, not the same rows
+-- counted forever.
 -- ============================================================================
 
 begin;
 
 -- ----------------------------------------------------------------------------
 -- 1. wholesale_retention_runs — append-only log of every retention run
---    (dry-run or real). This table is intentionally NOT covered by any
+--    (dry-run or real, successful calls only — a rejected/exception call
+--    writes nothing here). This table is intentionally NOT covered by any
 --    retention/cleanup logic of its own — it is the permanent record that a
 --    given cleanup happened, and must outlive the data it describes.
 -- ----------------------------------------------------------------------------
@@ -82,8 +102,8 @@ create table if not exists wholesale_retention_runs (
   table_name text not null,
   retention_days integer not null check (retention_days > 0),
   dry_run boolean not null,
-  rows_matched integer not null,
-  rows_affected integer not null,
+  rows_matched integer not null check (rows_matched >= 0),
+  rows_affected integer not null check (rows_affected >= 0),
   notes text
 );
 
@@ -95,7 +115,33 @@ alter table wholesale_retention_runs enable row level security;
 -- other wholesale_* table — see wholesale-migration.sql's header.
 
 -- ----------------------------------------------------------------------------
--- 2. wholesale_run_data_retention — the procedure itself.
+-- 2. wholesale_retention_runs — append-only guard. Blocks UPDATE and DELETE
+--    unconditionally, for every role including service_role, exactly the
+--    same pattern as trg_wholesale_price_history_append_only
+--    (wholesale-legal-migration.sql). The only legitimate write path is the
+--    single INSERT inside wholesale_run_data_retention() below.
+-- ----------------------------------------------------------------------------
+create or replace function public.wholesale_retention_runs_append_only_guard()
+returns trigger language plpgsql as $$
+begin
+  raise exception 'wholesale_retention_runs_is_append_only';
+end;
+$$;
+
+drop trigger if exists trg_wholesale_retention_runs_append_only on wholesale_retention_runs;
+create trigger trg_wholesale_retention_runs_append_only
+  before update or delete on wholesale_retention_runs
+  for each row execute function public.wholesale_retention_runs_append_only_guard();
+
+-- ----------------------------------------------------------------------------
+-- 3. wholesale_run_data_retention — the procedure itself. SECURITY INVOKER
+--    (the default — never SECURITY DEFINER; this function runs with the
+--    privileges of whoever calls it, exactly like every other wholesale_*
+--    RPC in this project, see wholesale-legal-migration.sql section 7-8) and
+--    a fixed, explicit search_path (public, pg_temp) so it can never be
+--    tricked by a caller-controlled search_path into resolving an
+--    unqualified identifier against an attacker-planted object in another
+--    schema.
 -- ----------------------------------------------------------------------------
 create or replace function public.wholesale_run_data_retention(
   p_admin_id uuid,
@@ -111,15 +157,21 @@ declare
   v_notes text;
 begin
   -- Same admin double-check every other admin-facing wholesale RPC already
-  -- uses (wholesale_publish_legal_document, above) — never trusts a role
-  -- claim from the caller, always re-reads profiles with the service role.
+  -- uses (wholesale_publish_legal_document, wholesale-legal-migration.sql
+  -- section 7) — never trusts a role claim from the caller, always re-reads
+  -- profiles with the service role.
   if not exists (
     select 1 from public.profiles where id = p_admin_id and role = 'admin' and status = 'approved'
   ) then
     raise exception 'invalid_admin';
   end if;
 
-  if p_retention_days is null or p_retention_days <= 0 then
+  -- Required, validated, and bounded — see this file's header for why there
+  -- is no default and no business-decided number here. 3650 = 10 years, a
+  -- typo guard only, mirrored by the caller-side RETENTION_DAYS_MAX in
+  -- api/wholesale-admin.js (defense in depth: the same limit enforced at
+  -- both layers, neither trusting the other alone).
+  if p_retention_days is null or p_retention_days <= 0 or p_retention_days > 3650 then
     raise exception 'invalid_retention_days';
   end if;
 
@@ -137,6 +189,8 @@ begin
       and (ip is not null or user_agent is not null);
 
   if p_dry_run then
+    -- No UPDATE statement executes on this path at all — dry-run is
+    -- read-only in practice, not merely "harmless in effect."
     v_notes := 'dry_run: no rows modified';
   else
     update wholesale_access_log
@@ -174,38 +228,11 @@ commit;
 -- Not part of the transaction above, on purpose — read this, do not run it
 -- as part of this file:
 --
---   PREFLIGHT (equivalent checks, run by hand or scripted before this file):
---     - confirm wholesale_access_log exists with ip/user_agent/created_at
---       columns (already true after wholesale-migration.sql).
---     - confirm profiles exists with role/status columns (already true).
---     - confirm wholesale_retention_runs does not already exist from a
---       previous partial attempt.
+--   Run supabase/wholesale-retention-preflight.sql BEFORE this file, and
+--   supabase/wholesale-retention-verify.sql AFTER.
 --
---   VERIFY (run after this file):
---     - call wholesale_run_data_retention(<real admin id>, 1, true) against
---       a project with at least one old wholesale_access_log row that has a
---       non-null ip — confirm rows_matched > 0, rows_affected = 0 (dry run
---       never writes), and that the matched row's ip is UNCHANGED afterward.
---     - call the same function with p_dry_run := false — confirm
---       rows_affected = rows_matched from the dry run immediately before it,
---       and that the matched row's ip/user_agent are now null while its
---       event/created_at/shop_id/device_id are unchanged.
---     - confirm a wholesale_retention_runs row was inserted for BOTH calls
---       above (one dry_run=true, one dry_run=false).
---     - confirm calling with p_retention_days = 0 or a negative number
---       raises invalid_retention_days and writes nothing.
---     - confirm a non-admin p_admin_id raises invalid_admin and writes
---       nothing, matching every other admin RPC's rejection behavior.
---     - grep this file (or the deployed function source via pg_proc) for
---       "wholesale_legal_documents", "wholesale_legal_acceptances", and
---       "wholesale_price_history" — confirm none of the three appears
---       anywhere in wholesale_run_data_retention's body.
---
---   ROLLBACK:
---     drop function if exists wholesale_run_data_retention(uuid, integer, boolean);
---     drop table if exists wholesale_retention_runs;
---   (No other object depends on either — safe to drop in this order, no
---   cascade needed. Dropping wholesale_retention_runs after real runs have
---   happened destroys that audit history — same caution as the rest of the
---   legal bundle's rollback: only do this before any real production use.)
+--   supabase/wholesale-retention-rollback.sql documents how to undo this
+--   file — its DEFAULT path is non-destructive (drops only the callable
+--   procedure, preserves wholesale_retention_runs and its audit history in
+--   full). It is never run automatically and is not part of this migration.
 -- ============================================================================
