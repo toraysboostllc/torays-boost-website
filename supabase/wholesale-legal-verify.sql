@@ -127,7 +127,11 @@ select 6, 'triggers_present',
 insert into _wsl_verify_results
 select 7, 'service_id_fk_now_restrict',
   case when (
-    select confdeltype from pg_constraint
+    -- confdeltype is pg_catalog's internal "char" type, not text — cast
+    -- explicitly, matching the fix already applied in
+    -- wholesale-legal-preflight.sql, so this comparison never depends on
+    -- Postgres's implicit "char"-vs-unknown-literal resolution.
+    select confdeltype::text from pg_constraint
     where conrelid = 'public.wholesale_price_history'::regclass and confrelid = 'public.wholesale_services'::regclass
   ) = 'r' then 'PASS' else 'FAIL' end,
   'pg_constraint.confdeltype for wholesale_price_history.service_id -> wholesale_services.id — expect ''r'' (RESTRICT), was ''c'' (CASCADE) before this migration';

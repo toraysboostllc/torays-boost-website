@@ -68,7 +68,13 @@ with raw as (
     -- The exact current FK name + delete rule for
     -- wholesale_price_history.service_id -> wholesale_services.id.
     (select conname from pg_constraint where conrelid = 'public.wholesale_price_history'::regclass and confrelid = 'public.wholesale_services'::regclass limit 1) as service_fk_name,
-    (select confdeltype from pg_constraint where conrelid = 'public.wholesale_price_history'::regclass and confrelid = 'public.wholesale_services'::regclass limit 1) as service_fk_deltype,
+    -- confdeltype is pg_catalog's internal "char" type, not text — cast
+    -- explicitly here, once, at the source, so every downstream use of
+    -- service_fk_deltype (coalesce, ||, comparisons) operates on real text
+    -- and never hits Postgres's "operator is not unique: unknown || "char""
+    -- ambiguity (confirmed in production: Supabase rejected this file with
+    -- exactly that error before this cast was added).
+    (select confdeltype::text from pg_constraint where conrelid = 'public.wholesale_price_history'::regclass and confrelid = 'public.wholesale_services'::regclass limit 1) as service_fk_deltype,
     (select count(*) from pg_constraint where conrelid = 'public.wholesale_price_history'::regclass and confrelid = 'public.wholesale_services'::regclass) as service_fk_count
 ),
 orphan_check as (
