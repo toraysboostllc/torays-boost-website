@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LockKeyhole } from "lucide-react";
 import { Logo } from "../components/ui/Logo.jsx";
@@ -41,6 +41,20 @@ function WholesaleLoginContent() {
   const [status, setStatus] = useState("idle"); // idle | loading | pending | error
   const [message, setMessage] = useState("");
 
+  // Runs once on mount only (never on a timer) so this form never opens
+  // pre-filled — belt-and-suspenders alongside the anti-autofill attributes
+  // below, in case a browser/password manager injects a value before this
+  // component finishes mounting. Same technique already proven against this
+  // exact problem on DESK's New Shop form (see that repo's "Harden New Shop
+  // form against browser/password-manager autofill" commit) — a text field
+  // immediately followed by a password field, inside a <form>, is exactly
+  // the shape Chrome's/password managers' login heuristic keys on,
+  // regardless of this field's own autoComplete value.
+  useEffect(() => {
+    setShopName("");
+    setCode("");
+  }, []);
+
   async function handleSubmit(e) {
     e.preventDefault();
     setStatus("loading");
@@ -78,7 +92,7 @@ function WholesaleLoginContent() {
           <h1 className="font-heading text-lg font-semibold text-torays-text">{t("login.title")}</h1>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmit} autoComplete="off" className="flex flex-col gap-4">
           <label className="flex flex-col gap-2">
             <span className="text-xs font-heading font-semibold uppercase tracking-wide text-torays-text-secondary">
               {t("login.shopName")}
@@ -86,7 +100,10 @@ function WholesaleLoginContent() {
             <input
               required
               type="text"
+              name="wsPortalShopName"
               autoComplete="off"
+              data-lpignore="true"
+              data-1p-ignore="true"
               maxLength={100}
               value={shopName}
               onChange={(e) => setShopName(e.target.value)}
@@ -101,7 +118,10 @@ function WholesaleLoginContent() {
             <input
               required
               type="password"
-              autoComplete="off"
+              name="wsPortalAccessCode"
+              autoComplete="new-password"
+              data-lpignore="true"
+              data-1p-ignore="true"
               autoCapitalize="characters"
               autoCorrect="off"
               spellCheck={false}
