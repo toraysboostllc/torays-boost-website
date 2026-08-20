@@ -17,6 +17,13 @@ export function createFakeSupabase() {
     wholesale_images: [],
     wholesale_tags: [],
     wholesale_service_tags: [],
+    // Torays Boost Pro Legal Bundle (supabase/wholesale-legal-migration.sql)
+    // — empty by default, same "assume every migration already ran, an
+    // individual test seeds what it needs" convention as every other table
+    // here. A test that wants "nothing published yet" simply never pushes a
+    // row into wholesale_legal_documents.
+    wholesale_legal_documents: [],
+    wholesale_legal_acceptances: [],
     // Seeded with the same single default row
     // wholesale-pricing-intelligence-migration.sql inserts for real (id=1) —
     // every test starts from the post-migration state, not a fresh-install
@@ -200,6 +207,58 @@ export function createFakeSupabase() {
           created_at: new Date().toISOString(),
         });
         return jsonResponse(200, null);
+      }
+      // Mirrors wholesale_accept_legal_terms() (see supabase/wholesale-
+      // legal-migration.sql) closely enough for handler-level tests: same
+      // validation order, same RAISE EXCEPTION message strings returned as
+      // {message} in a non-2xx body (real PostgREST wraps a PL/pgSQL RAISE
+      // EXCEPTION as a 400 with {code, message, details, hint} — this fake
+      // only reproduces the one field api/wholesale-accept-legal.js's
+      // RPC_ERROR_MAP actually reads), and a bare scalar (the new row's id)
+      // on success, exactly like a real SQL-function RPC response.
+      if (table === "wholesale_accept_legal_terms") {
+        const allChecked =
+          body.p_confirms_authority === true &&
+          body.p_accepts_terms_privacy === true &&
+          body.p_understands_tiers_optional === true &&
+          body.p_understands_independent_pricing === true &&
+          body.p_accepts_confidentiality === true;
+        if (!allChecked) return jsonResponse(400, { message: "all_boxes_required" });
+        if (typeof body.p_representative_name !== "string" || !body.p_representative_name.trim()) {
+          return jsonResponse(400, { message: "invalid_representative_name" });
+        }
+        if (typeof body.p_representative_title !== "string" || !body.p_representative_title.trim()) {
+          return jsonResponse(400, { message: "invalid_representative_title" });
+        }
+        if (body.p_locale !== "en" && body.p_locale !== "es") {
+          return jsonResponse(400, { message: "invalid_locale" });
+        }
+        const doc = db.wholesale_legal_documents.find((d) => d.id === body.p_legal_document_id && d.status === "published");
+        if (!doc) return jsonResponse(400, { message: "document_not_published" });
+        const shop = db.wholesale_shops.find((s) => s.id === body.p_shop_id && s.status === "active");
+        if (!shop) return jsonResponse(400, { message: "shop_not_active" });
+
+        const id = nextId();
+        db.wholesale_legal_acceptances.push({
+          id,
+          shop_id: body.p_shop_id,
+          device_id: body.p_device_id,
+          session_id: body.p_session_id,
+          legal_document_id: body.p_legal_document_id,
+          representative_name: body.p_representative_name.trim(),
+          representative_title: body.p_representative_title.trim(),
+          confirms_authority: true,
+          accepts_terms_privacy: true,
+          understands_tiers_optional: true,
+          understands_independent_pricing: true,
+          accepts_confidentiality: true,
+          content_hash: doc.content_hash,
+          locale: body.p_locale,
+          ip: body.p_ip ?? null,
+          user_agent: body.p_user_agent ?? null,
+          accepted_at: new Date().toISOString(),
+        });
+        return jsonResponse(200, id);
       }
       return jsonResponse(404, {});
     }

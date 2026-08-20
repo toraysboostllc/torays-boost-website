@@ -52,7 +52,11 @@ describe("wholesaleTranslations.js: EN and ES have exactly the same keys", () =>
     expect(wholesaleTranslations.es.result.tierBadgeRecommended).toBe("Recomendado");
     expect(wholesaleTranslations.es.result.tierBadgeHighProfit).toBe("Alta Ganancia");
     expect(wholesaleTranslations.es.result.tierCustomerEstimateLabel).toBe("Estimación al cliente");
-    expect(wholesaleTranslations.es.result.tierEstimatedProfitLabel).toBe("Ganancia estimada");
+    // Renamed for accuracy — see tests/wholesaleProfitLabelRename.test.js —
+    // "Ganancia estimada" -> "Ganancia bruta estimada" (this is a GROSS
+    // figure, per Document 3 Section 9 of the Torays Boost Pro Legal
+    // Bundle: it excludes taxes, parts, shipping, processing fees, etc.).
+    expect(wholesaleTranslations.es.result.tierEstimatedProfitLabel).toBe("Ganancia bruta estimada");
     expect(wholesaleTranslations.es.result.tierMarginLabel).toBe("Margen");
     expect(wholesaleTranslations.es.result.growMargin).toBe("Aumenta tu margen con Torays Boost");
     expect(wholesaleTranslations.es.result.keepCustomerNote).toBe(
