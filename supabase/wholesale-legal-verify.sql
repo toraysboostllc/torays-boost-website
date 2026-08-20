@@ -31,6 +31,25 @@
 -- stray row left behind is trivially identifiable and removable by
 -- searching for that marker — it is never a plausible real version string,
 -- shop name, or service name.
+--
+-- NO explicit SAVEPOINT / ROLLBACK TO SAVEPOINT / COMMIT anywhere inside a
+-- DO block in this file (Postgres ERROR 42601 "syntax error at or near
+-- 'to'" if attempted — PL/pgSQL does not allow explicit transaction
+-- control statements at all). Where a check needs "attempt a destructive
+-- operation, and if it unexpectedly succeeds, undo it and record FAIL" —
+-- checks 10, 12, and 14 below — it uses PL/pgSQL's own implicit
+-- subtransaction mechanism instead: a nested `begin ... exception ... end`
+-- block. Entering that block's EXCEPTION clause (whether from a real
+-- error or from the block's own deliberate `raise exception
+-- '__wsl_verify_unexpected_success__' using errcode = 'ZZ001'` when the
+-- operation succeeded when it shouldn't have) automatically rolls back
+-- everything done since that nested block's BEGIN — no explicit
+-- SAVEPOINT/ROLLBACK TO required or permitted. 'ZZ001' is a custom
+-- SQLSTATE Postgres itself never raises, so `when sqlstate 'ZZ001'`
+-- unambiguously catches only this file's own sentinel (unexpected
+-- success -> FAIL), while `when others` (or a specific expected class
+-- like unique_violation/foreign_key_violation) catches the real guard
+-- actually doing its job (-> PASS).
 -- ============================================================================
 
 begin;
@@ -202,18 +221,23 @@ begin
 
   -- Either way, exactly one published row now exists. Attempt a SECOND one
   -- and expect it to be rejected — proving the partial unique index is
-  -- actually enforced, not just present. SAVEPOINT + unconditional
-  -- rollback-to-savepoint (whether the exception fires or not) guarantees
-  -- this probe row never lingers even if the constraint unexpectedly failed
-  -- to reject it.
-  savepoint _wsl_verify_uniqueness_probe;
+  -- actually enforced, not just present. A nested begin/exception/end block
+  -- (PL/pgSQL's implicit subtransaction) guarantees this probe row never
+  -- lingers even if the constraint unexpectedly failed to reject it — see
+  -- this file's header for why explicit SAVEPOINT/ROLLBACK TO cannot be
+  -- used here.
   begin
     insert into wholesale_legal_documents (version, status, content_en, content_es, content_hash)
       values ('__wsl_verify__ v2', 'published', v_content, v_content, '__wsl_verify__ hash2');
-    rollback to savepoint _wsl_verify_uniqueness_probe;
-  exception when unique_violation then
-    v_rejected := true;
-    rollback to savepoint _wsl_verify_uniqueness_probe;
+    -- Reached only if the insert unexpectedly succeeded — the unique index
+    -- FAILED to reject it. Raise our own sentinel so entering this block's
+    -- EXCEPTION clause rolls back the accidental insert.
+    raise exception '__wsl_verify_unexpected_success__' using errcode = 'ZZ001';
+  exception
+    when sqlstate 'ZZ001' then
+      null; -- our own sentinel: unexpected success — v_rejected stays false (FAIL)
+    when others then
+      v_rejected := true; -- the expected rejection (unique_violation)
   end;
 
   insert into _wsl_verify_results values (
@@ -281,9 +305,10 @@ end $$;
 -- verify run, or its own '__wsl_verify__ v1' sentinel if none existed —
 -- reuse whichever is published now. Testing UPDATE/DELETE against a REAL
 -- row is safe by construction: both are only ever expected to be REJECTED
--- by the trigger, and each attempt sits inside its own SAVEPOINT with an
--- UNCONDITIONAL rollback-to-savepoint right after (whether the exception
--- fires or not) — so even if the guard unexpectedly failed to block it
+-- by the trigger, and each attempt sits inside its own nested
+-- begin/exception/end block (PL/pgSQL's implicit subtransaction — see this
+-- file's header for why explicit SAVEPOINT/ROLLBACK TO cannot be used
+-- inside a DO block) — so even if the guard unexpectedly failed to block it
 -- (the very failure this check exists to catch), the real row's content is
 -- never left changed, on top of this whole file never committing regardless.
 -- ----------------------------------------------------------------------------
@@ -305,22 +330,28 @@ begin
         || 'result before trusting this SKIP'
     );
   else
-    savepoint _wsl_verify_immutability_update;
     begin
       update wholesale_legal_documents set content_en = content_en || '{"extra":"x"}'::jsonb where id = v_doc_id;
-      rollback to savepoint _wsl_verify_immutability_update;
-    exception when others then
-      v_update_rejected := true;
-      rollback to savepoint _wsl_verify_immutability_update;
+      -- Reached only if the UPDATE unexpectedly succeeded — the
+      -- immutability guard FAILED to block it. Raise our own sentinel so
+      -- entering this block's EXCEPTION clause rolls back the accidental
+      -- change to the real row.
+      raise exception '__wsl_verify_unexpected_success__' using errcode = 'ZZ001';
+    exception
+      when sqlstate 'ZZ001' then
+        null; -- our own sentinel: unexpected success — v_update_rejected stays false (FAIL)
+      when others then
+        v_update_rejected := true; -- the trigger correctly blocked it
     end;
 
-    savepoint _wsl_verify_immutability_delete;
     begin
       delete from wholesale_legal_documents where id = v_doc_id;
-      rollback to savepoint _wsl_verify_immutability_delete;
-    exception when others then
-      v_delete_rejected := true;
-      rollback to savepoint _wsl_verify_immutability_delete;
+      raise exception '__wsl_verify_unexpected_success__' using errcode = 'ZZ001';
+    exception
+      when sqlstate 'ZZ001' then
+        null;
+      when others then
+        v_delete_rejected := true;
     end;
 
     insert into _wsl_verify_results values (
@@ -371,10 +402,6 @@ begin
     case when v_update_rejected and v_delete_rejected then 'PASS' else 'FAIL' end,
     'update_rejected=' || v_update_rejected || ', delete_rejected=' || v_delete_rejected || ' — expect true, true'
   );
-
-  -- The append-only guard means this row can never be deleted normally —
-  -- clean it up (and its parents) via a savepoint so this check's own
-  -- synthetic data does not linger even until the file's final rollback.
 end $$;
 
 -- The append-only trigger makes the synthetic history/service/category rows
@@ -387,10 +414,12 @@ end $$;
 
 -- ----------------------------------------------------------------------------
 -- Functional check (14): a real service with real price_history rows cannot
--- be deleted (FK violation) — uses a SAVEPOINT so the attempt itself never
--- risks leaving the outer transaction in a failed state for the remaining
--- checks. Informational SKIP (never FAIL) if no real price-history data
--- exists yet in this project.
+-- be deleted (FK violation) — uses a nested begin/exception/end block
+-- (PL/pgSQL's implicit subtransaction — see this file's header for why
+-- explicit SAVEPOINT/ROLLBACK TO cannot be used inside a DO block) so the
+-- attempt itself never risks leaving the outer transaction in a failed
+-- state for the remaining checks. Informational SKIP (never FAIL) if no
+-- real price-history data exists yet in this project.
 -- ----------------------------------------------------------------------------
 do $$
 declare
@@ -406,12 +435,19 @@ begin
         || 'file after at least one real price change has been recorded'
     );
   else
-    savepoint _wsl_verify_fk_check;
     begin
       delete from wholesale_services where id = v_real_service_id;
-    exception when foreign_key_violation then
-      v_rejected := true;
-      rollback to savepoint _wsl_verify_fk_check;
+      -- Reached only if the delete unexpectedly succeeded — the RESTRICT
+      -- foreign key FAILED to block it. Raise our own sentinel so entering
+      -- this block's EXCEPTION clause rolls back the accidental delete
+      -- immediately, rather than leaving a real service missing until this
+      -- whole file's final rollback.
+      raise exception '__wsl_verify_unexpected_success__' using errcode = 'ZZ001';
+    exception
+      when sqlstate 'ZZ001' then
+        null; -- our own sentinel: unexpected success — v_rejected stays false (FAIL)
+      when foreign_key_violation then
+        v_rejected := true; -- the RESTRICT foreign key correctly blocked it
     end;
 
     insert into _wsl_verify_results values (

@@ -10,6 +10,14 @@ const preflight = readFileSync(join(supabaseDir, "wholesale-legal-preflight.sql"
 const verify = readFileSync(join(supabaseDir, "wholesale-legal-verify.sql"), "utf8");
 const rollback = readFileSync(join(supabaseDir, "wholesale-legal-rollback.sql"), "utf8");
 
+/** Strips `-- ...` line comments so a "no live SAVEPOINT/ROLLBACK TO"
+ *  assertion never false-positives on this file's own explanatory prose
+ *  (which legitimately mentions those keywords to document why they're
+ *  NOT used). */
+function stripComments(sql) {
+  return sql.replace(/--[^\n]*/g, "");
+}
+
 describe("wholesale-legal-migration.sql: wrapping and idempotency", () => {
   it("is wrapped in an explicit begin;/commit; transaction", () => {
     const lines = migration.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -238,14 +246,12 @@ describe("wholesale-legal-verify.sql: regression — check 10/12 never unconditi
     expect(elseBranch[0]).not.toMatch(/insert into wholesale_legal_documents/);
   });
 
-  it("check 10's SECOND insert (the actual uniqueness probe) is always wrapped in a SAVEPOINT with an unconditional rollback-to-savepoint, whether it succeeds or is rejected", () => {
-    const body = check10Body();
-    expect(body).toContain("savepoint _wsl_verify_uniqueness_probe;");
-    // Present on BOTH the success path (right after the INSERT, before any
-    // exception) and inside the exception handler.
-    const occurrences = body.match(/rollback to savepoint _wsl_verify_uniqueness_probe;/g);
-    expect(occurrences).not.toBeNull();
-    expect(occurrences.length).toBe(2);
+  it("check 10's SECOND insert (the actual uniqueness probe) uses a nested begin/exception/end block with a ZZ001 sentinel to detect unexpected success — never a LIVE explicit SAVEPOINT statement (invalid inside a DO block, Postgres error 42601)", () => {
+    const body = stripComments(check10Body());
+    expect(body).not.toMatch(/\bsavepoint\b/i);
+    expect(body).not.toMatch(/\brollback to\b/i);
+    expect(body).toContain("raise exception '__wsl_verify_unexpected_success__' using errcode = 'ZZ001';");
+    expect(body).toContain("when sqlstate 'ZZ001' then");
   });
 
   it("check 12 never inserts a 'published' row at all — it only ever SELECTs whatever is already published (guaranteed to exist because check 10 ran first)", () => {
@@ -254,14 +260,15 @@ describe("wholesale-legal-verify.sql: regression — check 10/12 never unconditi
     expect(body).toContain("select id into v_doc_id from wholesale_legal_documents where status = 'published' limit 1;");
   });
 
-  it("check 12's UPDATE and DELETE attempts against the real published row are each wrapped in their own SAVEPOINT with an unconditional rollback-to-savepoint", () => {
+  it("check 12's UPDATE and DELETE attempts against the real published row each use a nested begin/exception/end block with a ZZ001 sentinel — never a LIVE explicit SAVEPOINT statement", () => {
     const body = check12Body();
-    expect(body).toContain("savepoint _wsl_verify_immutability_update;");
-    expect(body).toContain("savepoint _wsl_verify_immutability_delete;");
-    const updateRollbacks = body.match(/rollback to savepoint _wsl_verify_immutability_update;/g);
-    const deleteRollbacks = body.match(/rollback to savepoint _wsl_verify_immutability_delete;/g);
-    expect(updateRollbacks.length).toBe(2); // success path + exception path
-    expect(deleteRollbacks.length).toBe(2);
+    expect(stripComments(body)).not.toMatch(/\bsavepoint\b/i);
+    expect(stripComments(body)).not.toMatch(/\brollback to\b/i);
+    const sentinelRaises = body.match(/raise exception '__wsl_verify_unexpected_success__' using errcode = 'ZZ001';/g);
+    expect(sentinelRaises, "expected one sentinel raise for UPDATE and one for DELETE").not.toBeNull();
+    expect(sentinelRaises.length).toBe(2);
+    const sentinelCatches = body.match(/when sqlstate 'ZZ001' then/g);
+    expect(sentinelCatches.length).toBe(2);
   });
 
   it("check 12 degrades to a defensive SKIPPED (never crashes on a null id) if no published row somehow exists", () => {
@@ -273,8 +280,8 @@ describe("wholesale-legal-verify.sql: regression — check 10/12 never unconditi
     // Re-asserts the top-level guarantee (already checked above) in the
     // specific context of this fix: idempotent re-execution depends on
     // NOTHING from any run — including check 10's throwaway sentinel or
-    // the uniqueness-probe/immutability savepoints — ever surviving past
-    // this file's own final rollback.
+    // any of the nested begin/exception/end blocks' own writes — ever
+    // surviving past this file's own final rollback.
     const lines = verify.split("\n").map((l) => l.trim()).filter(Boolean);
     expect(lines[lines.length - 1]).toBe("rollback;");
     expect(verify).not.toMatch(/\ncommit;/);
@@ -309,6 +316,40 @@ describe("wholesale-legal-migration.sql: regression — confirms the migration i
     // INSERT into wholesale_legal_documents remains in what's left.
     const withoutFunctionBodies = migration.replace(/create or replace function[\s\S]*?\$\$;/g, "");
     expect(withoutFunctionBodies).not.toMatch(/insert into public\.wholesale_legal_documents/);
+  });
+});
+
+describe("wholesale-legal-verify.sql: regression — check 14 (FK-restrict test) also uses the ZZ001 sentinel pattern, never SAVEPOINT", () => {
+  // Production incident #2 (same underlying cause as the ERROR 23505 fix
+  // above, different symptom): Postgres ERROR 42601 "syntax error at or
+  // near 'to'" — SAVEPOINT / ROLLBACK TO SAVEPOINT are not valid inside a
+  // DO block or function body at all (PL/pgSQL has no explicit transaction
+  // control statements; nested begin/exception/end blocks are its own
+  // implicit-subtransaction mechanism). Check 14 originally used
+  // `savepoint _wsl_verify_fk_check;` / `rollback to savepoint
+  // _wsl_verify_fk_check;` — both invalid PL/pgSQL syntax.
+  function check14Body() {
+    const match = verify.match(/-- Functional check \(14\)[\s\S]*?end \$\$;/);
+    expect(match, "check 14 do $$ block not found").toBeTruthy();
+    return match[0];
+  }
+
+  it("contains no LIVE SAVEPOINT or ROLLBACK TO statement (comments explaining why are fine)", () => {
+    const body = stripComments(check14Body());
+    expect(body).not.toMatch(/\bsavepoint\b/i);
+    expect(body).not.toMatch(/\brollback to\b/i);
+  });
+
+  it("uses the ZZ001 sentinel to detect the DELETE unexpectedly succeeding, and still catches the real expected foreign_key_violation", () => {
+    const body = check14Body();
+    expect(body).toContain("raise exception '__wsl_verify_unexpected_success__' using errcode = 'ZZ001';");
+    expect(body).toContain("when sqlstate 'ZZ001' then");
+    expect(body).toContain("when foreign_key_violation then");
+  });
+
+  it("still degrades to SKIPPED (never FAIL) when no real price-history data exists yet", () => {
+    const body = check14Body();
+    expect(body).toContain("SKIPPED");
   });
 });
 
