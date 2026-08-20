@@ -1901,3 +1901,16 @@
   border-radius: 999px;
   padding: 3px 9px;
 }
+
+/* WholesaleLegal.jsx (src/pages/WholesaleLegal.jsx) — printOnly() toggles
+ * this class on every OTHER [data-legal-doc] section so a single document's
+ * "Print / Save as PDF" button scopes window.print() to just that section,
+ * without needing a PDF-generation library (Document 6, Electronic Consent
+ * & Records Disclosure, Section 6: the browser's own print/"save as PDF" is
+ * sufficient). Only takes effect inside @media print — on screen, every
+ * section stays visible regardless of this class. */
+@media print {
+  .ws-legal-print-hide {
+    display: none !important;
+  }
+}

@@ -63,3 +63,21 @@ export function formatWholesalePrice(amount, { language = "en", currency = "USD"
   const locale = language === "es" ? "es-US" : "en-US";
   return new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount);
 }
+
+/** Formats an ISO timestamp (e.g. wholesale_services.price_updated_at) for
+ *  display — via Intl.DateTimeFormat, never manual string building. Returns
+ *  `null` for anything that is not a genuinely parseable date: a missing/
+ *  null value (a service with no recorded price history yet — see Document
+ *  3, Section 5: "Torays Boost will not display an invented or estimated
+ *  date"), or a malformed string that would otherwise produce
+ *  Invalid Date/NaN. Callers must render `null` as their own explicit
+ *  "no date" state (e.g. result.priceUpdatedNone, "—") — this function
+ *  itself never fabricates a placeholder date string, only a real one or
+ *  nothing at all. */
+export function formatWholesaleDate(isoString, { language = "en" } = {}) {
+  if (typeof isoString !== "string" || !isoString) return null;
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return null;
+  const locale = language === "es" ? "es-US" : "en-US";
+  return new Intl.DateTimeFormat(locale, { year: "numeric", month: "short", day: "numeric" }).format(date);
+}

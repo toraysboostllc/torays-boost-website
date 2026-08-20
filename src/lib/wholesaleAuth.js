@@ -32,6 +32,14 @@ export async function wholesaleLogin(shopName, code) {
  * "transient" (any other non-2xx, or the fetch itself throwing — offline,
  * DNS, CORS, etc.) means the caller should show the real error inline and
  * offer Retry, never silently bounce to the login screen.
+ *
+ * "legal_required" is its own distinct kind, not folded into "auth" — a
+ * 403 with error: 'legal_acceptance_required' (see api/wholesale-prices.js)
+ * means the session and device are both genuinely fine; the shop just needs
+ * to see the clickwrap modal before the catalog is released, which is a
+ * completely different UI response than "redirect to the login screen".
+ * legalDocumentId/version travel through so the caller can pass them
+ * straight to acceptWholesaleLegalTerms() below without a second fetch.
  */
 export async function fetchWholesaleCatalog() {
   let res;
@@ -43,6 +51,15 @@ export async function fetchWholesaleCatalog() {
 
   const data = await res.json().catch(() => ({}));
 
+  if (res.status === 403 && data.error === "legal_acceptance_required") {
+    return {
+      ok: false,
+      kind: "legal_required",
+      legalDocumentId: data.legalDocumentId,
+      version: data.version,
+      message: data.message || "Legal acceptance required.",
+    };
+  }
   if (res.status === 401 || res.status === 403) {
     return { ok: false, kind: "auth", message: data.message || "Session expired." };
   }
@@ -60,4 +77,58 @@ export async function fetchWholesaleCatalog() {
 
 export async function wholesaleLogout() {
   await fetch("/api/wholesale-logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
+}
+
+/**
+ * Public GET, no auth — used both by the standalone /wholesale/legal page
+ * and by the clickwrap modal's own "read the full document" links, so both
+ * always show the exact same live published bundle. Never throws; a
+ * transient failure just means the caller shows its own inline error.
+ */
+export async function fetchWholesaleLegalDocuments() {
+  let res;
+  try {
+    res = await fetch("/api/wholesale-legal-documents", { credentials: "same-origin" });
+  } catch {
+    return { ok: false, message: "Could not reach the server." };
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return { ok: false, message: data.message || "Could not load the legal documents." };
+  }
+  return {
+    ok: true,
+    version: data.version,
+    content_en: data.content_en,
+    content_es: data.content_es,
+    content_hash: data.content_hash,
+    published_at: data.published_at,
+  };
+}
+
+/**
+ * Submits the clickwrap acceptance. `checkboxes` is passed through exactly
+ * as the 5-key shape api/wholesale-accept-legal.js expects
+ * ({confirmsAuthority, acceptsTermsPrivacy, understandsTiersOptional,
+ * understandsIndependentPricing, acceptsConfidentiality}) — this function
+ * does no re-shaping or renaming, so the modal's own state object and the
+ * wire shape stay identical and easy to audit against each other.
+ */
+export async function acceptWholesaleLegalTerms({ legalDocumentId, representativeName, representativeTitle, checkboxes, locale }) {
+  let res;
+  try {
+    res = await fetch("/api/wholesale-accept-legal", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ legalDocumentId, representativeName, representativeTitle, checkboxes, locale }),
+    });
+  } catch {
+    return { ok: false, message: "Could not reach the server." };
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return { ok: false, error: data.error, message: data.message || "Could not record acceptance." };
+  }
+  return { ok: true };
 }

@@ -10,6 +10,7 @@ import { WholesaleLocaleSelector } from "../components/wholesale/WholesaleLocale
 import { WholesaleSoundToggle } from "../components/wholesale/WholesaleSoundToggle.jsx";
 import { WholesaleWizard } from "../components/wholesale/WholesaleWizard.jsx";
 import { WholesaleSalesModule } from "../components/wholesale/WholesaleSalesModule.jsx";
+import { WholesaleLegalAcceptModal } from "../components/wholesale/WholesaleLegalAcceptModal.jsx";
 
 /**
  * Same auth/session model as before this round — nothing here changed:
@@ -35,7 +36,7 @@ function WholesalePricesContent() {
   useSEO({ title: "Wholesale Prices", noindex: true });
   const navigate = useNavigate();
 
-  // status: "loading" | "ready" | "error"
+  // status: "loading" | "ready" | "error" | "legal_required"
   const [state, setState] = useState({
     status: "loading",
     shopName: "",
@@ -43,6 +44,7 @@ function WholesalePricesContent() {
     microsoldering: null,
     salesModule: null,
     errorMessage: "",
+    legalDocumentId: null,
   });
 
   // Which wizard screen is currently showing — used only to hide the
@@ -64,6 +66,18 @@ function WholesalePricesContent() {
           navigate("/wholesale");
           return;
         }
+        // "legal_required" is its OWN branch, never folded into "auth" —
+        // the session/device are fine, the shop just needs to see the
+        // clickwrap modal (see WholesaleLegalAcceptModal.jsx). This check
+        // is re-run on every loadCatalog() call, including the one the
+        // modal itself triggers right after a successful accept, so a
+        // still-missing acceptance (e.g. a stale legalDocumentId a second
+        // tab tried to accept against) re-shows the modal instead of
+        // silently granting access.
+        if (result.kind === "legal_required") {
+          setState((prev) => ({ ...prev, status: "legal_required", legalDocumentId: result.legalDocumentId }));
+          return;
+        }
         setState((prev) => ({ ...prev, status: "error", errorMessage: result.message }));
         return;
       }
@@ -74,6 +88,7 @@ function WholesalePricesContent() {
         microsoldering: result.microsoldering,
         salesModule: result.salesModule,
         errorMessage: "",
+        legalDocumentId: null,
       });
     });
   }
@@ -129,6 +144,23 @@ function WholesalePricesContent() {
           {t("portal.retry")}
         </button>
       </div>
+    );
+  }
+
+  // Blocking gate — replaces the wizard entirely (there is no catalog data
+  // to show behind it yet anyway). onAccepted re-runs loadCatalog(), which
+  // either succeeds (modal unmounts, wizard renders) or, in the unlikely
+  // case the version changed again mid-flow, re-shows this same modal with
+  // the newly-required legalDocumentId. onLogout reuses the exact same
+  // handleLogout as the rest of this page — always available, independent
+  // of the form's validity, per the modal's own header comment.
+  if (state.status === "legal_required") {
+    return (
+      <WholesaleLegalAcceptModal
+        legalDocumentId={state.legalDocumentId}
+        onAccepted={loadCatalog}
+        onLogout={handleLogout}
+      />
     );
   }
 

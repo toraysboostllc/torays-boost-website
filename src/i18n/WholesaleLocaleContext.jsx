@@ -7,6 +7,7 @@ import {
   detectInitialWholesaleLanguage,
   parseStoredWholesaleLocale,
   formatWholesalePrice,
+  formatWholesaleDate,
 } from "../lib/wholesaleLocale.js";
 
 const WholesaleLocaleContext = createContext(null);
@@ -65,8 +66,12 @@ export function WholesaleLocaleProvider({ children }) {
     return formatWholesalePrice(amount, { language, currency });
   }
 
+  function formatDate(isoString) {
+    return formatWholesaleDate(isoString, { language });
+  }
+
   return (
-    <WholesaleLocaleContext.Provider value={{ language, setLanguage, country, currency, t, formatPrice }}>
+    <WholesaleLocaleContext.Provider value={{ language, setLanguage, country, currency, t, formatPrice, formatDate }}>
       {children}
     </WholesaleLocaleContext.Provider>
   );

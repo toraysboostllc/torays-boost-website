@@ -84,7 +84,7 @@ function formatTierMargin(pricing) {
  * from them.
  */
 export function WholesaleResultPanel({ selection, service, onConsultAnother }) {
-  const { t, formatPrice, language } = useWholesaleLocale();
+  const { t, formatPrice, formatDate, language } = useWholesaleLocale();
   const isQuote = service.pricing_type === "quote";
   const isRange = service.pricing_type === "range";
 
@@ -227,6 +227,18 @@ export function WholesaleResultPanel({ selection, service, onConsultAnother }) {
 
       <p className="wsp-result-keep-customer-note">{t("result.keepCustomerNote")}</p>
       {!isQuote && <p className="wsp-result-disclaimer">{t("result.disclaimer")}</p>}
+      {/* Document 3 (Pricing Estimates & Independent Retail Pricing
+          Disclaimer), Section 5: informational only, never a reserved
+          price. service.price_updated_at is `null` for a service with no
+          recorded price_history yet — formatDate() returns `null` for that
+          too, so this always renders the plain "—" placeholder
+          (result.priceUpdatedNone) rather than any invented/estimated
+          date. Reuses the existing wsp-result-disclaimer class — small,
+          muted, matches the existing disclaimer line right above it —
+          rather than introducing new styling for this addition. */}
+      <p className="wsp-result-disclaimer">
+        {t("result.priceUpdatedLabel")}: {formatDate(service.price_updated_at) || t("result.priceUpdatedNone")}
+      </p>
 
       <button
         type="button"

@@ -26,6 +26,12 @@ const WholesaleLogin = lazy(() =>
 const WholesalePrices = lazy(() =>
   import("./pages/WholesalePrices.jsx").then((m) => ({ default: m.WholesalePrices }))
 );
+// Public, no-login legal reference page (Torays Boost Pro Legal Bundle) —
+// lazy for the same reason as the other Wholesale routes above: visiting
+// "/" should never download this chunk.
+const WholesaleLegal = lazy(() =>
+  import("./pages/WholesaleLegal.jsx").then((m) => ({ default: m.WholesaleLegal }))
+);
 
 // The local SEO landing pages are deliberately NOT lazy, unlike Privacy/
 // Terms/etc above — they're organic-search entry points, so a visitor
@@ -71,6 +77,7 @@ export default function App() {
         <Route path="/image-credits" element={<ImageCredits />} />
         <Route path="/wholesale" element={<WholesaleLogin />} />
         <Route path="/wholesale/prices" element={<WholesalePrices />} />
+        <Route path="/wholesale/legal" element={<WholesaleLegal />} />
         <Route path="/phone-repair-miami" element={<PhoneRepairMiami />} />
         <Route path="/ps5-repair-miami" element={<Ps5RepairMiami />} />
         <Route path="/ps5-controller-repair-miami" element={<Ps5ControllerRepairMiami />} />
