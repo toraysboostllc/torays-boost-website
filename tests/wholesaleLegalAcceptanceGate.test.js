@@ -60,6 +60,29 @@ describe("GET /api/wholesale-prices: legal-acceptance gate", () => {
     expect(res.statusCode).toBe(200);
   });
 
+  it("PRE-MIGRATION compatibility: wholesale_legal_documents/wholesale_legal_acceptances don't exist yet — the portal must keep working, never 500, never block a shop", async () => {
+    // Deleting the key (not just emptying the array) makes fakeFetch's own
+    // `if (!db[table]) return jsonResponse(404, {})` fire for any query
+    // against these two tables — the same shape PostgREST returns for a
+    // table absent from its schema cache before wholesale-legal-migration.sql
+    // has ever run. This is deliberately a DIFFERENT scenario from the test
+    // above (table exists, zero rows) — this one simulates the table not
+    // existing at all yet.
+    const fake = createFakeSupabase();
+    seedApprovedShopAndDevice(fake);
+    delete fake.db.wholesale_legal_documents;
+    delete fake.db.wholesale_legal_acceptances;
+
+    const res = await callPrices(fake);
+
+    // The whole point: getPublishedLegalDocument()'s rejection is caught
+    // (see api/wholesale-prices.js, `.catch(() => null)`) and treated as
+    // "nothing published yet" — never surfaced as a 500, and never used to
+    // block the shop from its own catalog.
+    expect(res.statusCode).toBe(200);
+    expect(res.body.error).toBeUndefined();
+  });
+
   it("a published document exists but the shop has never accepted it — 403 legal_acceptance_required, carrying legalDocumentId/version", async () => {
     const fake = createFakeSupabase();
     seedApprovedShopAndDevice(fake);
