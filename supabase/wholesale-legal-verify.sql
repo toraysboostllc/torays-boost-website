@@ -161,28 +161,65 @@ end $$;
 -- ----------------------------------------------------------------------------
 -- Functional check (10): the one-published partial unique index actually
 -- rejects a second row with status='published'.
+--
+-- FIX (production incident): the previous version of this check always
+-- INSERTed its own '__wsl_verify__ v1' row as 'published' unconditionally.
+-- On a project where a real document was already published (e.g. via
+-- wholesale_publish_legal_document through the DESK admin panel), THAT
+-- insert itself collided with the existing published row and Supabase
+-- rejected the whole file with ERROR 23505 (duplicate key value violates
+-- unique constraint "idx_wholesale_legal_documents_one_published") before
+-- ever reaching this file's own final rollback. wholesale-legal-migration.sql
+-- was confirmed NOT to be the source of that row — its only INSERT into
+-- wholesale_legal_documents lives inside wholesale_publish_legal_document's
+-- function BODY (between its begin/end), which defines the function but
+-- never calls it; running the migration itself inserts nothing.
+--
+-- Fix: check whether a published row already exists FIRST. If none exists,
+-- create a throwaway sentinel (discarded by this file's final rollback,
+-- same as before). If one already exists — real or otherwise, this file
+-- never assumes which — reuse it and never insert a second published row
+-- unconditionally; only ever attempt an insert we EXPECT to be rejected.
+-- Either way, exactly one published row exists by the end of this block,
+-- which check 12 below reuses rather than creating its own.
 -- ----------------------------------------------------------------------------
 do $$
 declare
   v_content jsonb := '{"access_agreement":"__wsl_verify__","pricing_policy":"x","pricing_disclaimer":"x","privacy_security":"x","repair_warranty_terms":"x","econsent_disclosure":"x"}'::jsonb;
-  v_doc1 uuid;
+  v_existing_published_id uuid;
+  v_mode text;
   v_rejected boolean := false;
 begin
-  insert into wholesale_legal_documents (version, status, content_en, content_es, content_hash)
-    values ('__wsl_verify__ v1', 'published', v_content, v_content, '__wsl_verify__ hash1')
-    returning id into v_doc1;
+  select id into v_existing_published_id from wholesale_legal_documents where status = 'published' limit 1;
 
+  if v_existing_published_id is null then
+    v_mode := 'no published row existed — created a throwaway sentinel';
+    insert into wholesale_legal_documents (version, status, content_en, content_es, content_hash)
+      values ('__wsl_verify__ v1', 'published', v_content, v_content, '__wsl_verify__ hash1');
+  else
+    v_mode := 'a published row already existed (id=' || v_existing_published_id || ') — reused it, inserted nothing';
+  end if;
+
+  -- Either way, exactly one published row now exists. Attempt a SECOND one
+  -- and expect it to be rejected — proving the partial unique index is
+  -- actually enforced, not just present. SAVEPOINT + unconditional
+  -- rollback-to-savepoint (whether the exception fires or not) guarantees
+  -- this probe row never lingers even if the constraint unexpectedly failed
+  -- to reject it.
+  savepoint _wsl_verify_uniqueness_probe;
   begin
     insert into wholesale_legal_documents (version, status, content_en, content_es, content_hash)
       values ('__wsl_verify__ v2', 'published', v_content, v_content, '__wsl_verify__ hash2');
+    rollback to savepoint _wsl_verify_uniqueness_probe;
   exception when unique_violation then
     v_rejected := true;
+    rollback to savepoint _wsl_verify_uniqueness_probe;
   end;
 
   insert into _wsl_verify_results values (
     10, 'one_published_partial_unique_index_functional',
     case when v_rejected then 'PASS' else 'FAIL' end,
-    'inserted one published row, then attempted a second published row — expected a unique_violation on '
+    'mode: ' || v_mode || '; then attempted a second published row — expected a unique_violation on '
       || 'idx_wholesale_legal_documents_one_published; rejected=' || v_rejected
   );
 end $$;
@@ -233,35 +270,66 @@ end $$;
 -- ----------------------------------------------------------------------------
 -- Functional check (12): immutability guard rejects UPDATE and DELETE
 -- against a published wholesale_legal_documents row.
+--
+-- FIX (production incident, same root cause as check 10 above): this check
+-- used to unconditionally INSERT its own '__wsl_verify__ immutable' row as
+-- 'published' — a second unconditional published insert, which would ALSO
+-- collide with a real published document (on top of check 10 already
+-- failing first in that scenario). Fix: never insert a second published
+-- row here at all. By the time this check runs, check 10 above has already
+-- guaranteed a published row exists — either a real one that predates this
+-- verify run, or its own '__wsl_verify__ v1' sentinel if none existed —
+-- reuse whichever is published now. Testing UPDATE/DELETE against a REAL
+-- row is safe by construction: both are only ever expected to be REJECTED
+-- by the trigger, and each attempt sits inside its own SAVEPOINT with an
+-- UNCONDITIONAL rollback-to-savepoint right after (whether the exception
+-- fires or not) — so even if the guard unexpectedly failed to block it
+-- (the very failure this check exists to catch), the real row's content is
+-- never left changed, on top of this whole file never committing regardless.
 -- ----------------------------------------------------------------------------
 do $$
 declare
-  v_content jsonb := '{"access_agreement":"__wsl_verify__","pricing_policy":"x","pricing_disclaimer":"x","privacy_security":"x","repair_warranty_terms":"x","econsent_disclosure":"x"}'::jsonb;
   v_doc_id uuid;
   v_update_rejected boolean := false;
   v_delete_rejected boolean := false;
 begin
-  insert into wholesale_legal_documents (version, status, content_en, content_es, content_hash, published_at)
-    values ('__wsl_verify__ immutable', 'published', v_content, v_content, '__wsl_verify__ hash-immutable', now())
-    returning id into v_doc_id;
+  select id into v_doc_id from wholesale_legal_documents where status = 'published' limit 1;
 
-  begin
-    update wholesale_legal_documents set content_en = content_en || '{"extra":"x"}'::jsonb where id = v_doc_id;
-  exception when others then
-    v_update_rejected := true;
-  end;
+  if v_doc_id is null then
+    -- Should not normally happen — check 10 above always ensures a
+    -- published row exists by this point. Defensive SKIP rather than a
+    -- null-id crash, in case check 10's own result already flagged FAIL.
+    insert into _wsl_verify_results values (
+      12, 'immutability_guard_rejects_update_and_delete_on_published', 'SKIPPED',
+      'no published wholesale_legal_documents row exists even after check 10 ran — investigate check 10''s '
+        || 'result before trusting this SKIP'
+    );
+  else
+    savepoint _wsl_verify_immutability_update;
+    begin
+      update wholesale_legal_documents set content_en = content_en || '{"extra":"x"}'::jsonb where id = v_doc_id;
+      rollback to savepoint _wsl_verify_immutability_update;
+    exception when others then
+      v_update_rejected := true;
+      rollback to savepoint _wsl_verify_immutability_update;
+    end;
 
-  begin
-    delete from wholesale_legal_documents where id = v_doc_id;
-  exception when others then
-    v_delete_rejected := true;
-  end;
+    savepoint _wsl_verify_immutability_delete;
+    begin
+      delete from wholesale_legal_documents where id = v_doc_id;
+      rollback to savepoint _wsl_verify_immutability_delete;
+    exception when others then
+      v_delete_rejected := true;
+      rollback to savepoint _wsl_verify_immutability_delete;
+    end;
 
-  insert into _wsl_verify_results values (
-    12, 'immutability_guard_rejects_update_and_delete_on_published',
-    case when v_update_rejected and v_delete_rejected then 'PASS' else 'FAIL' end,
-    'update_rejected=' || v_update_rejected || ', delete_rejected=' || v_delete_rejected || ' — expect true, true'
-  );
+    insert into _wsl_verify_results values (
+      12, 'immutability_guard_rejects_update_and_delete_on_published',
+      case when v_update_rejected and v_delete_rejected then 'PASS' else 'FAIL' end,
+      'tested against published row id=' || v_doc_id || '; update_rejected=' || v_update_rejected
+        || ', delete_rejected=' || v_delete_rejected || ' — expect true, true'
+    );
+  end if;
 end $$;
 
 -- ----------------------------------------------------------------------------

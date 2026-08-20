@@ -198,6 +198,120 @@ describe("wholesale-legal-verify.sql: wrapped in begin;/rollback; so nothing it 
   });
 });
 
+describe("wholesale-legal-verify.sql: regression — check 10/12 never unconditionally INSERT a second 'published' row", () => {
+  // Production incident: Supabase rejected this file with
+  //   ERROR 23505: duplicate key value violates unique constraint
+  //   "idx_wholesale_legal_documents_one_published"
+  // because check 10 (and, before this fix, check 12 too) always tried to
+  // INSERT its own '__wsl_verify__' row as 'published' unconditionally,
+  // which collided with a real document that was already published.
+
+  function check10Body() {
+    const match = verify.match(
+      /-- Functional check \(10\)[\s\S]*?end \$\$;/
+    );
+    expect(match, "check 10 do $$ block not found").toBeTruthy();
+    return match[0];
+  }
+
+  function check12Body() {
+    const match = verify.match(
+      /-- Functional check \(12\)[\s\S]*?end \$\$;/
+    );
+    expect(match, "check 12 do $$ block not found").toBeTruthy();
+    return match[0];
+  }
+
+  it("BASE VACÍA (no published row yet): check 10 detects it first, then creates its own throwaway sentinel", () => {
+    const body = check10Body();
+    expect(body).toContain("select id into v_existing_published_id from wholesale_legal_documents where status = 'published' limit 1;");
+    expect(body).toMatch(/if v_existing_published_id is null then[\s\S]*?insert into wholesale_legal_documents/);
+  });
+
+  it("BASE CON UN PUBLICADO YA EXISTENTE: check 10 reuses it and inserts nothing published unconditionally", () => {
+    const body = check10Body();
+    // The only branch that inserts a 'published' row unconditionally is
+    // gated behind "v_existing_published_id is null" — the else branch
+    // (a row already exists) must set only v_mode, no INSERT.
+    const elseBranch = body.match(/else\s+v_mode := 'a published row already existed[\s\S]*?end if;/);
+    expect(elseBranch, "else branch (existing published row) not found").toBeTruthy();
+    expect(elseBranch[0]).not.toMatch(/insert into wholesale_legal_documents/);
+  });
+
+  it("check 10's SECOND insert (the actual uniqueness probe) is always wrapped in a SAVEPOINT with an unconditional rollback-to-savepoint, whether it succeeds or is rejected", () => {
+    const body = check10Body();
+    expect(body).toContain("savepoint _wsl_verify_uniqueness_probe;");
+    // Present on BOTH the success path (right after the INSERT, before any
+    // exception) and inside the exception handler.
+    const occurrences = body.match(/rollback to savepoint _wsl_verify_uniqueness_probe;/g);
+    expect(occurrences).not.toBeNull();
+    expect(occurrences.length).toBe(2);
+  });
+
+  it("check 12 never inserts a 'published' row at all — it only ever SELECTs whatever is already published (guaranteed to exist because check 10 ran first)", () => {
+    const body = check12Body();
+    expect(body).not.toMatch(/insert into wholesale_legal_documents\s*\(version, status/);
+    expect(body).toContain("select id into v_doc_id from wholesale_legal_documents where status = 'published' limit 1;");
+  });
+
+  it("check 12's UPDATE and DELETE attempts against the real published row are each wrapped in their own SAVEPOINT with an unconditional rollback-to-savepoint", () => {
+    const body = check12Body();
+    expect(body).toContain("savepoint _wsl_verify_immutability_update;");
+    expect(body).toContain("savepoint _wsl_verify_immutability_delete;");
+    const updateRollbacks = body.match(/rollback to savepoint _wsl_verify_immutability_update;/g);
+    const deleteRollbacks = body.match(/rollback to savepoint _wsl_verify_immutability_delete;/g);
+    expect(updateRollbacks.length).toBe(2); // success path + exception path
+    expect(deleteRollbacks.length).toBe(2);
+  });
+
+  it("check 12 degrades to a defensive SKIPPED (never crashes on a null id) if no published row somehow exists", () => {
+    const body = check12Body();
+    expect(body).toMatch(/if v_doc_id is null then[\s\S]*?'SKIPPED'/);
+  });
+
+  it("EJECUCIÓN REPETIDA: the whole file still ends in rollback;, never commit; — re-running it can never accumulate a stray published row across runs", () => {
+    // Re-asserts the top-level guarantee (already checked above) in the
+    // specific context of this fix: idempotent re-execution depends on
+    // NOTHING from any run — including check 10's throwaway sentinel or
+    // the uniqueness-probe/immutability savepoints — ever surviving past
+    // this file's own final rollback.
+    const lines = verify.split("\n").map((l) => l.trim()).filter(Boolean);
+    expect(lines[lines.length - 1]).toBe("rollback;");
+    expect(verify).not.toMatch(/\ncommit;/);
+  });
+
+  it("neither check touches wholesale_legal_acceptances at all", () => {
+    expect(check10Body()).not.toContain("wholesale_legal_acceptances");
+    expect(check12Body()).not.toContain("wholesale_legal_acceptances");
+  });
+});
+
+describe("wholesale-legal-migration.sql: regression — confirms the migration itself never inserts a published document", () => {
+  // The evidence for requirement #4 of the ERROR 23505 fix: the migration
+  // must not be the source of a stray published row. Its only INSERT into
+  // wholesale_legal_documents must live strictly inside
+  // wholesale_publish_legal_document's function body (between that
+  // function's own begin/end) — defining the function, never calling it.
+  it("the only INSERT into wholesale_legal_documents in the whole migration is inside wholesale_publish_legal_document's function body", () => {
+    const inserts = [...migration.matchAll(/insert into public\.wholesale_legal_documents/g)];
+    expect(inserts.length).toBe(1);
+    const fnMatch = migration.match(/create or replace function public\.wholesale_publish_legal_document[\s\S]*?\$\$;/);
+    expect(fnMatch, "wholesale_publish_legal_document function definition not found").toBeTruthy();
+    const insertIndex = inserts[0].index;
+    const fnStart = fnMatch.index;
+    const fnEnd = fnMatch.index + fnMatch[0].length;
+    expect(insertIndex).toBeGreaterThan(fnStart);
+    expect(insertIndex).toBeLessThan(fnEnd);
+  });
+
+  it("the migration contains no top-level (outside any function body) INSERT into wholesale_legal_documents", () => {
+    // Strip every CREATE OR REPLACE FUNCTION ... $$; block, then confirm no
+    // INSERT into wholesale_legal_documents remains in what's left.
+    const withoutFunctionBodies = migration.replace(/create or replace function[\s\S]*?\$\$;/g, "");
+    expect(withoutFunctionBodies).not.toMatch(/insert into public\.wholesale_legal_documents/);
+  });
+});
+
 describe("wholesale-legal-rollback.sql: correct drop order, never reverts the FK to CASCADE", () => {
   it("drops triggers before the functions/tables they depend on", () => {
     const triggerIdx = rollback.indexOf("drop trigger if exists trg_wholesale_price_history_append_only");
