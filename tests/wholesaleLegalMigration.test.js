@@ -353,6 +353,98 @@ describe("wholesale-legal-verify.sql: regression — check 14 (FK-restrict test)
   });
 });
 
+describe("wholesale-legal-verify.sql: regression — real Supabase run FAILs (check 12, check 15), both traced to verifier defects, not trigger defects", () => {
+  // Production incident #3 (round 4): a real free-tier Supabase run FAILed
+  // two checks — immutability_guard_rejects_update_and_delete_on_published
+  // (update_rejected=false, delete_rejected=false) and
+  // price_history_row_count_unchanged (before=4, now=5). Evidence trail:
+  // wholesale-legal-verify-failed-run.csv (external artifact, not in this
+  // repo). Both were diagnosed as verifier defects — the installed triggers
+  // themselves were never at fault — so wholesale-legal-migration.sql (which
+  // was already executed in production) required no patch and was not
+  // touched by this fix.
+
+  function check10Body() {
+    const match = verify.match(/-- Functional check \(10\)[\s\S]*?end \$\$;/);
+    expect(match, "check 10 do $$ block not found").toBeTruthy();
+    return match[0];
+  }
+
+  function check13Body() {
+    const match = verify.match(/-- Functional check \(13\)[\s\S]*?end \$\$;/);
+    expect(match, "check 13 do $$ block not found").toBeTruthy();
+    return match[0];
+  }
+
+  it("check 10's throwaway sentinel (no published row existed yet) sets published_at, not just status='published' — the immutability guard keys on published_at, not status", () => {
+    const body = check10Body();
+    const ifBranch = body.match(/if v_existing_published_id is null then[\s\S]*?else/);
+    expect(ifBranch, "if-branch (no published row existed) not found").toBeTruthy();
+    expect(ifBranch[0]).toMatch(/insert into wholesale_legal_documents \(version, status, content_en, content_es, content_hash, published_at\)/);
+    expect(ifBranch[0]).toMatch(/values \('__wsl_verify__ v1', 'published', v_content, v_content, '__wsl_verify__ hash1', now\(\)\);/);
+  });
+
+  it("check 13 wraps its 3 synthetic INSERTs and both UPDATE/DELETE attempts in ONE outer nested begin/exception/end block that force-rolls-back via a ZZ002 sentinel, so its price_history row never lingers past this check", () => {
+    const body = check13Body();
+    // Outer wrapper: a nested begin immediately inside the DO block's own
+    // begin, containing all 3 INSERTs.
+    expect(body).toMatch(/begin\s*\n\s*begin\s*\n\s*insert into wholesale_categories/);
+    expect(body).toContain("insert into wholesale_services");
+    expect(body).toContain("insert into wholesale_price_history");
+    // The outer block ends by deliberately raising its own ZZ002 sentinel —
+    // distinct from the ZZ001 sentinel used by the inner update/delete
+    // probes — specifically to force-rollback the INSERTs too.
+    expect(body).toContain("raise exception '__wsl_verify_cleanup__' using errcode = 'ZZ002';");
+    expect(body).toContain("when sqlstate 'ZZ002' then");
+    // v_update_rejected/v_delete_rejected are captured BEFORE the ZZ002
+    // raise (PL/pgSQL variable state is not transactional — it survives the
+    // nested block's rollback even though the block's own writes do not).
+    const zz002Index = body.indexOf("raise exception '__wsl_verify_cleanup__'");
+    const updateCaptureIndex = body.indexOf("v_update_rejected := true;");
+    const deleteCaptureIndex = body.indexOf("v_delete_rejected := true;");
+    expect(updateCaptureIndex).toBeGreaterThan(-1);
+    expect(deleteCaptureIndex).toBeGreaterThan(-1);
+    expect(updateCaptureIndex).toBeLessThan(zz002Index);
+    expect(deleteCaptureIndex).toBeLessThan(zz002Index);
+  });
+
+  it("check 13 uses no LIVE SAVEPOINT/ROLLBACK TO anywhere (comments explaining the design are fine) — only nested begin/exception/end blocks and the ZZ001/ZZ002 sentinel pattern", () => {
+    const body = stripComments(check13Body());
+    expect(body).not.toMatch(/\bsavepoint\b/i);
+    expect(body).not.toMatch(/\brollback to\b/i);
+  });
+
+  it("no stale comment claims check 13's rows rely on this file's final rollback for cleanup — that would now misdescribe the self-cleaning ZZ002 design", () => {
+    expect(verify).not.toMatch(/there is no cleanup step for them here on/);
+  });
+
+  it("check 15's snapshot-before/count-after logic is untouched by this fix — the fix lives entirely upstream in check 13's self-cleaning redesign", () => {
+    expect(verify).toContain("select count(*) into v_before from wholesale_price_history;");
+    expect(verify).toMatch(/case when \(select count\(\*\) from wholesale_price_history\) = \(select cnt from _wsl_verify_history_count_before\)/);
+  });
+});
+
+describe("wholesale-legal-verify.sql: regression — check 10's second probe insert (expected to be rejected by the one-published unique index) uses valid data, so wholesale-legal-immutability-patch-migration.sql's new CHECK constraint can never confound the result", () => {
+  // Companion fix to the immutability defense-in-depth patch
+  // (wholesale-legal-immutability-patch-*.sql): once that patch's CHECK
+  // constraint requires published_at on any status='published'/'superseded'
+  // row, check 10's second probe insert — which is DELIBERATELY expected to
+  // be rejected, to prove the one-published unique index works — must not
+  // omit published_at itself, or it would be rejected for an unrelated
+  // reason (the CHECK constraint) instead of, or in addition to, the actual
+  // thing this check exists to test (the unique index).
+  function check10Body() {
+    const match = verify.match(/-- Functional check \(10\)[\s\S]*?end \$\$;/);
+    expect(match, "check 10 do $$ block not found").toBeTruthy();
+    return match[0];
+  }
+
+  it("the second (expected-to-be-rejected) probe insert sets published_at = now(), same as a real published row would", () => {
+    const body = check10Body();
+    expect(body).toMatch(/insert into wholesale_legal_documents \(version, status, content_en, content_es, content_hash, published_at\)\s*\n\s*values \('__wsl_verify__ v2', 'published', v_content, v_content, '__wsl_verify__ hash2', now\(\)\);/);
+  });
+});
+
 describe("wholesale-legal-rollback.sql: correct drop order, never reverts the FK to CASCADE", () => {
   it("drops triggers before the functions/tables they depend on", () => {
     const triggerIdx = rollback.indexOf("drop trigger if exists trg_wholesale_price_history_append_only");

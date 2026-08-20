@@ -201,6 +201,23 @@ end $$;
 -- unconditionally; only ever attempt an insert we EXPECT to be rejected.
 -- Either way, exactly one published row exists by the end of this block,
 -- which check 12 below reuses rather than creating its own.
+--
+-- BUG FOUND AND FIXED (real Supabase run, not this file's own logic error
+-- in the sense of syntax — a semantic gap): the throwaway sentinel below
+-- MUST set published_at = now(), not just status = 'published'. The
+-- immutability guard (wholesale_legal_documents_immutability_guard, see
+-- wholesale-legal-migration.sql) keys its protection on
+-- `old.published_at is not null` — NOT on status — matching exactly how
+-- the real wholesale_publish_legal_document RPC always sets both
+-- status='published' AND published_at=now() together in the same INSERT.
+-- A sentinel with status='published' but published_at left null does not
+-- match that real invariant, so the immutability trigger correctly does
+-- NOT protect it (by the trigger's own accurate contract) — check 12 then
+-- reused that under-specified sentinel and its UPDATE/DELETE both
+-- "succeeded" for real (verify.sql's own recorded FAIL), which was
+-- evidence of a verifier defect, not a defect in the installed trigger.
+-- See wholesale-legal-verify-failed-run.csv (external artifact) and this
+-- fix's commit message for the full evidence trail.
 -- ----------------------------------------------------------------------------
 do $$
 declare
@@ -213,8 +230,8 @@ begin
 
   if v_existing_published_id is null then
     v_mode := 'no published row existed — created a throwaway sentinel';
-    insert into wholesale_legal_documents (version, status, content_en, content_es, content_hash)
-      values ('__wsl_verify__ v1', 'published', v_content, v_content, '__wsl_verify__ hash1');
+    insert into wholesale_legal_documents (version, status, content_en, content_es, content_hash, published_at)
+      values ('__wsl_verify__ v1', 'published', v_content, v_content, '__wsl_verify__ hash1', now());
   else
     v_mode := 'a published row already existed (id=' || v_existing_published_id || ') — reused it, inserted nothing';
   end if;
@@ -226,9 +243,17 @@ begin
   -- lingers even if the constraint unexpectedly failed to reject it — see
   -- this file's header for why explicit SAVEPOINT/ROLLBACK TO cannot be
   -- used here.
+  --
+  -- This probe row sets published_at = now() deliberately (valid data,
+  -- matching what a real published row always looks like) so the ONLY thing
+  -- it can be rejected by is the one-published unique index this check
+  -- exists to test — not also by
+  -- wholesale_legal_documents_published_requires_published_at (added by
+  -- wholesale-legal-immutability-patch-migration.sql), which would otherwise
+  -- confound this check with a second, unrelated reason to fail.
   begin
-    insert into wholesale_legal_documents (version, status, content_en, content_es, content_hash)
-      values ('__wsl_verify__ v2', 'published', v_content, v_content, '__wsl_verify__ hash2');
+    insert into wholesale_legal_documents (version, status, content_en, content_es, content_hash, published_at)
+      values ('__wsl_verify__ v2', 'published', v_content, v_content, '__wsl_verify__ hash2', now());
     -- Reached only if the insert unexpectedly succeeded — the unique index
     -- FAILED to reject it. Raise our own sentinel so entering this block's
     -- EXCEPTION clause rolls back the accidental insert.
@@ -366,7 +391,29 @@ end $$;
 -- ----------------------------------------------------------------------------
 -- Functional check (13): append-only guard rejects UPDATE and DELETE
 -- against a wholesale_price_history row. Uses a synthetic
--- category+service+history row, all rolled back with this transaction.
+-- category+service+history row.
+--
+-- BUG FOUND AND FIXED (real Supabase run): the append-only guard correctly
+-- rejects DELETE on this synthetic price_history row (that IS the feature
+-- under test) — which means the row can NEVER be removed via DELETE, and
+-- the previous version of this check had no other cleanup path, leaving it
+-- present for the rest of this transaction. Check 15 below (row-count
+-- unchanged) then correctly observed one extra row and reported FAIL — a
+-- real +1 in the running count, but not evidence of any actual defect: it
+-- was this check's own undeletable-by-design artifact.
+--
+-- Fix: wrap the ENTIRE test (the synthetic INSERTs and both UPDATE/DELETE
+-- attempts) in ONE outer nested begin/exception/end block, and
+-- deliberately raise our own cleanup sentinel at the end to force that
+-- whole block to roll back — undoing the INSERTs too. This is safe and
+-- correct because rolling back a nested block only undoes DATABASE
+-- writes; the PL/pgSQL variables (v_update_rejected/v_delete_rejected)
+-- that already captured the outcome are plain local state, not
+-- transactional, and survive the rollback intact. The result: this
+-- check's synthetic price_history row never lingers past this check,
+-- keeping check 15's original "row count exactly unchanged" invariant
+-- meaningful again, while still genuinely proving DELETE is rejected
+-- before undoing the whole attempt.
 -- ----------------------------------------------------------------------------
 do $$
 declare
@@ -376,25 +423,44 @@ declare
   v_update_rejected boolean := false;
   v_delete_rejected boolean := false;
 begin
-  insert into wholesale_categories (slug, name) values ('__wsl_verify__cat2', '__wsl_verify__ category 2')
-    returning id into v_cat_id;
-  insert into wholesale_services (slug, category_id, name, pricing_type, fixed_price)
-    values ('__wsl_verify__svc2', v_cat_id, '__wsl_verify__ service 2', 'fixed', 10.00)
-    returning id into v_service_id;
-  insert into wholesale_price_history (service_id, old_fixed_price, new_fixed_price)
-    values (v_service_id, 10.00, 12.00)
-    returning id into v_history_id;
-
   begin
-    update wholesale_price_history set new_fixed_price = 99.00 where id = v_history_id;
-  exception when others then
-    v_update_rejected := true;
-  end;
+    insert into wholesale_categories (slug, name) values ('__wsl_verify__cat2', '__wsl_verify__ category 2')
+      returning id into v_cat_id;
+    insert into wholesale_services (slug, category_id, name, pricing_type, fixed_price)
+      values ('__wsl_verify__svc2', v_cat_id, '__wsl_verify__ service 2', 'fixed', 10.00)
+      returning id into v_service_id;
+    insert into wholesale_price_history (service_id, old_fixed_price, new_fixed_price)
+      values (v_service_id, 10.00, 12.00)
+      returning id into v_history_id;
 
-  begin
-    delete from wholesale_price_history where id = v_history_id;
-  exception when others then
-    v_delete_rejected := true;
+    begin
+      update wholesale_price_history set new_fixed_price = 99.00 where id = v_history_id;
+      raise exception '__wsl_verify_unexpected_success__' using errcode = 'ZZ001';
+    exception
+      when sqlstate 'ZZ001' then
+        null; -- unexpected success — v_update_rejected stays false (FAIL)
+      when others then
+        v_update_rejected := true; -- the append-only guard correctly blocked it
+    end;
+
+    begin
+      delete from wholesale_price_history where id = v_history_id;
+      raise exception '__wsl_verify_unexpected_success__' using errcode = 'ZZ001';
+    exception
+      when sqlstate 'ZZ001' then
+        null;
+      when others then
+        v_delete_rejected := true;
+    end;
+
+    -- Force the whole outer block (including the 3 INSERTs above) to roll
+    -- back now that both outcomes are captured — this is the ONLY way to
+    -- undo a row an append-only guard has already (correctly) made
+    -- undeletable via plain DELETE.
+    raise exception '__wsl_verify_cleanup__' using errcode = 'ZZ002';
+  exception
+    when sqlstate 'ZZ002' then
+      null; -- expected: our own deliberate full-cleanup rollback, not a real error
   end;
 
   insert into _wsl_verify_results values (
@@ -404,13 +470,16 @@ begin
   );
 end $$;
 
--- The append-only trigger makes the synthetic history/service/category rows
--- from check 13 genuinely undeletable within this transaction (that IS the
--- feature being tested) — there is no cleanup step for them here on
--- purpose. They are removed the same way every other synthetic row in this
--- file is: by this file's own final ROLLBACK below, which discards the
--- entire transaction's writes regardless of whether any individual row
--- could otherwise be deleted.
+-- Check 13's synthetic category/service/price_history rows do NOT survive
+-- past this point — its own outer nested block above force-rolled-back the
+-- INSERTs (via the '__wsl_verify_cleanup__' sentinel) specifically because
+-- the append-only guard makes the price_history row undeletable via plain
+-- DELETE, and no cleanup path other than an implicit-subtransaction
+-- rollback can remove it before this file's own final ROLLBACK. Check 15
+-- below therefore sees the SAME wholesale_price_history row count as the
+-- snapshot taken before check 10 — this file's synthetic writes are once
+-- again genuinely self-cleaning, not merely "cleaned up eventually by the
+-- file-level rollback."
 
 -- ----------------------------------------------------------------------------
 -- Functional check (14): a real service with real price_history rows cannot
