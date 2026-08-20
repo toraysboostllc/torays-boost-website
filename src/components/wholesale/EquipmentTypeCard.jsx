@@ -6,6 +6,28 @@ import { translateCatalogLabel } from "../../lib/wholesaleCatalogI18n.js";
 import { wholesaleHoverProps } from "../../lib/wholesaleSound.js";
 
 /**
+ * Cards whose photo should cover the entire card edge-to-edge (no visible
+ * card background around it) instead of sitting in the normal letterboxed
+ * 16:9 photo box above a separate title row. Keyed by the same stable
+ * `entity.slug` WholesaleWizard/buildWholesaleWizardCatalog already assign
+ * ("microsoldering" is the synthetic slug WholesaleWizard gives its own
+ * tile; "ps5" is the real wholesale_categories.slug — see
+ * wholesaleWizardCatalog.js). Every other card is completely untouched by
+ * this map, including the 6 named in the approved spec (iPhone, iPad,
+ * Laptops, Xbox Series X, Nintendo Switch/Switch OLED, Controllers).
+ *
+ * The value is the CSS object-position for that card's photo — the point
+ * that must stay in frame after the `cover` crop. These are reasonable
+ * starting values, not tuned against final production photos (this repo
+ * has no access to what gets uploaded through DESK's admin panel) —
+ * revisit once the real photos are live if the crop needs adjusting.
+ */
+const WHOLESALE_FULL_BLEED_PHOTO_SLUGS = {
+  microsoldering: "50% 35%",
+  ps5: "50% 50%",
+};
+
+/**
  * Large photo card for the top-level grid — reused for both a real
  * Equipment Type and the special Microsoldering "lens" card (same visual
  * treatment, different click behavior decided entirely by the caller).
@@ -47,12 +69,17 @@ export function EquipmentTypeCard({ entity, onClick, featured = false }) {
   }, [imageUrl]);
 
   const showImage = imageUrl && imageUrl !== failedUrl;
+  // Only takes effect when there's actually a photo to show — with no
+  // image (or a failed one), this card falls back to the exact same icon
+  // treatment as every other card, never a "full bleed" empty/icon card.
+  const fullBleedPosition = showImage ? WHOLESALE_FULL_BLEED_PHOTO_SLUGS[entity.slug] : undefined;
+  const isFullBleed = Boolean(fullBleedPosition);
 
   return (
     <button
       type="button"
       {...hoverProps}
-      className={`wsp-card wsp-card-clickable w-full text-left${featured ? " wsp-card-featured" : ""}`}
+      className={`wsp-card wsp-card-clickable w-full text-left${featured ? " wsp-card-featured" : ""}${isFullBleed ? " wsp-card-fullbleed" : ""}`}
     >
       <span className="wsp-card-accent" aria-hidden="true" />
       <div className="wsp-card-photo">
@@ -63,12 +90,14 @@ export function EquipmentTypeCard({ entity, onClick, featured = false }) {
             loading="lazy"
             width={400}
             height={300}
+            style={isFullBleed ? { objectPosition: fullBleedPosition } : undefined}
             onError={() => setFailedUrl(imageUrl)}
           />
         ) : (
           <Icon size={44} className="wsp-card-photo-icon" aria-hidden="true" />
         )}
       </div>
+      {isFullBleed && <span className="wsp-card-fullbleed-gradient" aria-hidden="true" />}
       <div className="wsp-card-body flex items-center justify-between gap-2">
         <span className="wsp-card-title">{displayName}</span>
         <ChevronRight size={18} className="wsp-card-arrow" aria-hidden="true" />

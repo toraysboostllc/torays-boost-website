@@ -51,9 +51,12 @@ describe("buildWholesaleWizardCatalog: promoted categories become top-level Equi
 
     expect(ps5).toBeTruthy();
     expect(ps5.name).toBe("PlayStation 5");
+    expect(ps5.slug).toBe("ps5");
     expect(ps5.sourceEquipmentTypeId).toBe("et-video-consoles"); // real relation preserved
     expect(xbox).toBeTruthy();
+    expect(xbox.slug).toBe("xbox-series-x");
     expect(switchEntry).toBeTruthy();
+    expect(switchEntry.slug).toBe("switch");
   });
 
   it("a promoted Equipo has exactly 1 model (itself) — auto-advance case, no fake Modelo step", () => {
@@ -83,6 +86,7 @@ describe("buildWholesaleWizardCatalog: unpromoted equipment types pass through u
     const wizard = buildWholesaleWizardCatalog(fixtureEquipmentTypes());
     const iphone = wizard.find((e) => e.id === "et-iphone");
     expect(iphone).toBeTruthy();
+    expect(iphone.slug).toBe("iphone");
     expect(iphone.sourceEquipmentTypeId).toBe("et-iphone");
     expect(iphone.models.map((m) => m.id)).toEqual(["cat-iphone-7-11", "cat-iphone-12-14", "cat-iphone-15-17"]);
   });

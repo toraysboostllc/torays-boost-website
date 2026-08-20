@@ -49,7 +49,11 @@ function toWizardModel(category) {
  *
  * Every returned Equipo has the same shape regardless of whether it's a
  * promoted category or a real multi-category equipment type:
- *   { id, name, image, sourceEquipmentTypeId, models: WizardModel[] }
+ *   { id, slug, name, image, sourceEquipmentTypeId, models: WizardModel[] }
+ * `slug` is the real category slug (for a promoted Equipo) or equipment
+ * type slug (otherwise) — a stable identifier EquipmentTypeCard uses to
+ * opt specific cards (e.g. "ps5") into their own visual treatment, without
+ * matching on the admin-editable display `name`.
  * `models` is always length >= 1. The wizard shows a "Modelo" selection
  * step only when models.length > 1 — a promoted category always has
  * exactly 1 model (itself), so it auto-advances straight to "Falla" without
@@ -73,6 +77,7 @@ export function buildWholesaleWizardCatalog(equipmentTypes, promotedSlugs = PROM
     for (const category of promoted) {
       equipoList.push({
         id: category.id,
+        slug: category.slug,
         name: category.name,
         image: category.image ?? equipmentType.image ?? null,
         sourceEquipmentTypeId: equipmentType.id,
@@ -83,6 +88,7 @@ export function buildWholesaleWizardCatalog(equipmentTypes, promotedSlugs = PROM
     if (remaining.length > 0) {
       equipoList.push({
         id: equipmentType.id,
+        slug: equipmentType.slug,
         name: equipmentType.name,
         image: equipmentType.image ?? null,
         sourceEquipmentTypeId: equipmentType.id,
