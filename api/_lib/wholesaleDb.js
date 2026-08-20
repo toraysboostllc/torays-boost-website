@@ -331,6 +331,14 @@ function toClientService(sv, portalSettings) {
     // from "legacy" just by checking these two for null.
     competitive_price: sv.competitive_price ?? null,
     high_profit_price: sv.high_profit_price ?? null,
+    // Document 3 (Pricing Estimates & Independent Retail Pricing
+    // Disclaimer), Section 5: informational only, never a reserved price,
+    // and never fabricated — a service with zero recorded price_history
+    // rows has this as `null` (wholesale-legal-migration.sql's backfill
+    // deliberately leaves it null rather than inventing a date), and the
+    // client must render that as a plain "no date yet" state, never a made-
+    // up one.
+    price_updated_at: sv.price_updated_at ?? null,
   };
 }
 
@@ -487,4 +495,59 @@ export function clientIp(req) {
   const fwd = req.headers["x-forwarded-for"];
   if (typeof fwd === "string" && fwd.length) return fwd.split(",")[0].trim();
   return req.socket?.remoteAddress || null;
+}
+
+/* ===========================================================================
+ * Torays Boost Pro Legal Bundle — wholesale_legal_documents /
+ * wholesale_legal_acceptances (supabase/wholesale-legal-migration.sql).
+ * ========================================================================= */
+
+/** The single currently-live version of the 6-document bundle, or `null`
+ *  if nothing has ever been published yet (a fresh install before an admin
+ *  runs wholesale_publish_legal_document) — callers must treat `null` as
+ *  "the legal-acceptance gate is not active yet", never as an error. The
+ *  partial unique index in the migration (idx_wholesale_legal_documents_
+ *  one_published) guarantees at most one row can ever have
+ *  status=eq.published, so `rows[0]` is always the right (and only) one. */
+export async function getPublishedLegalDocument(env) {
+  const rows = await rest(
+    env,
+    `wholesale_legal_documents?status=eq.published&select=id,version,content_en,content_es,content_hash,published_at`
+  );
+  return rows[0] || null;
+}
+
+/** Whether this shop already has a recorded acceptance of this exact
+ *  legal_document_id — never "any acceptance ever", always scoped to the
+ *  CURRENTLY published version, so a shop that accepted an older superseded
+ *  version is correctly treated as not-yet-accepted for a newer one. */
+export async function hasAcceptedLegalDocument(env, shopId, legalDocumentId) {
+  const rows = await rest(
+    env,
+    `wholesale_legal_acceptances?shop_id=eq.${shopId}&legal_document_id=eq.${legalDocumentId}&select=id&limit=1`
+  );
+  return rows.length > 0;
+}
+
+/** Calls a Postgres RPC directly (not through rest()) because a RAISE
+ *  EXCEPTION inside the function — e.g. wholesale_accept_legal_terms
+ *  rejecting an incomplete checkbox set — must reach the caller as
+ *  structured detail (PostgREST's {code, message, details, hint} body), not
+ *  as rest()'s generic thrown Error. Never throws itself; the caller always
+ *  gets back {ok, status, data} and decides what each specific rejection
+ *  reason means for its own response. */
+export async function callWholesaleRpc(env, fnName, args) {
+  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
+    method: "POST",
+    headers: headers(env),
+    body: JSON.stringify(args),
+  });
+  const text = await res.text();
+  let data = null;
+  try {
+    data = text.trim() ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+  return { ok: res.ok, status: res.status, data };
 }

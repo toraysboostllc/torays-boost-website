@@ -24,6 +24,8 @@ import {
   updateDevice,
   buildWholesaleCatalog,
   revokeSessionByTokenHash,
+  getPublishedLegalDocument,
+  hasAcceptedLegalDocument,
 } from "./_lib/wholesaleDb.js";
 
 const SESSION_TOKEN_MAX = 128;
@@ -70,6 +72,32 @@ export default async function handler(req, res) {
   }
 
   await updateDevice(env, device.id, { last_seen_at: new Date().toISOString() });
+
+  // Torays Boost Pro Legal Bundle gate — re-checked on EVERY call, not just
+  // the first one after login: a shop that was already inside the portal
+  // when an admin publishes a new version must be gated on its very next
+  // catalog fetch, exactly like the shop/device status re-check above. A
+  // fresh install with nothing published yet (getPublishedLegalDocument()
+  // returns null) skips this gate entirely — the feature simply isn't
+  // active until an admin publishes a first version. Deliberately its own
+  // distinct error code — 'legal_acceptance_required' — and never the
+  // 'unauthorized'/'access_revoked' codes used above: the session and the
+  // device are both genuinely fine here, so the frontend must be able to
+  // tell "log in again" apart from "show the clickwrap modal" instead of
+  // treating both the same way.
+  const publishedLegalDoc = await getPublishedLegalDocument(env).catch(() => null);
+  if (publishedLegalDoc) {
+    const accepted = await hasAcceptedLegalDocument(env, shop.id, publishedLegalDoc.id).catch(() => false);
+    if (!accepted) {
+      res.status(403).json({
+        error: "legal_acceptance_required",
+        legalDocumentId: publishedLegalDoc.id,
+        version: publishedLegalDoc.version,
+        message: "Please review and accept the Torays Boost Pro legal terms to continue.",
+      });
+      return;
+    }
+  }
 
   const catalog = await buildWholesaleCatalog(env).catch(() => null);
   if (!catalog) {
