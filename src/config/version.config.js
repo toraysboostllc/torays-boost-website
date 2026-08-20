@@ -3,9 +3,15 @@
  * approved for production — never mid-round. Keep in sync with the
  * "version" field in package.json.
  */
-export const APP_VERSION = "1.0.1";
+export const APP_VERSION = "1.1.0";
 
 export const VERSION_HISTORY = [
+  {
+    version: "1.1.0",
+    date: "2026-08-20",
+    summary:
+      "Launched the Wholesale Pricing Portal: a bilingual (EN/ES) interactive wizard through equipment type, category, and service, with Silver/Gold price tiers and recommended-price display; shop-code login gated by per-device admin approval; and the full Torays Boost Pro legal bundle — six-document clickwrap acceptance, price-history disclosure, and a data-retention/anonymization procedure — backed by the new wholesale_legal_documents/acceptances schema and its own preflight/migration/verify/rollback SQL quartets, including a defense-in-depth hardening patch for the legal-document immutability guard.",
+  },
   {
     version: "1.0.1",
     date: "2026-08-18",
