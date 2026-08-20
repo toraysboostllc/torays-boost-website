@@ -140,29 +140,23 @@ function WholesalePricesContent() {
           without scrolling — gaps/padding use clamp()/vh so they shrink
           together with the wizard's own spacing below instead of eating
           a fixed chunk of the budget regardless of available height. */}
-      <div className="mx-auto flex max-w-6xl flex-col gap-[clamp(2px,0.5vh,16px)] px-4 py-[clamp(1px,0.25vh,14px)] sm:px-8">
-        <div className="flex flex-col gap-[clamp(2px,0.5vh,10px)]">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Logo size="sm" />
-            <div className="flex flex-wrap items-center gap-2">
-              <WholesaleSoundToggle />
-              <WholesaleLocaleSelector />
-            </div>
-          </div>
-
-          {/* "Main website" sits beside Logout rather than in the Sound/
-              Locale row above: that row is already the tightest one in this
-              header at 320px (the locale selector alone needs real width),
-              and Logout's own row already wraps to its full available width
-              at this size with plenty of room to spare beside it — adding
-              Main Website here costs far less vertical space than adding a
-              fourth control to the already-cramped row above would. It's
-              still visually distinct from Logout (own quiet pill class, see
-              .wsp-main-site-link — never .wsp-btn-ghost), just physically
-              adjacent, satisfying "near Sound/locale/Logout" without
-              growing the header more than necessary. */}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-col gap-0.5">
+      <div className="mx-auto flex max-w-6xl flex-col px-4 py-[clamp(1px,0.25vh,14px)] sm:px-8">
+        <div className="flex flex-wrap items-start justify-between gap-1">
+          {/* Identity block — logo, WHOLESALE PORTAL / PRIVATE AREA, and the
+              welcome line, grouped into one small light-glass block so they
+              read clearly against the busy background photo instead of
+              sitting directly on it. width: fit-content — never a big white
+              card, just enough glass to back this specific content. Every
+              text color here is an EXISTING token already tuned for a light
+              surface (--wsp-blue, --wsp-text-soft, the badge tokens) — no
+              new colors, just a background for them to sit on. */}
+          <div className="wsp-identity-glass">
+            {/* Logo and the WHOLESALE PORTAL/PRIVATE AREA badges share one
+                row (badges are shorter than the logo, so this costs no
+                extra height beyond the logo's own) — only the welcome line
+                gets its own row below. */}
+            <div className="flex items-center gap-2">
+              <Logo size="sm" />
               <div className="wsp-portal-badges">
                 <span className="wsp-portal-badge">{t("portal.badge")}</span>
                 <span className="wsp-portal-private-badge">
@@ -170,11 +164,23 @@ function WholesalePricesContent() {
                   {t("portal.privateArea")}
                 </span>
               </div>
-              <span className="wsp-text-soft text-xs font-medium sm:text-sm">
-                {t("portal.welcome", { shopName: state.shopName })}
-              </span>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <span className="wsp-text-soft text-xs font-medium sm:text-sm">
+              {t("portal.welcome", { shopName: state.shopName })}
+            </span>
+          </div>
+
+          {/* Sound/locale (top) and Main website/Logout (below it) stay
+              exactly the controls they were — same classes, same touch
+              targets, only their position shifted to the right column now
+              that the identity content moved into its own glass block on
+              the left. */}
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <WholesaleSoundToggle />
+              <WholesaleLocaleSelector />
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <button
                 type="button"
                 {...wholesaleHoverProps(handleMainWebsite)}
@@ -192,28 +198,37 @@ function WholesalePricesContent() {
           </div>
         </div>
 
-        {/* No-scroll spec: the generic page title used to live here as its
-            own <h1>, on top of the wizard's own per-screen heading right
-            below it (e.g. "Select a Device to View Pricing") — redundant
-            content taking its own row of vertical space. Every wizard
-            screen (and the progress/result panels) already renders its own
-            heading, now promoted to <h1>, so the page keeps exactly one
-            top-level heading at all times without a separate static one. */}
-        <WholesaleWizard
-          equipmentTypes={state.equipmentTypes}
-          microsoldering={state.microsoldering}
-          onScreenChange={setWizardScreen}
-        />
+        {/* Wizard + Sales move together as one group with a single small
+            gap between them (see .wsp-wizard-sales-group) — the ONLY
+            separation from the identity/controls header above is this
+            group's own margin-top, so there is exactly one controlled gap
+            between header and Wizard, never a second one stacked on top of
+            it. That margin widens from ≥768px (see the CSS) — mobile keeps
+            today's tight spacing so the accepted 320×568 scroll allowance
+            doesn't grow. No-scroll spec: the generic page title used to
+            live here as its own <h1>, on top of the wizard's own per-screen
+            heading right below it — redundant content taking its own row.
+            Every wizard screen (and the progress/result panels) already
+            renders its own heading, now promoted to <h1>, so the page keeps
+            exactly one top-level heading at all times without a separate
+            static one. */}
+        <div className="wsp-wizard-sales-group">
+          <WholesaleWizard
+            equipmentTypes={state.equipmentTypes}
+            microsoldering={state.microsoldering}
+            onScreenChange={setWizardScreen}
+          />
 
-        {/* Hidden ONLY on the narrowest phones (see the CSS rule) while the
-            price result is showing — everything the shop actually asked to
-            see (Shop Cost, all three tiers, profit, margin, the
-            recommendation, the button) stays full-size and fully visible;
-            this unrelated maintenance-mode module is what yields the room
-            instead. Every other screen and every wider breakpoint keeps it
-            visible exactly as before. */}
-        <div className={wizardScreen === "result" ? "wsp-sales-hide-on-narrow-result" : undefined}>
-          <WholesaleSalesModule salesModule={state.salesModule} />
+          {/* Hidden ONLY on the narrowest phones (see the CSS rule) while
+              the price result is showing — everything the shop actually
+              asked to see (Shop Cost, all three tiers, profit, margin, the
+              recommendation, the button) stays full-size and fully visible;
+              this unrelated maintenance-mode module is what yields the room
+              instead. Every other screen and every wider breakpoint keeps
+              it visible exactly as before. */}
+          <div className={wizardScreen === "result" ? "wsp-sales-hide-on-narrow-result" : undefined}>
+            <WholesaleSalesModule salesModule={state.salesModule} />
+          </div>
         </div>
       </div>
     </div>

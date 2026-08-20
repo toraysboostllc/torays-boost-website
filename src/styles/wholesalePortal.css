@@ -825,12 +825,18 @@
    Shop Cost hero, the 3 tier panels, disclaimers, and the button) settles
    tighter together on short viewports (667px, 568px) without dropping any
    text or figure; only the whitespace between them shrinks. */
+/* No shared `gap` on this panel — every child below sets its own explicit
+   margin-top instead. A uniform flex `gap` was collapsing to near-zero at
+   most viewport heights (clamp(0px, 0.1vh, 16px)), which is exactly what
+   made "Pricing Ready" / the equipment pill / Shop Cost read as one run-on
+   block. Explicit per-pair margins give the title->pill (~5px) and
+   pill->ShopCost (~7px) hierarchy its own fixed, deliberate values instead
+   of an accidental byproduct of viewport height — see each rule below. */
 .wsp-result-panel {
   --wsp-result-pad-x: clamp(6px, 2.5vw, 20px);
   padding: clamp(0px, 0.15vh, 24px) var(--wsp-result-pad-x);
   display: flex;
   flex-direction: column;
-  gap: clamp(0px, 0.1vh, 16px);
 }
 
 .wsp-result-header {
@@ -858,15 +864,24 @@
   color: var(--wsp-card-text);
 }
 
+/* Equipment/Model/Service identifier pill — same lime-green treatment on
+   EVERY result (never conditional on which equipment/service it names; the
+   breadcrumb text itself is the only thing that varies, per the no-
+   hardcoding rule). Colors are exact values from the approved spec, chosen
+   for WCAG AA contrast (#365314 on #D9F99D is well past 4.5:1). */
 .wsp-result-breadcrumb {
   font-size: clamp(10.5px, 2.6vw, 13px);
   font-weight: 600;
-  line-height: 1.05;
-  color: var(--wsp-card-text-soft);
-  padding: clamp(1px, 0.2vh, 8px) 8px;
-  border-radius: 10px;
-  background: var(--wsp-placeholder-bg-start);
+  line-height: 1.35;
+  color: #365314;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: #d9f99d;
+  border: 1px solid #a3e635;
   width: fit-content;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  margin-top: 5px;
 }
 
 .wsp-result-diagnostic-note {
@@ -877,6 +892,7 @@
   border: 1px solid rgba(59, 130, 246, 0.25);
   border-radius: 12px;
   padding: 14px 16px;
+  margin-top: 7px;
 }
 
 /* ---------------------------------------------------------------------
@@ -894,6 +910,7 @@
   display: flex;
   flex-direction: column;
   gap: clamp(1px, 0.15vh, 10px);
+  margin-top: 7px;
 }
 
 .wsp-result-money-label {
@@ -1301,6 +1318,7 @@
   font-size: 12.5px;
   color: var(--wsp-card-text-soft);
   font-style: italic;
+  margin-top: 6px;
 }
 
 /* DESK-authored per-service guidance (Adenda 8, Cambio 3) — a compact,
@@ -1318,6 +1336,7 @@
   color: #b42318;
   font-size: 14px;
   line-height: 1.4;
+  margin-top: 4px;
   margin-left: calc(-1 * var(--wsp-result-pad-x));
   margin-right: calc(-1 * var(--wsp-result-pad-x));
   padding-left: 4px;
@@ -1331,14 +1350,16 @@
 .wsp-result-keep-customer-note {
   font-size: clamp(11.5px, 2.6vw, 13px);
   color: var(--wsp-card-text-soft);
-  line-height: 1.02;
+  line-height: 1.2;
+  margin-top: 3px;
 }
 
 .wsp-result-disclaimer {
   font-size: 11.5px;
-  line-height: 1.1;
+  line-height: 1.2;
   color: var(--wsp-card-text-soft);
   opacity: 0.8;
+  margin-top: 1px;
 }
 
 /* Correction pass: this used to stretch to the panel's full width (a long
@@ -1354,7 +1375,7 @@
   width: min(300px, 100%);
   min-height: 56px;
   border-radius: 12px;
-  margin-top: 4px;
+  margin-top: 14px;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 6px 16px rgba(15, 30, 70, 0.35);
 }
 
@@ -1792,6 +1813,50 @@
 }
 
 /* ---------------------------------------------------------------------
+   Identity glass block — logo + WHOLESALE PORTAL/PRIVATE AREA badges +
+   welcome line, grouped into one small light-glass panel so they read
+   clearly against the busy background photo (Adenda 9, Cambio 1). Every
+   text color inside is an existing token already tuned for a light
+   surface — this block only adds the light backing they were missing when
+   sitting directly on the photo, not new colors. width: fit-content keeps
+   it exactly as large as its content, never a big white card.
+--------------------------------------------------------------------- */
+.wsp-identity-glass {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 6px 10px;
+  border-radius: 13px;
+  background: rgba(245, 249, 255, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 2px 10px rgba(15, 25, 47, 0.14);
+}
+
+/* Wizard + Torays Boost Sales move together as one group with a single
+   small gap between them — margin-top here is the ONLY separation from the
+   header above (see the comment in WholesalePrices.jsx), so there is never
+   a doubled-up gap. Mobile keeps today's tight spacing (the accepted
+   320×568 scroll allowance depends on it); ≥768px gets real breathing room
+   between the header and the Wizard, per spec. */
+.wsp-wizard-sales-group {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(2px, 0.5vh, 16px);
+  margin-top: clamp(2px, 0.5vh, 16px);
+}
+
+@media (min-width: 768px) {
+  .wsp-wizard-sales-group {
+    margin-top: 22px;
+  }
+}
+
+/* ---------------------------------------------------------------------
    Portal header — "PORTAL MAYORISTA" + "Área privada" badges above the
    welcome line, in WholesalePrices.jsx.
 --------------------------------------------------------------------- */
@@ -1807,7 +1872,12 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--wsp-blue);
+  /* Darker than --wsp-blue on purpose — sampled against the real photo
+     region behind the identity glass block, --wsp-blue measured only
+     3.57:1 (fails WCAG AA's 4.5:1 for text this small); #1e40af measures
+     ~6:1 against the same region, comfortably passing with headroom for
+     the photo's natural variation, while still reading as blue, not navy. */
+  color: #1e40af;
 }
 
 .wsp-portal-private-badge {

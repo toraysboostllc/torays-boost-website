@@ -36,9 +36,10 @@ describe("EquipmentTypeCard: lazy loading, explicit dimensions, icon fallback", 
     expect(src).toMatch(/height=\{?\d+\}?/);
   });
 
-  it("falls back to the shared icon mapping when there is no image", () => {
+  it("falls back to the shared icon mapping when there is no image (or a present one fails to load — see wholesaleEquipmentTypeCard.test.js for the onError fallback coverage)", () => {
     expect(src).toContain("wholesaleEquipmentIcon");
-    expect(src).toMatch(/entity\.image\?\.url\s*\?/);
+    expect(src).toContain("const imageUrl = entity.image?.url || null;");
+    expect(src).toMatch(/showImage\s*\?/);
   });
 });
 
