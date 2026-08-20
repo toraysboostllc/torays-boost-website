@@ -696,31 +696,30 @@ describe("wholesalePortal.css: price-tier cards — exact approved Silver/Purple
     expect(rule).toMatch(/color:\s*var\(--wsp-card-text\);/);
   });
 
-  it("the tier group is a 3-column grid, compact enough to avoid adding scroll to the already no-scroll-tuned result screen", () => {
+  it("the tier group is a single column on narrow phones (full-width read-only panels) and 3 columns from 640px up — never forced into 3 cramped columns on the smallest screens now that each card carries 3 labeled rows", () => {
     const rule = css.match(/\.wsp-result-tier-group\s*\{[\s\S]*?\n\}/)[0];
-    expect(rule).toMatch(/grid-template-columns:\s*repeat\(3, 1fr\)/);
+    expect(rule).toMatch(/grid-template-columns:\s*1fr;/);
+    const desktopRule = css.match(/@media \(min-width: 640px\)\s*\{\s*\.wsp-result-tier-group\s*\{[\s\S]*?\n\s*\}/)[0];
+    expect(desktopRule).toMatch(/grid-template-columns:\s*repeat\(3, 1fr\)/);
   });
 
-  it("each tier card meets (and exceeds, per the tactile-redesign spec's 48px minimum) the touch-target floor, and gets a keyboard focus-visible ring", () => {
+  it("correction pass: no selection/press/focus affordances at all — cursor: default (never pointer), no :active press state, no :focus-visible ring, since the cards are plain read-only <div>s, never buttons", () => {
     const cardRule = css.match(/\.wsp-result-tier-card\s*\{[\s\S]*?\n\}/)[0];
-    const minHeight = Number(cardRule.match(/min-height:\s*(\d+)px/)[1]);
-    expect(minHeight).toBeGreaterThanOrEqual(48);
-    const focusRule = css.match(/\.wsp-result-tier-card:focus-visible\s*\{[\s\S]*?\n\}/)[0];
-    expect(focusRule).toMatch(/outline:/);
+    expect(cardRule).toMatch(/cursor:\s*default;/);
+    expect(cardRule).not.toContain("cursor: pointer");
+    expect(css).not.toContain(".wsp-result-tier-card:active");
+    expect(css).not.toContain(".wsp-result-tier-card:focus-visible");
+    expect(css).not.toContain(".wsp-result-tier-selected");
   });
 
-  it("the selected tier gets a real border/shadow change, not just a color swap, and that change (plus the tactile-redesign's own hover/active transforms) is skipped under prefers-reduced-motion", () => {
-    const selectedRule = css.match(/\.wsp-result-tier-selected\s*\{[\s\S]*?\n\}/)[0];
-    expect(selectedRule).toMatch(/border-color:/);
-    expect(selectedRule).toMatch(/box-shadow:/);
-    expect(selectedRule).toMatch(/transform:/);
-    const mediaStart = css.indexOf("@media (prefers-reduced-motion: reduce)", css.indexOf(".wsp-result-tier-selected"));
+  it("keeps a soft, reduced-motion-safe hover lift as the only interactive feedback — no press/selected transform to reset alongside it", () => {
+    const hoverBlock = css.match(/@media \(hover: hover\) and \(pointer: fine\)\s*\{\s*\.wsp-result-tier-card:hover[\s\S]*?\n\s*\}\s*\n\}/)[0];
+    expect(hoverBlock).toContain("transform:");
+    const mediaStart = css.indexOf("@media (prefers-reduced-motion: reduce)", css.indexOf(".wsp-result-tier-card {"));
     const mediaBlock = css.slice(mediaStart, css.indexOf("\n}\n", mediaStart) + 3);
     expect(mediaBlock).toContain(".wsp-result-tier-card {");
     expect(mediaBlock).toContain("transition: none;");
-    expect(mediaBlock).toContain(".wsp-result-tier-card:hover,");
-    expect(mediaBlock).toContain(".wsp-result-tier-card:active,");
-    expect(mediaBlock).toContain(".wsp-result-tier-selected {");
+    expect(mediaBlock).toContain(".wsp-result-tier-card:hover {");
     expect(mediaBlock).toContain("transform: none;");
   });
 });

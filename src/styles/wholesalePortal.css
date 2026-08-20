@@ -769,17 +769,23 @@
    styling. Lives inside .wsp-scope only (WholesaleWizard.jsx), reads
    var(--wsp-*) directly like the progress panel above.
 --------------------------------------------------------------------- */
+/* No-scroll pass (result screen, tiers): vh-driven clamp()s throughout this
+   panel — same technique already established for the equipment-selection
+   screen's own no-scroll budget — so the whole card (header, breadcrumb,
+   Shop Cost hero, the 3 tier panels, disclaimers, and the button) settles
+   tighter together on short viewports (667px, 568px) without dropping any
+   text or figure; only the whitespace between them shrinks. */
 .wsp-result-panel {
-  padding: 24px 20px;
+  padding: clamp(2px, 0.6vh, 24px) clamp(12px, 3.2vw, 20px);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: clamp(1px, 0.4vh, 16px);
 }
 
 .wsp-result-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
 }
 
 .wsp-result-header-icon {
@@ -788,16 +794,18 @@
 
 .wsp-result-title {
   font-family: "Space Grotesk", sans-serif;
-  font-size: 20px;
+  font-size: clamp(15px, 2.4vh, 20px);
+  line-height: 1.2;
   font-weight: 700;
   color: var(--wsp-card-text);
 }
 
 .wsp-result-breadcrumb {
-  font-size: 13px;
+  font-size: clamp(11px, 2.6vw, 13px);
   font-weight: 600;
+  line-height: 1.3;
   color: var(--wsp-card-text-soft);
-  padding: 8px 12px;
+  padding: clamp(2px, 0.5vh, 8px) 10px;
   border-radius: 10px;
   background: var(--wsp-placeholder-bg-start);
   width: fit-content;
@@ -827,11 +835,12 @@
 .wsp-result-money {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: clamp(1px, 0.3vh, 10px);
 }
 
 .wsp-result-money-label {
   font-size: 12px;
+  line-height: 1.2;
   font-weight: 600;
   color: var(--wsp-card-text-soft);
   text-transform: uppercase;
@@ -851,6 +860,7 @@
 
 .wsp-result-money-value {
   font-variant-numeric: tabular-nums;
+  line-height: 1.15;
 }
 
 /* "Your Cost with Torays Boost" — the dominant hero figure, stacked
@@ -859,15 +869,16 @@
 .wsp-result-shopcost-hero {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 14px 16px;
+  gap: 2px;
+  padding: clamp(1px, 0.4vh, 14px) 16px;
   border-radius: 14px;
   background: var(--wsp-card-bg-hover);
   border: 1px solid var(--wsp-card-border);
 }
 
 .wsp-result-shopcost-value {
-  font-size: 36px;
+  font-size: clamp(18px, 4vh, 36px);
+  line-height: 1.1;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--wsp-shopcost-text);
@@ -891,10 +902,6 @@
   }
 }
 
-.wsp-result-figure-loss {
-  color: var(--wsp-red) !important;
-}
-
 .wsp-result-grow-margin {
   margin-top: -4px;
   font-size: 12.5px;
@@ -903,41 +910,48 @@
 }
 
 /* ---------------------------------------------------------------------
-   Price tiers — Silver (Competitive) / Purple (Recommended) / Gold (High
-   Profit), styled as real tactile buttons: rounded corners, a moderate
-   drop shadow that lifts on hover and compresses on press (the "press
-   effect"), a minimum 48px touch target. Shown only once a service has all
-   three configured (see hasTiers in WholesaleResultPanel.jsx) — a legacy
-   service never renders this group at all, so there is no empty/partial
-   state to style here. Gradients are the approved values — a light
-   metallic gray for Silver, a light professional violet for Purple, an
-   elegant (not bright-yellow) gold for Gold — every card keeps the same
-   dark-navy card text color regardless of which gradient it sits on,
-   confirmed AA-safe against both stops of all three (each gradient stays
-   light-to-medium, nothing near-black). Color is never the only signal:
-   every card always shows its own icon + text label + price + profit +
-   margin, and the selected card adds a visible border/shadow/checkmark,
-   never a color-only change. */
+   Price tiers — Silver / Purple (Recommended badge) / Gold (High Profit
+   badge). Correction pass: this used to be a tier PICKER (role=radio,
+   selectable, writing into an editable price below) — the shop can no
+   longer edit or select anything on this portal, DESK is the only place
+   that sets these prices. All three panels now render simultaneously,
+   always, purely as read-only information: no role=radio/radiogroup, no
+   aria-checked, no click handler of any kind, no "selected" state. Each
+   `<div>` is deliberately never a `<button>` and carries no interactive
+   ARIA role — `cursor: default` (not pointer), no :active press effect,
+   nothing changes on click. A soft hover elevation + a short hover tone
+   are still allowed (purely decorative feedback, see wholesaleHoverProps
+   in the component) — that's the only concession to "hoverable", never
+   "clickable". Gradients are the approved values — a light metallic gray
+   for Silver, a light professional violet for Purple, an elegant (not
+   bright-yellow) gold for Gold — every card keeps the same dark-navy card
+   text color regardless of which gradient it sits on, confirmed AA-safe
+   against both stops of all three. Color is never the only signal: every
+   card always shows its own icon + name, and Purple/Gold each carry a
+   text badge (Recommended / High Profit) — never a border/shadow that
+   would read as "this one is selected", since nothing is. */
 .wsp-result-tier-group {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  grid-template-columns: 1fr;
+  gap: clamp(1px, 0.3vh, 10px);
+}
+
+@media (min-width: 640px) {
+  .wsp-result-tier-group {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 .wsp-result-tier-card {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  min-height: 48px;
-  padding: 12px 6px 10px;
-  border-radius: 12px;
-  border: 2px solid transparent;
-  cursor: pointer;
-  text-align: center;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  cursor: default;
   color: var(--wsp-card-text);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.55) inset, 0 3px 8px rgba(15, 25, 47, 0.18);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+  transition: box-shadow 0.15s ease, transform 0.1s ease;
 }
 
 .wsp-result-tier-competitive {
@@ -952,6 +966,9 @@
   background: linear-gradient(135deg, #fff4bf 0%, #d4af37 100%);
 }
 
+/* Soft hover lift only — no press/active state, since nothing is
+   clickable. Gated behind (hover: hover) and (pointer: fine) so a touch
+   tap never leaves a stuck hover state. */
 @media (hover: hover) and (pointer: fine) {
   .wsp-result-tier-card:hover {
     transform: translateY(-2px);
@@ -959,93 +976,143 @@
   }
 }
 
-/* Touch/click press feedback — a real button compresses, it doesn't just
-   change color. Works for a mouse click's momentary :active state too. */
-.wsp-result-tier-card:active {
-  transform: translateY(1px);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.4) inset, 0 1px 3px rgba(15, 25, 47, 0.22);
-}
-
-.wsp-result-tier-top {
+.wsp-result-tier-head {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
-  min-height: 16px;
+  gap: 6px;
 }
 
 .wsp-result-tier-icon {
   opacity: 0.75;
+  flex-shrink: 0;
 }
 
-.wsp-result-tier-check {
-  color: var(--wsp-blue);
+.wsp-result-tier-name {
+  font-size: 13px;
+  line-height: 1.15;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
-.wsp-result-tier-label {
-  font-size: 10.5px;
+/* Purple's "Recommended" / Gold's "High Profit" — an informational label,
+   never a "you picked this" indicator (nothing on this panel is picked). */
+.wsp-result-tier-badge {
+  margin-left: auto;
+  font-size: 10px;
+  line-height: 1.3;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.02em;
-  line-height: 1.2;
+  letter-spacing: 0.03em;
+  color: var(--wsp-card-text);
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
 }
 
-.wsp-result-tier-price {
-  font-size: 16px;
+.wsp-result-tier-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.wsp-result-tier-row-label {
+  font-size: 11.5px;
+  line-height: 1.2;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+.wsp-result-tier-row-value {
+  font-size: 14px;
+  line-height: 1.15;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  margin-top: 1px;
 }
 
-@media (min-width: 640px) {
-  .wsp-result-tier-price {
-    font-size: 18px;
+/* Compact row presentation — narrow phones only. Correction pass: at
+   375-390px the panel layout above (icon+name+badge header, then 3
+   stacked label/value rows) made each card ~130px tall; three of them
+   stacked pushed "Check another price" below the fold and the page past
+   the viewport. Below 640px each card becomes ONE horizontal row instead
+   of a tall panel — the exact same DOM/content, just reflowed: the head
+   (icon+name+badge) becomes a fixed-width column on the left, and the
+   three label/value pairs (still every one of them, nothing hidden) share
+   the remaining width as three compact centered mini-columns. This is the
+   same "row instead of stacked panel" technique already used for the
+   equipment/model cards on this exact same screen size (see
+   .wsp-grid-compact .wsp-card-clickable further up). Scoped to
+   max-width: 639px only — the 3-column grid at 640px and up already fits
+   comfortably as full panels (verified at 768/1024/1440), so it is
+   untouched here. */
+@media (max-width: 639px) {
+  .wsp-result-tier-card {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding: clamp(2px, 0.5vh, 10px) 10px;
   }
-}
 
-/* Estimated shop profit at this tier's price — second in the stack, still
-   clearly a number of its own (never merged into the price line above). */
-.wsp-result-tier-profit {
-  font-size: 11.5px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  opacity: 0.85;
-}
+  /* Icon+name stay on one line (row + wrap), the badge is forced onto its
+     own second line via flex-basis:100% — two lines total for Purple/Gold
+     instead of three separate ones (icon / name / badge each on their own
+     line), which was the single biggest per-card height cost at this
+     width. Silver (no badge) is still just the one icon+name line. */
+  .wsp-result-tier-head {
+    flex: 0 0 auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 4px;
+    min-width: 0;
+  }
 
-/* Margin — smaller secondary text, the least prominent figure on the
-   card, exactly as specified. */
-.wsp-result-tier-margin {
-  font-size: 10px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  opacity: 0.65;
-}
+  .wsp-result-tier-name {
+    font-size: 10px;
+  }
 
-.wsp-result-tier-selected {
-  border-color: var(--wsp-blue);
-  box-shadow: 0 0 0 1px var(--wsp-blue), 0 4px 10px rgba(37, 99, 235, 0.25);
-  transform: translateY(-1px);
-}
+  .wsp-result-tier-badge {
+    flex-basis: 100%;
+    margin-left: 0;
+    font-size: 8px;
+    padding: 1px 5px;
+  }
 
-.wsp-result-tier-card:focus-visible {
-  outline: 2px solid var(--wsp-blue);
-  outline-offset: 2px;
+  .wsp-result-tier-row {
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    text-align: center;
+    gap: 0;
+    min-width: 0;
+  }
+
+  .wsp-result-tier-row-label {
+    font-size: 8px;
+    line-height: 1.2;
+  }
+
+  .wsp-result-tier-row-value {
+    font-size: 11.5px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .wsp-result-tier-card {
     transition: none;
   }
-  .wsp-result-tier-card:hover,
-  .wsp-result-tier-card:active,
-  .wsp-result-tier-selected {
+  .wsp-result-tier-card:hover {
     transform: none;
   }
 }
 
-/* The editable recommended-customer-price "hero" — the single most visible
-   figure on the panel. The input IS the figure, never a duplicate
-   read-only value elsewhere on the page. */
+/* The no-tiers fallback: DESK's own recommended_price, read-only text —
+   never an input, never something the shop can type into. Same visual
+   weight as before (it was always the panel's second-largest figure). */
 .wsp-result-money-hero {
   display: flex;
   flex-direction: column;
@@ -1056,54 +1123,22 @@
   border: 1px solid rgba(26, 79, 214, 0.25);
 }
 
-.wsp-result-money-hero-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.wsp-result-money-hero-top .wsp-result-money-label {
+.wsp-result-money-hero .wsp-result-money-label {
   color: var(--wsp-recommended-text);
 }
 
-.wsp-result-editable-badge {
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--wsp-recommended-text);
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(26, 79, 214, 0.3);
-  border-radius: 999px;
-  padding: 2px 8px;
-}
-
-.wsp-result-recommended-input {
-  width: 100%;
-  min-height: 46px;
-  border: none;
-  background: transparent;
-  padding: 0;
+.wsp-result-recommended-value {
   font-size: 28px;
+  line-height: 1.1;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--wsp-recommended-text);
 }
 
 @media (min-width: 640px) {
-  .wsp-result-recommended-input {
+  .wsp-result-recommended-value {
     font-size: 34px;
   }
-}
-
-.wsp-result-recommended-input:focus-visible {
-  outline: none;
-}
-
-.wsp-result-money-hero:focus-within {
-  outline: 2px solid var(--wsp-blue);
-  outline-offset: 2px;
 }
 
 .wsp-result-margin-row {
@@ -1115,6 +1150,7 @@
 
 .wsp-result-margin-badge {
   font-size: 20px;
+  line-height: 1.2;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--wsp-margin-badge-text);
@@ -1158,27 +1194,15 @@
   font-style: italic;
 }
 
-.wsp-result-loss-warning {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--wsp-red);
-  background: rgba(240, 82, 94, 0.1);
-  border: 1px solid rgba(240, 82, 94, 0.3);
-  border-radius: 10px;
-  padding: 10px 14px;
-}
-
 .wsp-result-keep-customer-note {
-  font-size: 13px;
+  font-size: clamp(11.5px, 2.6vw, 13px);
   color: var(--wsp-card-text-soft);
-  line-height: 1.5;
+  line-height: 1.1;
 }
 
 .wsp-result-disclaimer {
   font-size: 11.5px;
+  line-height: 1.1;
   color: var(--wsp-card-text-soft);
   opacity: 0.8;
 }
@@ -1198,6 +1222,16 @@
   border-radius: 12px;
   margin-top: 4px;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 6px 16px rgba(15, 30, 70, 0.35);
+}
+
+/* No-scroll pass: only the narrowest phones (320px-class) need the button
+   itself to shrink — 375/390 already pass at the full 56px touch target.
+   46px stays above the 44px minimum touch-target guideline. */
+@media (max-width: 359px) {
+  .wsp-result-consult-another {
+    min-height: 44px;
+    margin-top: 0;
+  }
 }
 
 /* ---------------------------------------------------------------------

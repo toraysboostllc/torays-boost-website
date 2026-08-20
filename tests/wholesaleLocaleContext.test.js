@@ -46,7 +46,14 @@ describe("wholesaleTranslations.js: EN and ES have exactly the same keys", () =>
     expect(wholesaleTranslations.es.result.recommendedPrice).toBe("Precio recomendado al cliente");
     expect(wholesaleTranslations.es.result.potentialProfit).toBe("Ganancia potencial");
     expect(wholesaleTranslations.es.result.estimatedMargin).toBe("Margen estimado");
-    expect(wholesaleTranslations.es.result.editableLabel).toBe("Editable");
+    expect(wholesaleTranslations.es.result.tierNameCompetitive).toBe("Plata");
+    expect(wholesaleTranslations.es.result.tierNameRecommended).toBe("Purple");
+    expect(wholesaleTranslations.es.result.tierNameHighProfit).toBe("Gold");
+    expect(wholesaleTranslations.es.result.tierBadgeRecommended).toBe("Recomendado");
+    expect(wholesaleTranslations.es.result.tierBadgeHighProfit).toBe("Alta Ganancia");
+    expect(wholesaleTranslations.es.result.tierCustomerEstimateLabel).toBe("Estimación al cliente");
+    expect(wholesaleTranslations.es.result.tierEstimatedProfitLabel).toBe("Ganancia estimada");
+    expect(wholesaleTranslations.es.result.tierMarginLabel).toBe("Margen");
     expect(wholesaleTranslations.es.result.growMargin).toBe("Aumenta tu margen con Torays Boost");
     expect(wholesaleTranslations.es.result.keepCustomerNote).toBe(
       "Tú conservas a tu cliente. Nosotros hacemos la reparación a nivel de placa."
