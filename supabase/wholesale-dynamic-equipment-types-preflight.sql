@@ -16,22 +16,64 @@
 -- ONE statement, ONE result table — same convention as every other preflight
 -- in this project. Entirely read-only.
 --
+-- RESULT CONTRACT (do not change column names/types without updating every
+-- consumer of this file — this contract is what the owner reads by hand):
+--   check_number  integer  — 1-14 for individual checks, 99 for the final
+--                            OVERALL STATUS row.
+--   check_name    text
+--   status        text     — exactly one of 'PASS', 'FAIL', 'STOP'. There is
+--                            no fourth "REVIEW REQUIRED" status: checks that
+--                            are purely informational (snapshots meant to be
+--                            read by hand, never blocking) report PASS and
+--                            carry '(READ BY HAND)' in check_name and/or a
+--                            'REVIEW REQUIRED — ' prefix in details instead —
+--                            the signal survives, it just never sits in a
+--                            fourth status value the OVERALL STATUS gate
+--                            would have to special-case.
+--   details       text
+--
+-- STATUS MEANING for OVERALL STATUS specifically:
+--   PASS = safe to run the migration as-is.
+--   FAIL = a structural check failed (missing table, slug not found, row
+--          count mismatch) — fix the flagged row(s) before running the
+--          migration.
+--   STOP = a hard, no-exceptions gate. Today the only source is check 14:
+--          zero active services currently tagged 'microsoldering'. Also
+--          used by the zero-rows safety net below if this file were to
+--          ever produce no check rows at all.
+--
+-- ZERO-ROWS SAFETY NET: this file must never silently report success with
+-- an empty result (the exact failure mode that prompted this rewrite — a
+-- run against Supabase returned "Success. No rows returned" instead of the
+-- expected 15 rows). The final SELECT is a UNION ALL where a single
+-- synthetic OVERALL STATUS / STOP row is appended ONLY when the normal
+-- check computation produced zero rows. Under correct execution this
+-- branch never fires (every check below is a single self-contained SELECT
+-- with no FROM clause that could reduce it below one row, or a SELECT from
+-- a CTE that itself is guaranteed exactly one row by construction — none of
+-- them can legitimately return zero rows). If you ever see ONLY that one
+-- STOP row and nothing else, something is wrong with how the query was
+-- run/received (wrong database, partial paste, a client that only shows
+-- one statement's result, etc.) — re-run the full, unmodified file text and
+-- tell Claude before proceeding either way.
+--
 -- Order of operations:
---   1. Run this file. Read the check_name/status/details rows and the final
---      OVERALL STATUS row.
---   2. Read every row under "current catalog snapshot" (checks 6-14) by
---      hand before proceeding — this migration hardcodes slug-based lookups
---      ('video-consoles' for the 3 promoted categories, 'macbook'/'laptops'
---      for the Laptops merge) and check 13 specifically flags the one edge
---      case that needs a human call: macbook AND laptops both already
---      having their own photo (the migration will not silently overwrite
---      either one in that case). Check 14 is a HARD GATE, not informational
---      — with zero active services currently tagged 'microsoldering',
---      OVERALL STATUS is FAIL and the migration must not run yet (it would
+--   1. Run this file. Read every check_number/check_name/status/details row
+--      and the final OVERALL STATUS row (check_number = 99).
+--   2. Read every row marked '(READ BY HAND)' or prefixed 'REVIEW REQUIRED —'
+--      in its details (checks 2, 3, 6, 8, 9, 11, 13) before proceeding —
+--      this migration hardcodes slug-based lookups ('video-consoles' for
+--      the 3 promoted categories, 'macbook'/'laptops' for the Laptops
+--      merge) and check 13 specifically flags the one edge case that needs
+--      a human call: macbook AND laptops both already having their own
+--      photo (the migration will not silently overwrite either one in that
+--      case). Check 14 is a HARD GATE (status STOP), not informational —
+--      with zero active services currently tagged 'microsoldering',
+--      OVERALL STATUS is STOP and the migration must not run yet (it would
 --      succeed, but Microsoldering would end up with zero content, a
 --      silent no-op the owner has said must stop the migration instead).
---      If check 5, 6, 10, 11, 13, or 14 show something other than what you
---      expect, STOP and tell Claude before running the migration.
+--      If check 4, 5, 7, 10, 12, or 14 show anything other than PASS, STOP
+--      and tell Claude before running the migration.
 --   3. Only if OVERALL STATUS is PASS, run
 --      wholesale-dynamic-equipment-types-migration.sql.
 --   4. Run wholesale-dynamic-equipment-types-verify.sql afterward to confirm
@@ -154,8 +196,15 @@ equipment_type_visibility as (
   where et.is_tag_lens = false
   group by et.slug, et.name, et.active, et.sort_order
 ),
+-- Every branch below is either a bare `select <constants/scalar subqueries>`
+-- (no FROM at all — valid Postgres, always exactly one row, like `select 1`)
+-- or a `select ... from <cte>` where that CTE is itself guaranteed exactly
+-- one row (raw, microsoldering_tag_status — both built from scalar
+-- subqueries with no FROM/JOIN that could shrink their row count). None of
+-- the 14 branches can legitimately return zero or more-than-one row, so
+-- `checks` is guaranteed to always be exactly 14 rows.
 checks as (
-  select 1 as ord, 'prerequisite_tables_exist' as check_name,
+  select 1 as check_number, 'prerequisite_tables_exist' as check_name,
     case when equipment_types_table_exists and categories_table_exists and images_table_exists then 'PASS' else 'FAIL' end as status,
     'wholesale_equipment_types=' || equipment_types_table_exists
       || ', wholesale_categories=' || categories_table_exists
@@ -166,10 +215,11 @@ checks as (
 
   union all
 
-  select 2, 'new_columns_not_already_present',
+  select 2, 'new_columns_not_already_present (READ BY HAND)',
+    'PASS',
     case when not (name_es_already_exists or image_focus_x_already_exists or image_focus_y_already_exists or full_bleed_photo_already_exists)
-      then 'PASS' else 'REVIEW REQUIRED' end,
-    'name_es=' || name_es_already_exists || ', image_focus_x=' || image_focus_x_already_exists
+      then '' else 'REVIEW REQUIRED — ' end
+      || 'name_es=' || name_es_already_exists || ', image_focus_x=' || image_focus_x_already_exists
       || ', image_focus_y=' || image_focus_y_already_exists || ', full_bleed_photo=' || full_bleed_photo_already_exists
       || ' — expect all false on a first run. If true, this migration''s column-add step already ran; its own '
       || '"add column if not exists" makes re-running safe regardless (informational, not a blocker)'
@@ -177,9 +227,10 @@ checks as (
 
   union all
 
-  select 3, 'new_rpcs_not_already_present',
-    case when not (swap_rpc_already_exists or delete_rpc_already_exists) then 'PASS' else 'REVIEW REQUIRED' end,
-    'wholesale_swap_equipment_type_sort_order exists=' || swap_rpc_already_exists
+  select 3, 'new_rpcs_not_already_present (READ BY HAND)',
+    'PASS',
+    case when not (swap_rpc_already_exists or delete_rpc_already_exists) then '' else 'REVIEW REQUIRED — ' end
+      || 'wholesale_swap_equipment_type_sort_order exists=' || swap_rpc_already_exists
       || ', wholesale_delete_equipment_type exists=' || delete_rpc_already_exists
       || ' — expect both false on a first run; CREATE OR REPLACE makes a re-run safe either way'
   from raw
@@ -205,7 +256,7 @@ checks as (
   union all
 
   select 6, 'video_consoles_current_categories (READ BY HAND)',
-    'REVIEW REQUIRED',
+    'PASS',
     coalesce(
       (select string_agg(slug || ' (name=' || name || ', services=' || service_count || ', images=' || image_count || ')', E'\n' order by slug) from video_consoles_categories),
       '(none found — Video Consoles has zero categories already)'
@@ -226,7 +277,7 @@ checks as (
   union all
 
   select 8, 'current_equipment_types_snapshot (READ BY HAND)',
-    'REVIEW REQUIRED',
+    'PASS',
     (select listing from current_equipment_types) || E'\n\nTotal rows: ' || (select total_count from current_equipment_types)
       || ' — this is every row that exists, active or not, visible or not. See check 9 below for which ones '
       || 'ACTUALLY show as a card today — that is the list that matters for deciding the final visual order, '
@@ -235,7 +286,7 @@ checks as (
   union all
 
   select 9, 'equipment_type_real_visibility (READ BY HAND)',
-    'REVIEW REQUIRED',
+    'PASS',
     coalesce(
       (select string_agg(
         slug || ' (name=' || name || ') — ' ||
@@ -265,7 +316,7 @@ checks as (
   union all
 
   select 11, 'macbook_current_categories (READ BY HAND)',
-    'REVIEW REQUIRED',
+    'PASS',
     coalesce(
       (select string_agg(slug || ' (name=' || name || ', services=' || service_count || ', images=' || image_count || ')', E'\n' order by slug) from macbook_categories),
       '(none found — macbook has zero categories already)'
@@ -287,19 +338,17 @@ checks as (
 
   union all
 
-  select 13, 'macbook_and_laptops_photo_collision_check',
-    case when (
-      (select count(*) from wholesale_images where equipment_type_id = raw.macbook_id) > 0
-      and (select count(*) from wholesale_images where equipment_type_id = raw.laptops_id) > 0
-    ) then 'REVIEW REQUIRED' else 'PASS' end,
+  select 13, 'macbook_and_laptops_photo_collision_check (READ BY HAND)',
+    'PASS',
     case when (
       (select count(*) from wholesale_images where equipment_type_id = raw.macbook_id) > 0
       and (select count(*) from wholesale_images where equipment_type_id = raw.laptops_id) > 0
     ) then
-      'BOTH macbook and laptops already have their own photo. The migration''s photo-transfer step will NOT '
-        || 'overwrite laptops'' existing photo (guarded by the unique-per-equipment-type index) — macbook''s '
-        || 'photo will simply stay attached to the now-hidden macbook row, unused. If you want macbook''s '
-        || 'photo to become the Laptops card''s photo instead, replace it from DESK after the migration runs.'
+      'REVIEW REQUIRED — BOTH macbook and laptops already have their own photo. The migration''s photo-transfer '
+        || 'step will NOT overwrite laptops'' existing photo (guarded by the unique-per-equipment-type index) — '
+        || 'macbook''s photo will simply stay attached to the now-hidden macbook row, unused. If you want '
+        || 'macbook''s photo to become the Laptops card''s photo instead, replace it from DESK after the '
+        || 'migration runs.'
     else
       'macbook photos=' || (select count(*) from wholesale_images where equipment_type_id = raw.macbook_id)
         || ', laptops photos=' || (select count(*) from wholesale_images where equipment_type_id = raw.laptops_id)
@@ -316,7 +365,7 @@ checks as (
   -- the migration rather than pass quietly. Tag at least one active
   -- service as Microsoldering from DESK, then re-run this preflight.
   select 14, 'microsoldering_tagged_active_service_count',
-    case when tagged_active_service_count > 0 then 'PASS' else 'FAIL' end,
+    case when tagged_active_service_count > 0 then 'PASS' else 'STOP' end,
     'active services tagged ''microsoldering'' -> ' || tagged_active_service_count
       || ' — must be > 0. STOP/NO-GO if 0: the Microsoldering card would have zero content post-migration '
       || '(same hide-if-empty rule every other equipment type gets). Tag at least one active service as '
@@ -326,25 +375,48 @@ checks as (
 overall as (
   select
     case
+      when bool_or(status = 'STOP') then 'STOP'
       when bool_or(status = 'FAIL') then 'FAIL'
-      when bool_or(status = 'REVIEW REQUIRED') then 'REVIEW REQUIRED'
       else 'PASS'
     end as status
   from checks
-)
-select check_name, status, details
-from (
-  select ord, check_name, status, details from checks
+),
+report as (
+  select check_number, check_name, status, details from checks
   union all
   select
     99,
     'OVERALL STATUS',
     overall.status,
-    'PASS = safe to run wholesale-dynamic-equipment-types-migration.sql as-is. REVIEW REQUIRED = read every '
-      || 'flagged row by hand (especially 6, 8, 11, and 13) and confirm the migration''s hardcoded slug '
-      || 'references match before proceeding — this file cannot verify that automatically. FAIL = fix the '
-      || 'flagged row(s) first — check 14 (zero services tagged microsoldering) is the one FAIL that is only '
-      || 'fixed from DESK (tag a service), not by changing the migration.'
+    'PASS = safe to run wholesale-dynamic-equipment-types-migration.sql as-is. STOP = a hard, no-exceptions '
+      || 'gate — today only check 14 (zero services tagged microsoldering), fixed from DESK (tag a service), '
+      || 'never by changing the migration. FAIL = a structural check failed (checks 4, 5, 7, 10, or 12) — fix '
+      || 'the flagged row(s) first. Regardless of PASS/FAIL/STOP, read every row marked ''(READ BY HAND)'' or '
+      || 'prefixed ''REVIEW REQUIRED — '' in its details (especially checks 6, 8, 9, 11, and 13) by hand before '
+      || 'proceeding — this file cannot verify those automatically.'
   from overall
-) t
-order by ord;
+)
+select check_number, check_name, status, details
+from report
+
+union all
+
+-- Zero-rows safety net (see header). This branch is unreachable under
+-- correct execution — `report` always has exactly 15 rows — and exists
+-- purely so that a query returning nothing is structurally impossible: if
+-- `report` were ever empty, this becomes the ONLY row, and it explicitly
+-- says NO-GO instead of silently reporting nothing.
+select
+  0,
+  'OVERALL STATUS',
+  'STOP',
+  'ZERO CHECK ROWS WERE RETURNED — this preflight produced no results at all, which should never happen under '
+    || 'correct execution. Treat this as NO-GO/STOP: do NOT run the migration. This safety row exists '
+    || 'specifically to catch a silent empty-result failure (for example, Supabase SQL Editor showing '
+    || '"Success. No rows returned"). Re-run this file with its full, unmodified text selected, in the correct '
+    || 'database/schema; if it still returns only this one row, tell Claude before proceeding — something is '
+    || 'fundamentally wrong (permissions, wrong project/schema, or a bug in this file), not just an empty '
+    || 'catalog.'
+where not exists (select 1 from report)
+
+order by check_number;

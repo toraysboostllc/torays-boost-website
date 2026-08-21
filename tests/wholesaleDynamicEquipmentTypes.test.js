@@ -60,18 +60,18 @@ describe("wholesale-dynamic-equipment-types-preflight.sql: read-only gate before
     expect(preflight).toMatch(/'macbook-air', 'macbook-pro'/);
   });
 
-  it("flags REVIEW REQUIRED (not FAIL, not silently ignored) when both macbook AND laptops already have their own photo — the one edge case the migration's guard would leave un-transferred", () => {
+  it("flags REVIEW REQUIRED — in the details text (status stays PASS, never silently ignored) when both macbook AND laptops already have their own photo — the one edge case the migration's guard would leave un-transferred", () => {
     expect(preflight).toContain("macbook_and_laptops_photo_collision_check");
-    expect(preflight).toMatch(/then 'REVIEW REQUIRED' else 'PASS' end/);
+    expect(preflight).toMatch(/'REVIEW REQUIRED — BOTH macbook and laptops already have their own photo/);
   });
 
   it("produces a single OVERALL STATUS row", () => {
     expect(preflight).toContain("'OVERALL STATUS'");
   });
 
-  it("check 14 is a HARD GATE (FAIL, not REVIEW REQUIRED) when zero active services are tagged microsoldering — real STOP/NO-GO, not just informational", () => {
+  it("check 14 is a HARD GATE (STOP, not FAIL, not REVIEW REQUIRED) when zero active services are tagged microsoldering — real STOP/NO-GO, not just informational", () => {
     expect(preflight).toContain("microsoldering_tagged_active_service_count");
-    expect(preflight).toMatch(/case when tagged_active_service_count > 0 then 'PASS' else 'FAIL' end/);
+    expect(preflight).toMatch(/case when tagged_active_service_count > 0 then 'PASS' else 'STOP' end/);
     expect(preflight).toContain("STOP/NO-GO if 0");
   });
 
@@ -80,6 +80,22 @@ describe("wholesale-dynamic-equipment-types-preflight.sql: read-only gate before
     expect(cte, "microsoldering_tag_status CTE not found").toBeTruthy();
     expect(cte[1]).toContain("join wholesale_services s on s.id = st.service_id");
     expect(cte[1]).toContain("s.active = true");
+  });
+
+  it("output contract is exactly check_number, check_name, status, details — status restricted to PASS/FAIL/STOP, no fourth REVIEW REQUIRED status value", () => {
+    expect(preflight).toMatch(/select check_number, check_name, status, details\s*\nfrom report/);
+    expect(preflight).not.toMatch(/status\s*=\s*'REVIEW REQUIRED'/);
+    expect(preflight).not.toMatch(/'REVIEW REQUIRED'\s*end\s+as\s+status/);
+    expect(preflight).not.toMatch(/then 'REVIEW REQUIRED'/);
+  });
+
+  it("never silently returns zero rows — a synthetic OVERALL STATUS/STOP row is appended only when the real checks produced none", () => {
+    expect(preflight).toMatch(/where not exists \(select 1 from report\)/);
+    expect(preflight).toMatch(/ZERO CHECK ROWS WERE RETURNED/);
+    // the safety-net branch itself must report STOP, not PASS/FAIL
+    const netBranch = preflight.match(/-- Zero-rows safety net[\s\S]*?where not exists \(select 1 from report\)/);
+    expect(netBranch, "zero-rows safety net branch not found").toBeTruthy();
+    expect(netBranch[0]).toMatch(/\n\s*0,\s*\n\s*'OVERALL STATUS',\s*\n\s*'STOP',/);
   });
 });
 
