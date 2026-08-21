@@ -148,10 +148,26 @@ export function WholesaleWizard({ equipmentTypes, microsoldering, onScreenChange
                 because this component was mounted (it's Hidden/inactive on
                 the server otherwise, exactly like any other equipment
                 type). `featured` gives it a subtle distinguishing border/
-                shadow, never a larger size than the other cards. */}
+                shadow, never a larger size than the other cards.
+                id/name/nameEs/fullBleedPhoto/imageFocusX/imageFocusY all
+                come straight from the real wholesale_equipment_types row
+                (see api/_lib/wholesaleDb.js) — DESK can rename it, give it
+                a Spanish name, or toggle full-bleed exactly like any other
+                card, with nothing hardcoded here. t("microsoldering.title")
+                is used only as a last-resort fallback for a project that
+                somehow has the tag-lens row active with no name set at all. */}
             {microsoldering && (
               <EquipmentTypeCard
-                entity={{ slug: "microsoldering", name: t("microsoldering.title"), image: microsoldering.image }}
+                entity={{
+                  id: microsoldering.id,
+                  slug: microsoldering.slug || "microsoldering",
+                  name: microsoldering.name || t("microsoldering.title"),
+                  nameEs: microsoldering.name_es,
+                  fullBleedPhoto: microsoldering.full_bleed_photo,
+                  imageFocusX: microsoldering.image_focus_x,
+                  imageFocusY: microsoldering.image_focus_y,
+                  image: microsoldering.image,
+                }}
                 onClick={handleSelectMicrosoldering}
                 featured
               />

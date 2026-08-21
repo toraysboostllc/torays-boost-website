@@ -148,3 +148,74 @@ describe("buildWholesaleWizardCatalog: pure, defensive, data-driven", () => {
     expect(PROMOTED_CATEGORY_SLUGS).toEqual(new Set(["ps5", "xbox-series-x", "switch"]));
   });
 });
+
+describe("buildWholesaleWizardCatalog: backward-compatible dedup bridge — zero duplicate/missing cards across either deployment order", () => {
+  /** Mirrors the shape the API returns AFTER the dynamic-equipment-types
+   *  migration has run: ps5/xbox-series-x/switch are now their own
+   *  top-level equipment types (each with one category that happens to
+   *  share its slug — exactly how the migration re-points the existing
+   *  category, see wholesale-dynamic-equipment-types-migration.sql). */
+  function fixturePostMigration() {
+    return [
+      {
+        id: "et-iphone", slug: "iphone", name: "iPhone", image: null,
+        categories: [{ id: "cat-iphone-7-11", slug: "iphone-7-11", name: "iPhone 7-11", notes: null, diagnostic_fee: null, diagnostic_description: null, image: null, services: [{ id: "svc-1", name: "No Power" }] }],
+      },
+      {
+        id: "et-ps5", slug: "ps5", name: "PlayStation 5", name_es: "PlayStation 5", full_bleed_photo: true, image_focus_x: 40, image_focus_y: 60,
+        image: { url: "https://example.com/ps5-card.webp", alt_text: "PS5" },
+        categories: [{ id: "cat-ps5", slug: "ps5", name: "PlayStation 5", notes: null, diagnostic_fee: 10, diagnostic_description: null, image: null, services: [{ id: "svc-hdmi", name: "HDMI Port Replacement" }] }],
+      },
+      {
+        id: "et-video-consoles", slug: "video-consoles", name: "Video Consoles", image: null,
+        categories: [], // emptied by the migration, hidden server-side in reality, but modeled here as present-with-zero-categories defensively
+      },
+    ];
+  }
+
+  it("post-migration: PS5 appears EXACTLY ONCE, sourced from the real equipment type (not the nested category), carrying its own name_es/full_bleed_photo/image_focus", () => {
+    const wizard = buildWholesaleWizardCatalog(fixturePostMigration());
+    const ps5Cards = wizard.filter((e) => e.slug === "ps5");
+    expect(ps5Cards).toHaveLength(1);
+    expect(ps5Cards[0].id).toBe("et-ps5"); // the EQUIPMENT TYPE id, not the category id — proves it came from the real-row branch
+    expect(ps5Cards[0].nameEs).toBe("PlayStation 5");
+    expect(ps5Cards[0].fullBleedPhoto).toBe(true);
+    expect(ps5Cards[0].imageFocusX).toBe(40);
+    expect(ps5Cards[0].imageFocusY).toBe(60);
+    expect(ps5Cards[0].image.url).toBe("https://example.com/ps5-card.webp");
+  });
+
+  it("post-migration: Video Consoles (now empty) produces no card at all", () => {
+    const wizard = buildWholesaleWizardCatalog(fixturePostMigration());
+    expect(wizard.find((e) => e.slug === "video-consoles")).toBeUndefined();
+  });
+
+  it("pre-migration fixture: PS5 still gets defaulted presentation fields (bridge cards never carry DB-driven fullbleed/position/nameEs, since categories don't have them)", () => {
+    const wizard = buildWholesaleWizardCatalog(fixtureEquipmentTypes());
+    const ps5 = wizard.find((e) => e.id === "cat-ps5");
+    expect(ps5.nameEs).toBeNull();
+    expect(ps5.fullBleedPhoto).toBe(false);
+    expect(ps5.imageFocusX).toBe(50);
+    expect(ps5.imageFocusY).toBe(50);
+  });
+
+  it("a mixed/transitional response (one promoted category's equipment type migrated, another not yet) never double-counts the migrated one and still promotes the un-migrated one normally", () => {
+    const mixed = [
+      // ps5 already migrated to its own real equipment type...
+      { id: "et-ps5", slug: "ps5", name: "PlayStation 5", image: null, categories: [{ id: "cat-ps5", slug: "ps5", name: "PlayStation 5", notes: null, diagnostic_fee: null, diagnostic_description: null, image: null, services: [{ id: "svc-a", name: "X" }] }] },
+      // ...but xbox-series-x/switch have NOT been migrated yet — still nested under Video Consoles.
+      { id: "et-video-consoles", slug: "video-consoles", name: "Video Consoles", image: null, categories: [
+        { id: "cat-xbox", slug: "xbox-series-x", name: "Xbox Series X", notes: null, diagnostic_fee: null, diagnostic_description: null, image: null, services: [{ id: "svc-b", name: "Y" }] },
+        { id: "cat-switch", slug: "switch", name: "Switch", notes: null, diagnostic_fee: null, diagnostic_description: null, image: null, services: [{ id: "svc-c", name: "Z" }] },
+      ] },
+    ];
+    const wizard = buildWholesaleWizardCatalog(mixed);
+    expect(wizard.filter((e) => e.slug === "ps5")).toHaveLength(1);
+    expect(wizard.find((e) => e.slug === "ps5").id).toBe("et-ps5"); // from the real row, not re-promoted from a phantom nested category
+    expect(wizard.filter((e) => e.slug === "xbox-series-x")).toHaveLength(1);
+    expect(wizard.find((e) => e.slug === "xbox-series-x").id).toBe("cat-xbox"); // still via the legacy bridge
+    expect(wizard.filter((e) => e.slug === "switch")).toHaveLength(1);
+    // Video Consoles itself still doesn't appear, since both its remaining categories were promoted away.
+    expect(wizard.find((e) => e.slug === "video-consoles")).toBeUndefined();
+  });
+});

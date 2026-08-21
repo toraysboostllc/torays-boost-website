@@ -413,6 +413,10 @@ export async function buildWholesaleCatalog(env) {
       id: et.id,
       slug: et.slug,
       name: et.name,
+      name_es: et.name_es || null,
+      full_bleed_photo: Boolean(et.full_bleed_photo),
+      image_focus_x: et.image_focus_x ?? 50,
+      image_focus_y: et.image_focus_y ?? 50,
       image: imageByEquipmentType.get(et.id) || null,
       categories: (categoriesByEquipmentType.get(et.id) || [])
         .map(toClientCategory)
@@ -457,6 +461,19 @@ export async function buildWholesaleCatalog(env) {
       .filter((et) => et.categories.length > 0);
 
     microsoldering = {
+      // `id`/`slug`/`name_es`/`full_bleed_photo`/`image_focus_x`/`image_focus_y`
+      // come straight from the real wholesale_equipment_types row DESK
+      // already lets an admin edit exactly like any other card — this
+      // object is no longer just { image, equipmentTypes }, specifically so
+      // WholesaleWizard.jsx never has to hand-write a synthetic entity with
+      // a hardcoded name/no id (see that file's own header comment).
+      id: microsolderingType.id,
+      slug: microsolderingType.slug,
+      name: microsolderingType.name,
+      name_es: microsolderingType.name_es || null,
+      full_bleed_photo: Boolean(microsolderingType.full_bleed_photo),
+      image_focus_x: microsolderingType.image_focus_x ?? 50,
+      image_focus_y: microsolderingType.image_focus_y ?? 50,
       image: imageByEquipmentType.get(microsolderingType.id) || null,
       equipmentTypes: lensEquipmentTypes,
     };

@@ -626,10 +626,14 @@ describe("wholesalePortal.css: Microsoldering tile is 'featured' via border/shad
     const wizardSrc = read("src/components/wholesale/WholesaleWizard.jsx");
     expect(cardSrc).toMatch(/featured \? " wsp-card-featured" : ""/);
     expect((wizardSrc.match(/featured\b/g) || []).length).toBeGreaterThan(0);
-    // only the Microsoldering EquipmentTypeCard call gets `featured`
+    // only the Microsoldering EquipmentTypeCard call gets `featured` —
+    // anchored on its onClick handler (unique to this element) rather than
+    // the entity literal's exact shape, since entity is now built from the
+    // real DB row's fields (id/name/nameEs/fullBleedPhoto/...), not a
+    // single-line hardcoded object.
     const microTileBlock = wizardSrc.slice(
-      wizardSrc.indexOf('entity={{ slug: "microsoldering"'),
-      wizardSrc.indexOf("/>", wizardSrc.indexOf('entity={{ slug: "microsoldering"'))
+      wizardSrc.indexOf("onClick={handleSelectMicrosoldering}"),
+      wizardSrc.indexOf("/>", wizardSrc.indexOf("onClick={handleSelectMicrosoldering}"))
     );
     expect(microTileBlock).toContain("featured");
   });

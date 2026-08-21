@@ -22,14 +22,32 @@ import { wholesaleHoverProps } from "../../lib/wholesaleSound.js";
  *
  * `featured` marks the Microsoldering tile with a subtle distinguishing
  * accent (border/shadow only — never a larger size, per the approved spec).
- * `entity.name` is the raw, stored-in-English catalog name; it's translated
- * for display only via translateCatalogLabel, never mutated or sent
- * anywhere — the alt text and the click handler still see the original.
+ *
+ * Display name is a three-tier fallback, in order: `entity.nameEs` (typed
+ * into DESK directly — see wholesale_equipment_types.name_es, the dynamic-
+ * equipment-types migration) when present and we're in Spanish; else the
+ * legacy hardcoded translateCatalogLabel dictionary (kept only as a fallback
+ * for the small set of pre-existing cards that already have an entry there
+ * and haven't had name_es filled in yet); else the raw, stored-in-English
+ * `entity.name`. `entity.name` itself is NEVER mutated or sent anywhere —
+ * the alt text and the click handler always see the original.
+ *
+ * Full-bleed (photo covers the whole card edge-to-edge, bottom gradient
+ * scrim, title/arrow overlaid) is driven entirely by `entity.fullBleedPhoto`
+ * (a DESK-editable boolean — see wholesale_equipment_types.full_bleed_photo)
+ * and `entity.imageFocusX`/`entity.imageFocusY` (normalized 0-100 crop-focus
+ * point DESK's admin UI sets via a visual grid/drag control, never typed
+ * CSS — see wholesale_equipment_types.image_focus_x/image_focus_y). There is
+ * deliberately no hardcoded slug map here: any card, present or future, gets
+ * this treatment purely by what its own database row says.
  */
 export function EquipmentTypeCard({ entity, onClick, featured = false }) {
   const { language } = useWholesaleLocale();
   const Icon = wholesaleEquipmentIcon(entity);
-  const displayName = translateCatalogLabel(entity.name, language);
+  const displayName =
+    language === "es" && entity.nameEs && entity.nameEs.trim()
+      ? entity.nameEs.trim()
+      : translateCatalogLabel(entity.name, language);
   const hoverProps = wholesaleHoverProps(onClick);
   const imageUrl = entity.image?.url || null;
 
@@ -47,12 +65,18 @@ export function EquipmentTypeCard({ entity, onClick, featured = false }) {
   }, [imageUrl]);
 
   const showImage = imageUrl && imageUrl !== failedUrl;
+  // Only takes effect when there's actually a photo to show — with no
+  // image (or a failed one), this card falls back to the exact same icon
+  // treatment as every other card, never a "full bleed" empty/icon card.
+  const isFullBleed = Boolean(entity.fullBleedPhoto) && showImage;
+  const focusX = Number.isFinite(entity.imageFocusX) ? entity.imageFocusX : 50;
+  const focusY = Number.isFinite(entity.imageFocusY) ? entity.imageFocusY : 50;
 
   return (
     <button
       type="button"
       {...hoverProps}
-      className={`wsp-card wsp-card-clickable w-full text-left${featured ? " wsp-card-featured" : ""}`}
+      className={`wsp-card wsp-card-clickable w-full text-left${featured ? " wsp-card-featured" : ""}${isFullBleed ? " wsp-card-fullbleed" : ""}`}
     >
       <span className="wsp-card-accent" aria-hidden="true" />
       <div className="wsp-card-photo">
@@ -63,12 +87,14 @@ export function EquipmentTypeCard({ entity, onClick, featured = false }) {
             loading="lazy"
             width={400}
             height={300}
+            style={isFullBleed ? { objectPosition: `${focusX}% ${focusY}%` } : undefined}
             onError={() => setFailedUrl(imageUrl)}
           />
         ) : (
           <Icon size={44} className="wsp-card-photo-icon" aria-hidden="true" />
         )}
       </div>
+      {isFullBleed && <span className="wsp-card-fullbleed-gradient" aria-hidden="true" />}
       <div className="wsp-card-body flex items-center justify-between gap-2">
         <span className="wsp-card-title">{displayName}</span>
         <ChevronRight size={18} className="wsp-card-arrow" aria-hidden="true" />

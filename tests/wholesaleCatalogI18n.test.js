@@ -63,12 +63,16 @@ describe("translateCatalogLabel: every distinct service name in the real seed ca
 });
 
 describe("Components wire translateCatalogLabel in for every catalog-sourced name they render", () => {
-  it("EquipmentTypeCard translates entity.name for display, but keeps the raw value for alt text fallback and onClick untouched", () => {
+  it("EquipmentTypeCard prefers a DB-driven entity.nameEs first, falls back to translateCatalogLabel, and keeps the raw value for alt text fallback and onClick untouched", () => {
     const src = read("src/components/wholesale/EquipmentTypeCard.jsx");
     expect(src).toContain(
       'import { translateCatalogLabel } from "../../lib/wholesaleCatalogI18n.js";'
     );
-    expect(src).toContain("const displayName = translateCatalogLabel(entity.name, language);");
+    // Three-tier fallback: entity.nameEs (typed into DESK) wins when present
+    // in Spanish; translateCatalogLabel (the legacy hardcoded dictionary) is
+    // still consulted as the next tier, never removed outright.
+    expect(src).toMatch(/language === "es" && entity\.nameEs && entity\.nameEs\.trim\(\)/);
+    expect(src).toContain("translateCatalogLabel(entity.name, language)");
     expect(src).toContain("{displayName}");
   });
 
