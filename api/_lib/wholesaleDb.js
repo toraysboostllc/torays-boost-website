@@ -366,24 +366,31 @@ function toClientService(sv, portalSettings, image) {
  *  from the SAME portalSettings row fetched at the top — never refetched
  *  per service.
  *
+ *  MICROSOLDERING WIRE SPLIT (see the dedicated comment further down, right
+ *  where it happens, for the full reproduced-bug rationale): the
+ *  Microsoldering row is pulled OUT of `equipmentTypes` before the response
+ *  is built and returned in its own `microsolderingEquipmentType` field
+ *  instead — the ONE deliberate, narrow exception to "every equipment type
+ *  is a plain equipmentTypes[] member" in this file, needed only because
+ *  git main's still-deployed WholesaleWizard.jsx renders an unconditional
+ *  manual tile from a separate legacy key and would double-render
+ *  Microsoldering if it were also a normal array member. The CURRENT
+ *  client (wholesaleWizardCatalog.js) merges that field straight back into
+ *  the same unified pipeline every other equipment type already flows
+ *  through. `tagLensEquipmentTypes`, the OLDER (tag-based) version of this
+ *  same idea, is REMOVED entirely — nothing in Production ever shipped
+ *  reading it.
+ *
  *  LEGACY COMPATIBILITY (TEMPORARY — remove once this deploy has been live
  *  and verified for a while): the response ALSO carries a top-level
  *  `microsoldering` key, in the OLD pre-unification nested shape
  *  (`{ id, name, image, equipmentTypes: [{ id, name, categories: [{ id,
- *  slug, name, services }] }] }`) that git `main`'s still-deployed
- *  WholesaleWizard.jsx hardcodes a manual tile and click-through around.
- *  Built from the SAME already-active data above, wrapped as ONE synthetic
- *  "equipment type" entry containing the real Microsoldering card's own
- *  (single, internal) category and its real services — never a second
- *  query, never invented data. Only ever populated from a row literally
- *  slugged 'microsoldering' AND catalog_mode='direct_services', since that
- *  is the one shape the old client's hardcoded reader understands; a
- *  hypothetical second direct_services row has no legacy shape to be
- *  compatible with and does not get one. The `tagLensEquipmentTypes` field
- *  this response used to also carry is REMOVED entirely — nothing in
- *  Production ever shipped reading it (this whole mechanism only ever
- *  existed within this unmerged branch), so there is nothing left to stay
- *  compatible with there. */
+ *  slug, name, services }] }] }`) that git `main`'s WholesaleWizard.jsx
+ *  actually reads for its manual tile and click-through. Built from the
+ *  SAME extracted row as `microsolderingEquipmentType` above, wrapped as
+ *  ONE synthetic "equipment type" entry containing the real Microsoldering
+ *  card's own (single, internal) category and its real services — never a
+ *  second query, never invented data. */
 export async function buildWholesaleCatalog(env) {
   const [equipmentTypes, categories, services, portalSettings] = await Promise.all([
     listActiveEquipmentTypes(env),
@@ -467,9 +474,34 @@ export async function buildWholesaleCatalog(env) {
     // excluded here exactly like an empty grouped card always has been.
     .filter((et) => et.categories.length > 0);
 
+  // MICROSOLDERING WIRE SPLIT — the ONE deliberate, narrow, backward-
+  // compat-only exception to "never gate on slug": git main's still-
+  // deployed WholesaleWizard.jsx renders an UNCONDITIONAL manual tile
+  // whenever `data.microsoldering` is non-null, IN ADDITION TO its own
+  // generic loop over `data.equipmentTypes`. If the Microsoldering row
+  // stayed a normal member of `equipmentTypesOut` (which is the
+  // architecturally correct place for it — see this function's own
+  // header), an already-open old client tab would render it TWICE: once
+  // via the manual tile, once via its own unmodified per-equipment-type
+  // loop. This was a REAL, reproduced duplicate-card bug found while
+  // testing this exact stale-tab scenario against a real snapshot of
+  // main's WholesaleWizard.jsx — not a hypothetical. The fix: pull the
+  // Microsoldering row OUT of `equipmentTypesOut` before it's sent, into
+  // its own `microsolderingEquipmentType` field; the CURRENT client (see
+  // wholesaleWizardCatalog.js) merges it straight back into the same
+  // unified pipeline every other equipment type already flows through —
+  // genuinely one pipeline, the split exists ONLY at the wire level, for
+  // this one specific old-client hardcoded reader. This does NOT
+  // generalize to a future second direct_services card: only
+  // 'microsoldering' has a legacy `data.microsoldering` reader in old
+  // client code, so only it needs this treatment.
+  const microsolderingIndex = equipmentTypesOut.findIndex((et) => et.slug === "microsoldering" && et.catalog_mode === "direct_services");
+  const microsolderingOut = microsolderingIndex >= 0 ? equipmentTypesOut.splice(microsolderingIndex, 1)[0] : null;
+
   // LEGACY COMPATIBILITY BRIDGE — see this function's own header for the
-  // full rationale and removal plan.
-  const microsolderingOut = equipmentTypesOut.find((et) => et.slug === "microsoldering" && et.catalog_mode === "direct_services");
+  // full rationale and removal plan. Nested shape, DIFFERENT from
+  // `microsolderingEquipmentType` above (which is flat, for the current
+  // client) — built from the SAME extracted row so it can never drift.
   const legacyMicrosoldering = microsolderingOut
     ? {
         id: microsolderingOut.id,
@@ -487,10 +519,15 @@ export async function buildWholesaleCatalog(env) {
 
   return {
     equipmentTypes: equipmentTypesOut,
+    // PRIMARY channel for the current client to recover Microsoldering —
+    // see the wire-split comment above. Same per-card shape as
+    // `equipmentTypes`'s own entries; `null` when Microsoldering has no
+    // content yet (same "hide if empty" rule, nothing special).
+    microsolderingEquipmentType: microsolderingOut,
     // LEGACY, TEMPORARY — see this function's own header for what this is
     // and the removal plan. The current client only consults it as a
-    // fallback, when Microsoldering isn't already present in
-    // `equipmentTypes` (an old server — see wholesaleWizardCatalog.js).
+    // fallback, when `microsolderingEquipmentType` itself is absent (an
+    // old server — see wholesaleWizardCatalog.js).
     microsoldering: legacyMicrosoldering,
     // Read-only for the portal — shops never write either of these. Falls
     // back to safe, conservative defaults (maintenance + blocked, no

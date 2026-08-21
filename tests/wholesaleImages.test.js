@@ -400,10 +400,14 @@ describe("Microsoldering: catalog_mode='direct_services', a plain member of equi
     });
   }
   function microCard(res) {
-    return res.body.equipmentTypes.find((e) => e.slug === "microsoldering");
+    // Microsoldering is pulled OUT of equipmentTypes[] at the wire level —
+    // see api/_lib/wholesaleDb.js's own comment for the real, reproduced
+    // old-client-tab reason (a genuine duplicate-card bug, not a
+    // hypothetical). This is the PRIMARY channel the current client reads.
+    return res.body.microsolderingEquipmentType;
   }
 
-  it("appears in equipmentTypes[] once its own (DESK-managed, internal) category has at least one active service — a plain member, own catalog_mode, no separate response channel", async () => {
+  it("appears via microsolderingEquipmentType (never equipmentTypes[] itself) once its own (DESK-managed, internal) category has at least one active service — own catalog_mode, no tag involved", async () => {
     seedShopWithSession();
     const microType = seedMicrosolderingType();
     const cat = seedCategory(microType.id, { slug: "microsoldering-direct", name: "Microsoldering" });
@@ -411,7 +415,9 @@ describe("Microsoldering: catalog_mode='direct_services', a plain member of equi
 
     const res = await callPrices();
 
-    expect(res.body.equipmentTypes.map((e) => e.slug)).toContain("microsoldering");
+    // Deliberately NOT a member of equipmentTypes[] — see the wire-split
+    // comment in api/_lib/wholesaleDb.js for the real, reproduced reason.
+    expect(res.body.equipmentTypes.map((e) => e.slug)).not.toContain("microsoldering");
     expect(microCard(res).catalog_mode).toBe("direct_services");
     // The TEMPORARY legacy compatibility key is still present alongside the
     // unified card (see tests/wholesaleDynamicEquipmentTypesApi.test.js for
@@ -453,7 +459,7 @@ describe("Microsoldering: catalog_mode='direct_services', a plain member of equi
 
     const res = await callPrices();
 
-    expect(microCard(res)).toBeUndefined();
+    expect(microCard(res)).toBeNull();
   });
 
   it("a service under a Hidden category never appears — Microsoldering produces no card when that was its only category", async () => {
@@ -464,7 +470,7 @@ describe("Microsoldering: catalog_mode='direct_services', a plain member of equi
 
     const res = await callPrices();
 
-    expect(microCard(res)).toBeUndefined();
+    expect(microCard(res)).toBeNull();
   });
 
   it("no category added yet from DESK (fresh, nothing added): Microsoldering produces no card — never an empty-but-present one", async () => {
@@ -473,7 +479,7 @@ describe("Microsoldering: catalog_mode='direct_services', a plain member of equi
 
     const res = await callPrices();
 
-    expect(microCard(res)).toBeUndefined();
+    expect(microCard(res)).toBeNull();
   });
 
   it("Microsoldering equipment type itself hidden: absent from equipmentTypes[] — no card renders at all, exactly like any other hidden equipment type", async () => {
@@ -484,7 +490,7 @@ describe("Microsoldering: catalog_mode='direct_services', a plain member of equi
 
     const res = await callPrices();
 
-    expect(microCard(res)).toBeUndefined();
+    expect(microCard(res)).toBeNull();
   });
 
   it("no Microsoldering equipment type row exists at all (fresh/incomplete environment): absent, no crash", async () => {
@@ -496,7 +502,7 @@ describe("Microsoldering: catalog_mode='direct_services', a plain member of equi
     const res = await callPrices();
 
     expect(res.statusCode).toBe(200);
-    expect(microCard(res)).toBeUndefined();
+    expect(microCard(res)).toBeNull();
   });
 
   it("Microsoldering's own cover photo is signed and gated exactly like any other Equipment Type's photo", async () => {

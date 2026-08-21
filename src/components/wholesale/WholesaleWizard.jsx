@@ -57,21 +57,25 @@ function WizardSteps({ equipoDone, modeloDone, fallaDone, t }) {
  * changes a purely presentational banner on the Modelo/Falla screens below
  * — never whether or where the card appears, never gated by its slug).
  *
- * `equipmentTypes` and `legacyMicrosoldering` are exactly what
- * /api/wholesale-prices already returned when the portal loaded (see
- * WholesalePrices.jsx) — this component never fetches anything itself.
- * `legacyMicrosoldering` is a TEMPORARY compatibility fallback only,
- * consulted solely when Microsoldering isn't already present in
- * `equipmentTypes` — see buildWholesaleWizardCatalog's own header for what
- * it's for and when to delete it. Screen history is a simple stack (push
- * forward, pop on Back) instead of hardcoding a back-target per screen.
+ * `equipmentTypes`, `microsolderingEquipmentType`, and `legacyMicrosoldering`
+ * are exactly what /api/wholesale-prices already returned when the portal
+ * loaded (see WholesalePrices.jsx) — this component never fetches anything
+ * itself. `microsolderingEquipmentType` is the PRIMARY channel Microsoldering
+ * arrives through (kept as its own field at the wire level for a real,
+ * reproduced old-client-tab reason — see api/_lib/wholesaleDb.js and
+ * buildWholesaleWizardCatalog's own header). `legacyMicrosoldering` is a
+ * TEMPORARY compatibility fallback only, consulted solely when
+ * `microsolderingEquipmentType` itself is absent (an old server) — see
+ * buildWholesaleWizardCatalog's own header for what it's for and when to
+ * delete it. Screen history is a simple stack (push forward, pop on Back)
+ * instead of hardcoding a back-target per screen.
  */
-export function WholesaleWizard({ equipmentTypes, legacyMicrosoldering, onScreenChange }) {
+export function WholesaleWizard({ equipmentTypes, microsolderingEquipmentType, legacyMicrosoldering, onScreenChange }) {
   const { t, language } = useWholesaleLocale();
 
   const topEquipoList = useMemo(
-    () => buildWholesaleWizardCatalog(equipmentTypes, undefined, legacyMicrosoldering),
-    [equipmentTypes, legacyMicrosoldering]
+    () => buildWholesaleWizardCatalog(equipmentTypes, undefined, microsolderingEquipmentType, legacyMicrosoldering),
+    [equipmentTypes, microsolderingEquipmentType, legacyMicrosoldering]
   );
 
   const [screenStack, setScreenStack] = useState(["top"]);

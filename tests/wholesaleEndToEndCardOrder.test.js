@@ -163,7 +163,7 @@ describe("End-to-end: real server (buildWholesaleCatalog) -> real client (buildW
     const res = await callPrices();
     expect(res.statusCode).toBe(200);
 
-    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes);
+    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes, undefined, res.body.microsolderingEquipmentType);
 
     expect(cards.map((c) => c.name)).toEqual(APPROVED_ORDER);
   });
@@ -172,7 +172,7 @@ describe("End-to-end: real server (buildWholesaleCatalog) -> real client (buildW
     seedFixedCatalog();
 
     const res = await callPrices();
-    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes);
+    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes, undefined, res.body.microsolderingEquipmentType);
 
     const ids = cards.map((c) => c.id);
     const slugs = cards.map((c) => c.slug);
@@ -184,7 +184,7 @@ describe("End-to-end: real server (buildWholesaleCatalog) -> real client (buildW
     seedFixedCatalog();
 
     const res = await callPrices();
-    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes);
+    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes, undefined, res.body.microsolderingEquipmentType);
 
     const macbookCard = cards.find((c) => c.name === "MacBook");
     expect(macbookCard.models.map((m) => m.name).sort()).toEqual(["MacBook Air", "MacBook Pro"]);
@@ -194,7 +194,7 @@ describe("End-to-end: real server (buildWholesaleCatalog) -> real client (buildW
     seedFixedCatalog();
 
     const res = await callPrices();
-    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes);
+    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes, undefined, res.body.microsolderingEquipmentType);
 
     const laptopsCard = cards.find((c) => c.name === "Laptops");
     expect(laptopsCard.models.map((m) => m.name).sort()).toEqual(["Gaming Laptops", "Laptops (Standard)"]);
@@ -204,7 +204,7 @@ describe("End-to-end: real server (buildWholesaleCatalog) -> real client (buildW
     seedFixedCatalog();
 
     const res = await callPrices();
-    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes);
+    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes, undefined, res.body.microsolderingEquipmentType);
 
     const microCard = cards.find((c) => c.name === "Microsoldering");
     expect(microCard.isDirectServices).toBe(true);
@@ -217,7 +217,7 @@ describe("End-to-end: real server (buildWholesaleCatalog) -> real client (buildW
     seedFixedCatalog();
 
     const res = await callPrices();
-    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes);
+    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes, undefined, res.body.microsolderingEquipmentType);
 
     const microCard = cards.find((c) => c.name === "Microsoldering");
     const allText = JSON.stringify(microCard);
@@ -230,7 +230,7 @@ describe("End-to-end: real server (buildWholesaleCatalog) -> real client (buildW
     seedFixedCatalog();
 
     const res = await callPrices();
-    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes);
+    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes, undefined, res.body.microsolderingEquipmentType);
 
     expect(cards.map((c) => c.name)).not.toContain("Gaming Laptops");
     expect(cards.map((c) => c.name)).not.toContain("Video Consoles");
@@ -251,7 +251,7 @@ describe("End-to-end: a brand-new DESK-created GROUPED equipment type appears as
     seedService(droneCat.id, { slug: "drone-gimbal-calibration", name: "Gimbal Calibration" });
 
     const res = await callPrices();
-    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes);
+    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes, undefined, res.body.microsolderingEquipmentType);
 
     expect(cards).toHaveLength(10);
     expect(cards.map((c) => c.name)).toEqual([...APPROVED_ORDER, "Drone Repair"]);
@@ -268,7 +268,7 @@ describe("End-to-end: a brand-new DESK-created DIRECT_SERVICES equipment type ap
     seedService(drCat.id, { slug: "data-recovery-hdd-recovery", name: "HDD Recovery" });
 
     const res = await callPrices();
-    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes);
+    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes, undefined, res.body.microsolderingEquipmentType);
 
     expect(cards).toHaveLength(10);
     const drCard = cards.find((c) => c.slug === "data-recovery-direct");

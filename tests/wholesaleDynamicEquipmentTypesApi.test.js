@@ -130,7 +130,11 @@ describe("wholesale-prices: Microsoldering (catalog_mode='direct_services') is a
 
     const res = await callPrices();
 
-    const microCard = res.body.equipmentTypes.find((e) => e.slug === "microsoldering");
+    // Deliberately NOT in equipmentTypes[] — see the wire-split comment in
+    // api/_lib/wholesaleDb.js for the real, reproduced old-client-tab
+    // reason. microsolderingEquipmentType is the PRIMARY channel instead.
+    expect(res.body.equipmentTypes.map((e) => e.slug)).not.toContain("microsoldering");
+    const microCard = res.body.microsolderingEquipmentType;
     expect(microCard).toBeTruthy();
     expect(microCard.id).toBe(microsolderingType.id);
     expect(microCard.name).toBe("Microsoldering");

@@ -70,6 +70,10 @@ export async function fetchWholesaleCatalog() {
     ok: true,
     shopName: data.shopName,
     equipmentTypes: data.equipmentTypes || [],
+    // PRIMARY channel Microsoldering arrives through — see
+    // api/_lib/wholesaleDb.js's own comment for the real, reproduced
+    // old-client-tab reason this is a separate field.
+    microsolderingEquipmentType: data.microsolderingEquipmentType || null,
     // TEMPORARY compatibility passthrough — see buildWholesaleWizardCatalog's
     // header for what this is for (an old server only) and when to delete
     // it. Not read anywhere else in this file.

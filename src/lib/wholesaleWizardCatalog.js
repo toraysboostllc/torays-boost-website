@@ -90,21 +90,33 @@ function cardPresentation(source) {
  * Consoles", pre-migration) is dropped entirely from the returned list — it
  * would otherwise render as an empty card with nothing behind it.
  *
- * `legacyMicrosoldering`, 3rd param, TEMPORARY (see its own comment at the
+ * `microsolderingEquipmentType`, 3rd param: the PRIMARY channel for
+ * Microsoldering specifically — the server pulls it OUT of `equipmentTypes`
+ * at the wire level (see api/_lib/wholesaleDb.js's dedicated comment for
+ * the real, reproduced reason: git main's WholesaleWizard.jsx renders an
+ * unconditional manual tile from its own separate legacy key, so leaving
+ * Microsoldering as a normal equipmentTypes[] member would double-render
+ * it for an already-open old client tab). This function merges it straight
+ * back into the SAME unified pipeline every other equipment type already
+ * flows through — genuinely one pipeline, the split is a wire-level
+ * concern only, and it does NOT generalize to any other slug.
+ *
+ * `legacyMicrosoldering`, 4th param, TEMPORARY (see its own comment at the
  * usage site below): a fallback for when the server predates
- * catalog_mode='direct_services' cards being included in `equipmentTypes`
- * at all (an old server, pre wholesale-catalog-architecture-fix) — this
- * function only ever CONSULTS it when Microsoldering isn't already present
- * in `equipmentTypes`, never as a primary source.
+ * `microsolderingEquipmentType` existing at all (an old server, pre
+ * wholesale-catalog-architecture-fix) — this function only ever CONSULTS
+ * it when Microsoldering isn't already present in `equipmentTypes`, never
+ * as a primary source.
  */
 export function buildWholesaleWizardCatalog(
   equipmentTypes,
   promotedSlugs = PROMOTED_CATEGORY_SLUGS,
+  microsolderingEquipmentType = null,
   legacyMicrosoldering = null
 ) {
   if (!Array.isArray(equipmentTypes)) return [];
 
-  const combinedEquipmentTypes = [...equipmentTypes]
+  const combinedEquipmentTypes = [...equipmentTypes, ...(microsolderingEquipmentType ? [microsolderingEquipmentType] : [])]
     // Sorted once, here, by the same sort_order DESK's reorder buttons
     // write to every row — missing values (e.g. fixtures that predate this
     // field) fall back to Infinity, a stable no-op that preserves whatever

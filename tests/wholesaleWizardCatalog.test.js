@@ -220,7 +220,7 @@ describe("buildWholesaleWizardCatalog: backward-compatible dedup bridge — zero
   });
 });
 
-describe("buildWholesaleWizardCatalog: catalog_mode='direct_services' (Microsoldering) is a PLAIN member of equipmentTypes[], plus a TEMPORARY legacy-server fallback (3rd param) for a stale pre-deploy client tab", () => {
+describe("buildWholesaleWizardCatalog: Microsoldering arrives via microsolderingEquipmentType (3rd param) — a WIRE-LEVEL split, never a member of equipmentTypes[] itself — plus a TEMPORARY legacy-server fallback (4th param) for a stale pre-deploy client tab", () => {
   function fixtureGroupedEquipmentTypes() {
     return [
       {
@@ -229,10 +229,15 @@ describe("buildWholesaleWizardCatalog: catalog_mode='direct_services' (Microsold
       },
     ];
   }
-  /** Microsoldering the NEW way: catalog_mode='direct_services', a plain
-   *  entry in equipmentTypes[] with its own single (DESK-managed, internal)
-   *  category holding directly-owned services — never a tag-based
-   *  aggregation of some OTHER equipment type's category. */
+  /** Microsoldering the NEW way: catalog_mode='direct_services', its own
+   *  single (DESK-managed, internal) category holding directly-owned
+   *  services — never a tag-based aggregation of some OTHER equipment
+   *  type's category. Arrives as its OWN object (never pre-merged into the
+   *  equipmentTypes array) — see api/_lib/wholesaleDb.js's wire-split
+   *  comment for the real, reproduced old-client-tab reason: git main's
+   *  WholesaleWizard.jsx renders an unconditional manual tile from a
+   *  separate legacy key, so a Microsoldering entry left inside
+   *  equipmentTypes[] would double-render for an already-open old tab. */
   function fixtureMicrosolderingDirect() {
     return {
       id: "et-microsoldering", slug: "microsoldering", name: "Microsoldering", name_es: "Microsoldadura",
@@ -255,8 +260,8 @@ describe("buildWholesaleWizardCatalog: catalog_mode='direct_services' (Microsold
     };
   }
 
-  it("Microsoldering (direct_services) sorts into the SAME list as grouped types by sort_order — sort_order 1 lands before iPhone's sort_order 2", () => {
-    const wizard = buildWholesaleWizardCatalog([fixtureMicrosolderingDirect(), ...fixtureGroupedEquipmentTypes()]);
+  it("microsolderingEquipmentType merges into the SAME list as grouped types, sorted by sort_order — sort_order 1 lands before iPhone's sort_order 2", () => {
+    const wizard = buildWholesaleWizardCatalog(fixtureGroupedEquipmentTypes(), undefined, fixtureMicrosolderingDirect());
     expect(wizard).toHaveLength(2);
     expect(wizard[0].slug).toBe("microsoldering");
     expect(wizard[0].isDirectServices).toBe(true);
@@ -266,20 +271,20 @@ describe("buildWholesaleWizardCatalog: catalog_mode='direct_services' (Microsold
     expect(wizard[1].isDirectServices).toBe(false);
   });
 
-  it("Microsoldering already present in equipmentTypes[]: legacyMicrosoldering is ignored entirely — no duplicate card even if both are supplied", () => {
-    const wizard = buildWholesaleWizardCatalog([fixtureMicrosolderingDirect(), ...fixtureGroupedEquipmentTypes()], undefined, fixtureLegacyMicrosoldering());
+  it("microsolderingEquipmentType present: legacyMicrosoldering (4th param) is ignored entirely — no duplicate card even if both are supplied", () => {
+    const wizard = buildWholesaleWizardCatalog(fixtureGroupedEquipmentTypes(), undefined, fixtureMicrosolderingDirect(), fixtureLegacyMicrosoldering());
     const microCards = wizard.filter((e) => e.slug === "microsoldering");
     expect(microCards).toHaveLength(1); // not 2 — the legacy fallback never fired
     expect(microCards[0].id).toBe("et-microsoldering");
   });
 
-  it("Microsoldering absent from equipmentTypes[], no legacyMicrosoldering either (current-shape client talking to a server that never sends either): no Microsoldering card, no crash", () => {
+  it("microsolderingEquipmentType absent, no legacyMicrosoldering either (current-shape client talking to a server that never sends either): no Microsoldering card, no crash", () => {
     const wizard = buildWholesaleWizardCatalog(fixtureGroupedEquipmentTypes());
     expect(wizard.map((e) => e.slug)).toEqual(["iphone"]);
   });
 
-  it("Microsoldering absent from equipmentTypes[] (old server, pre catalog_mode), legacyMicrosoldering present: falls back to it, producing exactly one Microsoldering card, inserted first", () => {
-    const wizard = buildWholesaleWizardCatalog(fixtureGroupedEquipmentTypes(), undefined, fixtureLegacyMicrosoldering());
+  it("microsolderingEquipmentType absent (old server, pre wholesale-catalog-architecture-fix), legacyMicrosoldering present: falls back to it, producing exactly one Microsoldering card, inserted first", () => {
+    const wizard = buildWholesaleWizardCatalog(fixtureGroupedEquipmentTypes(), undefined, null, fixtureLegacyMicrosoldering());
     expect(wizard).toHaveLength(2);
     expect(wizard[0].slug).toBe("microsoldering");
     expect(wizard[0].isDirectServices).toBe(true);
@@ -287,12 +292,12 @@ describe("buildWholesaleWizardCatalog: catalog_mode='direct_services' (Microsold
   });
 
   it("legacyMicrosoldering present but with an empty equipmentTypes[] (nothing added yet from DESK): produces no fallback card, matching the 'hide if empty' rule every other card gets", () => {
-    const wizard = buildWholesaleWizardCatalog(fixtureGroupedEquipmentTypes(), undefined, fixtureLegacyMicrosoldering({ equipmentTypes: [] }));
+    const wizard = buildWholesaleWizardCatalog(fixtureGroupedEquipmentTypes(), undefined, null, fixtureLegacyMicrosoldering({ equipmentTypes: [] }));
     expect(wizard.map((e) => e.slug)).toEqual(["iphone"]);
   });
 
   it("legacyMicrosoldering is null: identical to not passing it at all", () => {
-    const wizard = buildWholesaleWizardCatalog(fixtureGroupedEquipmentTypes(), undefined, null);
+    const wizard = buildWholesaleWizardCatalog(fixtureGroupedEquipmentTypes(), undefined, null, null);
     expect(wizard.map((e) => e.slug)).toEqual(["iphone"]);
   });
 });

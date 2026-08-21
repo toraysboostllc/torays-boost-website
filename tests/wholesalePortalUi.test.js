@@ -151,9 +151,14 @@ describe("WholesalePrices page: wizard-driven portal, server-trust (no client-si
     expect(wizardSrc).not.toMatch(/\.filter\(\s*\(?\w*\)?\s*=>\s*\w*\.active\b/);
   });
 
-  it("reads equipmentTypes from fetchWholesaleCatalog's response shape, not the old flat categories field or a separate microsoldering key", () => {
+  it("reads equipmentTypes from fetchWholesaleCatalog's response shape, not the old flat categories field or the legacy microsoldering key directly", () => {
     expect(src).toContain("result.equipmentTypes");
-    expect(src).not.toContain("result.microsoldering");
+    // Word-boundary regex, not a plain substring check — this repo's real
+    // `result.microsolderingEquipmentType` (the new wire-split field) is
+    // legitimate and must NOT trip this assertion; only a direct
+    // `result.microsoldering` reference (the OLD flat/legacy key read
+    // straight into equipmentTypes) should.
+    expect(src).not.toMatch(/result\.microsoldering\b/);
     expect(src).not.toContain("result.categories");
   });
 
