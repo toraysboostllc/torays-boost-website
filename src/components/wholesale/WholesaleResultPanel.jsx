@@ -1,8 +1,9 @@
 import { RotateCcw, ShieldCheck, Tag, Star, TrendingUp } from "lucide-react";
 import { useWholesaleLocale } from "../../i18n/WholesaleLocaleContext.jsx";
 import { computeFixedPricing, computeRangePricing, hasCompletePriceTiers } from "../../lib/wholesaleMargin.js";
-import { translateCatalogLabel } from "../../lib/wholesaleCatalogI18n.js";
+import { translateCatalogLabel, translateServiceName, resolveServiceDescription } from "../../lib/wholesaleCatalogI18n.js";
 import { wholesaleHoverProps } from "../../lib/wholesaleSound.js";
+import { ServicePhoto } from "./ServicePhoto.jsx";
 
 /** Silver/Purple/Gold, in display order. Purely presentational metadata —
  *  the actual prices come from the service object, keyed the same way.
@@ -105,7 +106,7 @@ export function WholesaleResultPanel({ selection, service, onConsultAnother }) {
     selection.modelName && selection.modelName !== selection.equipoName
       ? translateCatalogLabel(selection.modelName, language)
       : null,
-    translateCatalogLabel(service.name, language),
+    translateServiceName(service, language),
   ]
     .filter(Boolean)
     .join(" · ");
@@ -118,6 +119,26 @@ export function WholesaleResultPanel({ selection, service, onConsultAnother }) {
       </div>
 
       <p className="wsp-result-breadcrumb">{breadcrumb}</p>
+
+      {/* Service photo + description — same dynamic { url, alt_text } shape
+          and DESK-editable description_en/description_es fields every
+          service can carry (see api/_lib/wholesaleDb.js's toClientService),
+          never conditional on which service/equipo this is. Renders nothing
+          at all when the service has neither, so a service with no photo or
+          description looks exactly like this panel always has. */}
+      {(service.image || resolveServiceDescription(service, language)) && (
+        <div className="wsp-result-service-meta">
+          <ServicePhoto
+            image={service.image}
+            alt={service.image?.alt_text || translateServiceName(service, language)}
+            size={72}
+            className="wsp-result-service-photo"
+          />
+          {resolveServiceDescription(service, language) && (
+            <p className="wsp-result-service-description">{resolveServiceDescription(service, language)}</p>
+          )}
+        </div>
+      )}
 
       {isQuote ? (
         <p className="wsp-result-diagnostic-note">{t("result.requiresDiagnostic")}</p>

@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check, Cpu } from "lucide-react";
 import { useWholesaleLocale } from "../../i18n/WholesaleLocaleContext.jsx";
 import { buildWholesaleWizardCatalog } from "../../lib/wholesaleWizardCatalog.js";
-import { translateCatalogLabel } from "../../lib/wholesaleCatalogI18n.js";
+import { translateServiceName } from "../../lib/wholesaleCatalogI18n.js";
 import { wholesaleHoverProps } from "../../lib/wholesaleSound.js";
 import { pushScreen, popScreen, resetStack, currentScreen, TOP_SCREEN } from "../../lib/wizardScreenStack.js";
 import { EquipmentTypeCard } from "./EquipmentTypeCard.jsx";
+import { ServicePhoto } from "./ServicePhoto.jsx";
 import { WholesaleProgressPanel } from "./WholesaleProgressPanel.jsx";
 import { WholesaleResultPanel } from "./WholesaleResultPanel.jsx";
 
@@ -220,7 +221,13 @@ export function WholesaleWizard({ equipmentTypes, microsolderingEquipmentType, l
                     className="wsp-wizard-fault-item"
                     {...wholesaleHoverProps(() => handleSelectFault(service))}
                   >
-                    {translateCatalogLabel(service.name, language)}
+                    <ServicePhoto
+                      image={service.image}
+                      alt={service.image?.alt_text || translateServiceName(service, language)}
+                      size={40}
+                      className="wsp-wizard-fault-item-photo"
+                    />
+                    <span className="wsp-wizard-fault-item-label">{translateServiceName(service, language)}</span>
                   </button>
                 </li>
               ))}

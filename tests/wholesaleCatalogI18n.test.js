@@ -76,11 +76,58 @@ describe("Components wire translateCatalogLabel in for every catalog-sourced nam
     expect(src).toContain("{displayName}");
   });
 
-  it("WholesaleWizard translates each Falla (service) name in the fault list", () => {
+  it("WholesaleWizard translates each Falla (service) name in the fault list via translateServiceName — the same 3-tier precedence as EquipmentTypeCard (service.name_es > legacy dictionary > raw English), never translateCatalogLabel(service.name, ...) directly", () => {
     const src = read("src/components/wholesale/WholesaleWizard.jsx");
     expect(src).toContain(
-      'import { translateCatalogLabel } from "../../lib/wholesaleCatalogI18n.js";'
+      'import { translateServiceName } from "../../lib/wholesaleCatalogI18n.js";'
     );
-    expect(src).toContain("{translateCatalogLabel(service.name, language)}");
+    expect(src).toContain("{translateServiceName(service, language)}");
+    expect(src).not.toMatch(/translateCatalogLabel\(service\.name/);
+  });
+});
+
+describe("translateServiceName / resolveServiceDescription: real-DB fields win over the legacy dictionary, never blank/throw", () => {
+  it("service.name_es wins in Spanish when present; falls back to translateCatalogLabel's legacy dictionary otherwise; English is always the raw stored name", async () => {
+    const { translateServiceName } = await import("../src/lib/wholesaleCatalogI18n.js");
+    expect(translateServiceName({ name: "Board Repair", name_es: "Reparación Personalizada" }, "es")).toBe(
+      "Reparación Personalizada"
+    );
+    // No name_es set — falls back to the legacy dictionary, exactly like
+    // translateCatalogLabel alone would have.
+    expect(translateServiceName({ name: "Board Repair", name_es: null }, "es")).toBe("Reparación de Placa");
+    // English never consults name_es — always the raw stored name.
+    expect(translateServiceName({ name: "Board Repair", name_es: "Reparación Personalizada" }, "en")).toBe(
+      "Board Repair"
+    );
+    // Whitespace-only name_es is treated as absent, not as a real override.
+    expect(translateServiceName({ name: "Board Repair", name_es: "   " }, "es")).toBe("Reparación de Placa");
+  });
+
+  it("never throws on a missing/null service or name", async () => {
+    const { translateServiceName } = await import("../src/lib/wholesaleCatalogI18n.js");
+    expect(translateServiceName({}, "es")).toBeUndefined();
+    expect(translateServiceName(null, "es")).toBeUndefined();
+  });
+
+  it("resolveServiceDescription prefers the language-matched field, falls back to English, then to Spanish, and returns null (never a blank string) when neither is set", async () => {
+    const { resolveServiceDescription } = await import("../src/lib/wholesaleCatalogI18n.js");
+    expect(resolveServiceDescription({ description_en: "Solders a new port.", description_es: "Suelda un puerto nuevo." }, "es")).toBe(
+      "Suelda un puerto nuevo."
+    );
+    expect(resolveServiceDescription({ description_en: "Solders a new port.", description_es: "Suelda un puerto nuevo." }, "en")).toBe(
+      "Solders a new port."
+    );
+    // Only English filled in — Spanish still gets it rather than nothing.
+    expect(resolveServiceDescription({ description_en: "Solders a new port.", description_es: null }, "es")).toBe(
+      "Solders a new port."
+    );
+    // Only Spanish filled in — English still gets it (same "some description beats none" rule).
+    expect(resolveServiceDescription({ description_en: null, description_es: "Suelda un puerto nuevo." }, "en")).toBe(
+      "Suelda un puerto nuevo."
+    );
+    expect(resolveServiceDescription({ description_en: null, description_es: null }, "en")).toBeNull();
+    expect(resolveServiceDescription({ description_en: "   ", description_es: "  " }, "en")).toBeNull();
+    expect(resolveServiceDescription({}, "es")).toBeNull();
+    expect(resolveServiceDescription(null, "es")).toBeNull();
   });
 });

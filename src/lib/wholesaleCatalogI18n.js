@@ -68,3 +68,36 @@ export function translateCatalogLabel(name, language) {
   if (language !== "es") return name;
   return CATALOG_NAME_ES[name] ?? name;
 }
+
+/** Same 3-tier precedence EquipmentTypeCard.jsx already established for
+ *  equipment types (see its own header comment): a real, DESK-editable
+ *  `service.name_es` (wholesale_services.name_es — see
+ *  wholesale-catalog-architecture-fix-migration.sql) wins when present and
+ *  we're in Spanish; else this file's legacy hardcoded CATALOG_NAME_ES
+ *  dictionary (kept only for the pre-existing seed services that already
+ *  have an entry there and haven't had name_es filled in yet); else the raw
+ *  English `service.name`. Every caller that renders a service's display
+ *  name (the Falla list, the result breadcrumb) goes through this — never
+ *  translateCatalogLabel(service.name, ...) directly, which would silently
+ *  ignore a name DESK actually typed in. */
+export function translateServiceName(service, language) {
+  if (language === "es" && typeof service?.name_es === "string" && service.name_es.trim()) {
+    return service.name_es.trim();
+  }
+  return translateCatalogLabel(service?.name, language);
+}
+
+/** The optional per-service description DESK can write (description_en /
+ *  description_es — same migration as name_es above). Prefers the
+ *  language-matched field; falls back to English when only that one is
+ *  filled in (never a blank block when SOME description exists); returns
+ *  `null` — never an empty string — when neither is set, so callers can use
+ *  a plain truthiness check to decide whether to render anything at all. */
+export function resolveServiceDescription(service, language) {
+  const es = typeof service?.description_es === "string" ? service.description_es.trim() : "";
+  const en = typeof service?.description_en === "string" ? service.description_en.trim() : "";
+  if (language === "es" && es) return es;
+  if (en) return en;
+  if (es) return es;
+  return null;
+}

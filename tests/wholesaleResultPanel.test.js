@@ -127,11 +127,11 @@ describe("WholesaleResultPanel.jsx: never surfaces Torays Boost's own internal c
 });
 
 describe("WholesaleResultPanel.jsx: breadcrumb summary and required disclaimers", () => {
-  it("builds the breadcrumb from microsoldering/equipoName/modelName/service.name, filtering out redundant/empty parts", () => {
+  it("builds the breadcrumb from microsoldering/equipoName/modelName/translateServiceName(service), filtering out redundant/empty parts", () => {
     expect(panelSrc).toMatch(/selection\.microsoldering \? t\("microsoldering\.title"\) : null/);
     expect(panelSrc).toContain("selection.equipoName");
     expect(panelSrc).toMatch(/selection\.modelName && selection\.modelName !== selection\.equipoName/);
-    expect(panelSrc).toContain("service.name");
+    expect(panelSrc).toContain("translateServiceName(service, language)");
     expect(panelSrc).toContain('.join(" · ")');
   });
 
@@ -308,11 +308,19 @@ describe("WholesaleResultPanel.jsx: accessibility — the tier group is a labele
 });
 
 describe("WholesaleResultPanel.jsx: catalog names (equipo/model/service) are localized for display only, never mutated", () => {
-  it("imports translateCatalogLabel and applies it to every catalog-sourced name in the breadcrumb", () => {
-    expect(panelSrc).toContain('import { translateCatalogLabel } from "../../lib/wholesaleCatalogI18n.js";');
+  it("imports translateCatalogLabel/translateServiceName/resolveServiceDescription and applies the right one to each catalog-sourced name in the breadcrumb", () => {
+    expect(panelSrc).toContain(
+      'import { translateCatalogLabel, translateServiceName, resolveServiceDescription } from "../../lib/wholesaleCatalogI18n.js";'
+    );
     expect(panelSrc).toContain("translateCatalogLabel(selection.equipoName, language)");
     expect(panelSrc).toContain("translateCatalogLabel(selection.modelName, language)");
-    expect(panelSrc).toContain("translateCatalogLabel(service.name, language)");
+    // The service's own name goes through translateServiceName, NOT
+    // translateCatalogLabel directly — service.name_es (a real,
+    // DESK-editable DB field) must win over the legacy hardcoded dictionary
+    // translateCatalogLabel alone would silently fall back to. See
+    // wholesaleCatalogI18n.js's own header for the 3-tier precedence.
+    expect(panelSrc).toContain("translateServiceName(service, language)");
+    expect(panelSrc).not.toMatch(/translateCatalogLabel\(service\.name/);
   });
 });
 

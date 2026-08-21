@@ -969,6 +969,35 @@
   text-align: center;
 }
 
+/* Optional service photo + description, shown right under the breadcrumb —
+   see WholesaleResultPanel.jsx's own comment. Centered like the breadcrumb
+   above it; the photo is a fixed square (never stretched/cropped oddly by a
+   tall or wide source image, thanks to ServicePhoto's explicit width/height
+   plus object-fit here), the description wraps normally under it. */
+.wsp-result-service-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  text-align: center;
+}
+
+.wsp-result-service-photo {
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: var(--wsp-placeholder-bg-start);
+}
+
+.wsp-result-service-description {
+  font-size: clamp(12px, 3vw, 13.5px);
+  line-height: 1.45;
+  color: var(--wsp-card-text-soft);
+  max-width: 46ch;
+}
+
 .wsp-result-diagnostic-note {
   font-size: 14px;
   line-height: 1.5;
@@ -1874,6 +1903,9 @@
 
 .wsp-wizard-fault-item {
   width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   text-align: left;
   padding: 14px 16px;
   min-height: 48px;
@@ -1885,6 +1917,23 @@
   font-weight: 600;
   cursor: pointer;
   transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+/* Optional — only rendered by ServicePhoto when the service actually has a
+   photo (see its own header). Fixed square so a mix of photo-less and
+   photo-carrying rows in the same list still align on the same baseline. */
+.wsp-wizard-fault-item-photo {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--wsp-placeholder-bg-start);
+}
+
+.wsp-wizard-fault-item-label {
+  flex: 1;
+  min-width: 0;
 }
 
 .wsp-wizard-fault-item:hover {

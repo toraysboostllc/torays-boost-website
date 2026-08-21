@@ -185,12 +185,16 @@ describe("Cambio 4 (rev. final) — light-red equipment/model/service identifier
     expect(panelSrc).not.toMatch(/breadcrumb.*ipad/i);
   });
 
-  it("is built exclusively from selection/service fields DESK returned — the JSX literally interpolates selection.equipoName/modelName and service.name, never a device-name string literal", () => {
+  it("is built exclusively from selection/service fields DESK returned — the JSX literally interpolates selection.equipoName/modelName and the service's translated name, never a device-name string literal", () => {
     const idx = panelSrc.indexOf("const breadcrumb = [");
     const block = panelSrc.slice(idx, panelSrc.indexOf("].filter(Boolean)", idx));
     expect(block).toContain("selection.equipoName");
     expect(block).toContain("selection.modelName");
-    expect(block).toContain("service.name");
+    // The service's own name goes through translateServiceName (service's
+    // real name_es field wins over the legacy dictionary — see
+    // wholesaleCatalogI18n.test.js) rather than translateCatalogLabel
+    // directly.
+    expect(block).toContain("translateServiceName(service, language)");
     // No hardcoded device/brand names anywhere in this component file.
     for (const literal of ["PS5", "iPad", "iPhone", "MacBook", "Xbox", "Switch", "HDMI"]) {
       expect(panelSrc).not.toContain(literal);
@@ -212,10 +216,10 @@ describe("Cambio 4 (rev. final) — light-red equipment/model/service identifier
     expect(block).toContain('.filter(Boolean)');
     expect(block).toContain('.join(" · ")');
     // The array has exactly 4 possible entries (microsoldering tag,
-    // equipoName, modelName, service.name) and no 5th branch that could
-    // special-case one particular equipment/service.
-    const entryCount = (block.match(/translateCatalogLabel\(|t\("microsoldering\.title"\)/g) || []).length;
-    expect(entryCount).toBe(4); // microsoldering label + equipoName + modelName + service.name, each via translateCatalogLabel (or the microsoldering t() call)
+    // equipoName, modelName, the service's own translated name) and no 5th
+    // branch that could special-case one particular equipment/service.
+    const entryCount = (block.match(/translateCatalogLabel\(|translateServiceName\(|t\("microsoldering\.title"\)/g) || []).length;
+    expect(entryCount).toBe(4); // microsoldering label + equipoName + modelName + translateServiceName(service)
   });
 });
 
