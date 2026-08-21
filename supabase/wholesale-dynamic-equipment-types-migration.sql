@@ -142,22 +142,48 @@ where wholesale_images.category_id = c.id
   and c.slug in ('ps5', 'xbox-series-x', 'switch');
 
 -- ----------------------------------------------------------------------------
--- 5. Explicit final sort_order for the full, exact requested visual order —
---    the single source of truth for card position, independent of whatever
---    each row's sort_order happened to be before this migration. Safe to
---    re-run (plain idempotent assignment, not a relative swap). A slug that
---    doesn't match any row is simply a no-op UPDATE (0 rows affected), never
---    an error — see the preflight's check 8 for confirming these slugs
---    match your actual seeded data before relying on this step.
+-- 5. Placeholder sort_order for the 3 new rows ONLY — appended strictly after
+--    every existing row, guaranteed collision-free with anything already in
+--    the table. This migration deliberately does NOT touch any pre-existing
+--    equipment type's sort_order, and deliberately does NOT attempt to
+--    reproduce a specific requested 8-card visual order by guessing which
+--    slug ("laptops", "gaming-laptops", or something else) corresponds to
+--    which card name.
+--
+--    WHY: an earlier version of this migration hardcoded sort_order = 1..8
+--    against 8 specific slugs, including an assumption that 'gaming-laptops'
+--    was the "Laptops" card. Running this file's own preflight against a
+--    faithful replay of the real seed + migration history (see the audit
+--    that accompanies this round) proved that assumption WRONG: both
+--    'laptops' and 'gaming-laptops' are seeded as empty, zero-service
+--    placeholder categories ("Diagnostic-only categories — no services yet,
+--    prices pending", per scripts/wholesaleCatalogSeed.data.js's own
+--    comment) and are therefore NOT visible cards at all today — while
+--    'macbook' (never mentioned in the approved 8-card list) DOES have real,
+--    populated categories and IS a visible card today. Hardcoding the old
+--    per-slug sort_order assignment silently produced sort_order collisions
+--    (ipad/macbook both at 3, laptops/gaming-laptops both at 4,
+--    video-consoles/xbox-series-x both at 6) without erroring, because
+--    sort_order has no uniqueness constraint — exactly the kind of
+--    quietly-wrong result a real audit exists to catch before it reaches
+--    production.
+--
+--    Achieving the exact requested visual order is therefore a DELIBERATE,
+--    SEPARATE, manual step — via DESK's existing Equipment Types reorder
+--    buttons (now atomic, see wholesale_swap_equipment_type_sort_order
+--    below) — performed AFTER you've confirmed, from real production data,
+--    which slug is genuinely your "Laptops" card. See this round's audit
+--    report for the exact options.
 -- ----------------------------------------------------------------------------
-update wholesale_equipment_types set sort_order = 1, updated_at = now() where slug = 'microsoldering';
-update wholesale_equipment_types set sort_order = 2, updated_at = now() where slug = 'iphone';
-update wholesale_equipment_types set sort_order = 3, updated_at = now() where slug = 'ipad';
-update wholesale_equipment_types set sort_order = 4, updated_at = now() where slug = 'gaming-laptops';
-update wholesale_equipment_types set sort_order = 5, updated_at = now() where slug = 'ps5';
-update wholesale_equipment_types set sort_order = 6, updated_at = now() where slug = 'xbox-series-x';
-update wholesale_equipment_types set sort_order = 7, updated_at = now() where slug = 'switch';
-update wholesale_equipment_types set sort_order = 8, updated_at = now() where slug = 'controllers';
+update wholesale_equipment_types set sort_order = (
+  select coalesce(max(sort_order), 0) + 1 from wholesale_equipment_types
+), updated_at = now() where slug = 'ps5';
+update wholesale_equipment_types set sort_order = (
+  select coalesce(max(sort_order), 0) + 1 from wholesale_equipment_types
+), updated_at = now() where slug = 'xbox-series-x';
+update wholesale_equipment_types set sort_order = (
+  select coalesce(max(sort_order), 0) + 1 from wholesale_equipment_types
+), updated_at = now() where slug = 'switch';
 
 -- ----------------------------------------------------------------------------
 -- 6. Hide "Video Consoles" if (and only if) it now has zero categories left.

@@ -27,8 +27,6 @@ function stripComments(sql) {
   return sql.replace(/--[^\n]*/g, "");
 }
 
-const REQUESTED_ORDER = ["microsoldering", "iphone", "ipad", "gaming-laptops", "ps5", "xbox-series-x", "switch", "controllers"];
-
 describe("wholesale-dynamic-equipment-types-preflight.sql: read-only gate before the migration", () => {
   it("is read-only — no insert/update/delete/alter/create/drop statement", () => {
     expect(preflight).not.toMatch(/\binsert into\b|\bupdate\s+\w+\s+set\b|\bdelete from\b|\balter table\b|\bcreate table\b|\bdrop table\b/i);
@@ -120,18 +118,44 @@ describe("wholesale-dynamic-equipment-types-migration.sql: PS5/Xbox/Switch categ
   });
 });
 
-describe("wholesale-dynamic-equipment-types-migration.sql: exact requested visual order", () => {
-  it("sets sort_order 1-8 in exactly the approved order (Microsoldering, iPhone, iPad, Laptops, PS5, Xbox Series X, Nintendo Switch, Controllers)", () => {
-    REQUESTED_ORDER.forEach((slug, i) => {
-      const expected = i + 1;
-      const re = new RegExp(`update wholesale_equipment_types set sort_order = ${expected},.*where slug = '${slug}';`);
-      expect(migration, `expected sort_order=${expected} for slug='${slug}'`).toMatch(re);
-    });
+describe("wholesale-dynamic-equipment-types-migration.sql: does NOT guess a final visual order — collision-free placeholder for the 3 new rows only", () => {
+  // A prior version of this migration hardcoded sort_order = 1..8 against 8
+  // specific slugs, including the assumption that 'gaming-laptops' is the
+  // "Laptops" card. A real audit (replaying the actual seed data against an
+  // isolated Postgres instance) proved that assumption wrong: 'laptops' and
+  // 'gaming-laptops' are both seeded with zero services (empty placeholder
+  // categories), while 'macbook' — not even part of the approved card list —
+  // has real, populated categories. Hardcoding per-slug sort_order values
+  // for rows this migration doesn't actually know the real state of risks
+  // silent, non-erroring collisions (sort_order has no uniqueness
+  // constraint). These tests pin the corrected, honest design instead.
+
+  it("only ps5/xbox-series-x/switch get their sort_order touched by this migration — no hardcoded assumption about which slug is 'Laptops'", () => {
+    // Scope to statements that assign sort_order by slug (this migration's step 5).
+    // wholesale_swap_equipment_type_sort_order's own body also contains
+    // "update wholesale_equipment_types set sort_order = ..." lines (it swaps
+    // two existing rows' values by id, not slug) — those are a different,
+    // pre-existing, already-tested RPC and must not be counted here.
+    const sortBySlugStatements = migration.match(/update wholesale_equipment_types set sort_order = \([\s\S]*?where slug = '[^']+';/g) || [];
+    expect(sortBySlugStatements).toHaveLength(3);
+    for (const slug of ["ps5", "xbox-series-x", "switch"]) {
+      expect(sortBySlugStatements.some((l) => l.includes(`where slug = '${slug}'`))).toBe(true);
+    }
+    expect(migration).not.toMatch(/where slug = 'gaming-laptops'/);
+    expect(migration).not.toMatch(/where slug = 'laptops'/);
+    expect(migration).not.toMatch(/where slug = 'macbook'/);
   });
 
-  it("the sort_order assignment is a single explicit source of truth, not a relative shift depending on prior values", () => {
-    const sortLines = migration.split("\n").filter((l) => /update wholesale_equipment_types set sort_order = \d+,/.test(l));
-    expect(sortLines.length).toBe(8);
+  it("each of the 3 new rows gets a sort_order strictly greater than every existing row (collision-free by construction, never a hardcoded literal)", () => {
+    const sortBlock = migration.match(/update wholesale_equipment_types set sort_order = \(([\s\S]*?)\), updated_at = now\(\) where slug = 'ps5';/);
+    expect(sortBlock, "ps5 sort_order assignment not found").toBeTruthy();
+    expect(sortBlock[1]).toContain("select coalesce(max(sort_order), 0) + 1 from wholesale_equipment_types");
+  });
+
+  it("the migration's own header documents WHY it stopped short of a final order, referencing the real audit finding, not just asserting a design choice", () => {
+    expect(migration).toMatch(/'laptops' and\s+'gaming-laptops' are seeded as empty/);
+    expect(migration).toContain("'macbook'");
+    expect(migration).toContain("never mentioned in the approved 8-card list");
   });
 });
 
@@ -189,17 +213,17 @@ describe("wholesale-dynamic-equipment-types-verify.sql: read-only real-data chec
     expect(verify).toContain("price_history_for_migrated_categories_intact");
   });
 
-  it("checks the exact 8-slug sort_order sequence and zero duplicate slugs (order + duplicate-prevention coverage)", () => {
-    expect(verify).toContain("sort_order_matches_requested_visual_order");
+  it("checks the 3 new rows get a collision-free sort_order and zero duplicate slugs overall (order-safety + duplicate-prevention coverage, not a hardcoded final order)", () => {
+    expect(verify).toContain("new_rows_sort_order_collision_free");
     expect(verify).toContain("no_duplicate_equipment_type_slugs");
-    for (const slug of REQUESTED_ORDER) {
-      expect(verify).toContain(`'${slug}'`);
-    }
+    expect(verify).not.toContain("sort_order_matches_requested_visual_order");
   });
 
-  it("checks Microsoldering is untouched and still first in order (is_tag_lens normalization didn't break it)", () => {
-    expect(verify).toContain("microsoldering_untouched_and_first_in_order");
+  it("checks Microsoldering's identity is untouched — does NOT assert a specific sort_order, since this migration deliberately never reassigns it", () => {
+    expect(verify).toContain("microsoldering_untouched_identity");
     expect(verify).toMatch(/is_tag_lens = true\s*\n\s*\) = 1 and exists/);
+    expect(verify).not.toContain("microsoldering_untouched_and_first_in_order");
+    expect(verify).not.toMatch(/slug = 'microsoldering' and is_tag_lens = true and sort_order = 1/);
   });
 
   it("functionally tests the swap RPC and the delete RPC's guards using the ZZ001/ZZ002 sentinel pattern, never a live SAVEPOINT", () => {

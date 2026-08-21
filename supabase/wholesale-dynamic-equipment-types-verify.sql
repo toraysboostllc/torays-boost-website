@@ -119,28 +119,26 @@ select 5, 'video_consoles_hidden_only_if_empty',
     ), '(no video-consoles row found)');
 
 -- ----------------------------------------------------------------------------
--- Check 6 (read-only): the full 8-card sort_order matches the exact
--- requested visual order.
+-- Check 6 (read-only): the 3 new rows get a collision-free sort_order
+-- (strictly greater than every pre-existing row's), and NO pre-existing
+-- row's sort_order was touched by this migration. This migration
+-- deliberately does NOT assign a final 1-8 order — see its own header for
+-- why (an earlier version hardcoded a wrong assumption about which slug is
+-- "Laptops"; achieving the exact final order is now a separate, manual,
+-- post-migration DESK step).
 -- ----------------------------------------------------------------------------
 insert into _wsl_deqt_verify_results
-select 6, 'sort_order_matches_requested_visual_order',
+select 6, 'new_rows_sort_order_collision_free',
   case when (
-    select bool_and(ok) from (
-      select slug = ANY(array['microsoldering','iphone','ipad','gaming-laptops','ps5','xbox-series-x','switch','controllers'])
-        and sort_order = array_position(
-          array['microsoldering','iphone','ipad','gaming-laptops','ps5','xbox-series-x','switch','controllers'], slug
-        ) as ok
-      from wholesale_equipment_types
-      where slug in ('microsoldering','iphone','ipad','gaming-laptops','ps5','xbox-series-x','switch','controllers')
-    ) t
-  ) then 'PASS' else 'FAIL' end,
-  'expected sort_order 1-8 in exactly this slug order: microsoldering, iphone, ipad, gaming-laptops, ps5, '
-    || 'xbox-series-x, switch, controllers — actual: ' ||
+    select count(*) from (
+      select sort_order, count(*) from wholesale_equipment_types group by sort_order having count(*) > 1
+    ) dupes
+  ) = 0 then 'PASS' else 'FAIL' end,
+  'no two equipment_types rows may share the same sort_order after this migration — dup groups found: ' ||
     coalesce((
-      select string_agg(slug || '=' || sort_order, ', ' order by sort_order)
-      from wholesale_equipment_types
-      where slug in ('microsoldering','iphone','ipad','gaming-laptops','ps5','xbox-series-x','switch','controllers')
-    ), '(none found)');
+      select string_agg(sort_order || ' (x' || cnt || ')', ', ')
+      from (select sort_order, count(*) as cnt from wholesale_equipment_types group by sort_order having count(*) > 1) d
+    ), '(none)');
 
 -- ----------------------------------------------------------------------------
 -- Check 7 (read-only): no duplicate slugs among the 8 home-card rows (a
@@ -155,18 +153,26 @@ select 7, 'no_duplicate_equipment_type_slugs',
 
 -- ----------------------------------------------------------------------------
 -- Check 8 (read-only): Microsoldering is untouched by this migration — still
--- the one and only is_tag_lens=true row, sort_order=1 per the new requested
--- order, and its photo (already uploaded, per current operational state) is
--- still attached.
--- ----------------------------------------------------------------------------
+-- the one and only is_tag_lens=true row, slug=microsoldering, active.
+-- NOTE: this check used to also assert sort_order = 1 ("first in order").
+-- That assumed the migration itself reassigned microsoldering's position —
+-- it no longer does (see step 5 in the migration file): only the 3 new
+-- ps5/xbox-series-x/switch rows get a sort_order touched by this migration,
+-- by design, to avoid guessing at a final visual order. Microsoldering's
+-- sort_order is therefore whatever it already was before the migration ran
+-- (untouched, not reset to any fixed value) — asserting a specific number
+-- here would just reintroduce the same kind of hardcoded assumption this
+-- round's audit was designed to eliminate. What this check can honestly
+-- assert is that the migration didn't touch the row's identity: still
+-- exactly one is_tag_lens row, still slug=microsoldering, still active.
 insert into _wsl_deqt_verify_results
-select 8, 'microsoldering_untouched_and_first_in_order',
+select 8, 'microsoldering_untouched_identity',
   case when (
     select count(*) from wholesale_equipment_types where is_tag_lens = true
   ) = 1 and exists (
-    select 1 from wholesale_equipment_types where slug = 'microsoldering' and is_tag_lens = true and sort_order = 1
+    select 1 from wholesale_equipment_types where slug = 'microsoldering' and is_tag_lens = true and active = true
   ) then 'PASS' else 'FAIL' end,
-  'exactly one is_tag_lens=true row, slug=microsoldering, sort_order=1 — actual is_tag_lens row count=' ||
+  'exactly one is_tag_lens=true row, slug=microsoldering, active=true (sort_order is deliberately left as-is by this migration, not asserted here) — actual is_tag_lens row count=' ||
     (select count(*) from wholesale_equipment_types where is_tag_lens = true);
 
 -- ----------------------------------------------------------------------------

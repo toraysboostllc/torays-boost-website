@@ -16,12 +16,14 @@
 -- Order of operations:
 --   1. Run this file. Read the check_name/status/details rows and the final
 --      OVERALL STATUS row.
---   2. Read every row under "current catalog snapshot" (checks 6-8) by hand
---      before proceeding — this migration hardcodes slug-based lookups
---      (e.g. 'video-consoles', 'gaming-laptops') that assume the current
---      seeded catalog shape. If any of those rows show something other than
---      what you expect, STOP and tell Claude before running the migration —
---      the migration's slug references may need correcting first.
+--   2. Read every row under "current catalog snapshot" (checks 6-9) by hand
+--      before proceeding — this migration hardcodes ONE slug-based lookup
+--      ('video-consoles', for the 3 promoted categories being moved off of
+--      it) and otherwise makes NO assumption about which other row is your
+--      "Laptops" card (see check 9 — a prior version of this file assumed
+--      'gaming-laptops', and that assumption was proven wrong against real
+--      seed data). If check 5 or 6 show something other than what you
+--      expect, STOP and tell Claude before running the migration.
 --   3. Only if OVERALL STATUS is PASS, run
 --      wholesale-dynamic-equipment-types-migration.sql.
 --   4. Run wholesale-dynamic-equipment-types-verify.sql afterward to confirm
@@ -90,6 +92,32 @@ current_equipment_types as (
     E'\n' order by sort_order, name
   ) as listing, count(*) as total_count
   from wholesale_equipment_types
+),
+-- Real, computed visibility per equipment type — a card only actually shows
+-- on the portal when it has at least one category with at least one active
+-- service (the exact filter buildWholesaleCatalog applies). This exists
+-- specifically because a PRIOR version of this migration hardcoded an
+-- assumption ('gaming-laptops' = the real "Laptops" card) that turned out
+-- to be wrong when checked against the real seed data: 'laptops' and
+-- 'gaming-laptops' are BOTH seeded as empty, zero-service placeholder
+-- categories ("Diagnostic-only categories — no services yet, prices
+-- pending"), while 'macbook' — never mentioned in any approved card-order
+-- list — has real, populated categories. Read this row carefully; do not
+-- assume any specific slug is "the" Laptops card.
+equipment_type_visibility as (
+  select
+    et.slug, et.name, et.active, et.sort_order,
+    count(distinct c.id) filter (where c.active) as active_category_count,
+    count(distinct s.id) filter (where s.active) as active_service_count,
+    (
+      count(distinct c.id) filter (where c.active) > 0
+      and count(distinct s.id) filter (where s.active) > 0
+    ) as would_be_visible_today
+  from wholesale_equipment_types et
+  left join wholesale_categories c on c.equipment_type_id = et.id
+  left join wholesale_services s on s.category_id = c.id
+  where et.is_tag_lens = false
+  group by et.slug, et.name, et.active, et.sort_order
 ),
 checks as (
   select 1 as ord, 'prerequisite_tables_exist' as check_name,
@@ -165,10 +193,28 @@ checks as (
   select 8, 'current_equipment_types_snapshot (READ BY HAND)',
     'REVIEW REQUIRED',
     (select listing from current_equipment_types) || E'\n\nTotal rows: ' || (select total_count from current_equipment_types)
-      || ' — cross-check this against the expected 8 visible home cards (Microsoldering, iPhone, iPad, a '
-      || 'Laptops-named equipment type, Controllers, plus Video Consoles which should NOT be independently '
-      || 'visible today). If the Laptops-related slug isn''t exactly ''gaming-laptops'', the migration''s '
-      || 'explicit sort_order-by-slug step for it needs correcting before you run it.'
+      || ' — this is every row that exists, active or not, visible or not. See check 9 below for which ones '
+      || 'ACTUALLY show as a card today — that is the list that matters for deciding the final visual order, '
+      || 'and it is computed, never assumed.'
+
+  union all
+
+  select 9, 'equipment_type_real_visibility (READ BY HAND — DO NOT ASSUME, this settles the "which one is Laptops" question)',
+    'REVIEW REQUIRED',
+    coalesce(
+      (select string_agg(
+        slug || ' (name=' || name || ') — ' ||
+        case when would_be_visible_today then 'VISIBLE today' else 'NOT visible today (empty)' end ||
+        ' [active_categories=' || active_category_count || ', active_services=' || active_service_count || ']',
+        E'\n' order by would_be_visible_today desc, sort_order
+      ) from equipment_type_visibility),
+      '(no non-tag-lens equipment types found)'
+    )
+      || E'\n\nThis migration does NOT assume which of these is your real "Laptops" card, and does not set a '
+      || 'final sort_order for any pre-existing row — only the 3 new PS5/Xbox/Switch rows get a (collision-'
+      || 'free, appended-at-the-end) placeholder position. Achieving your exact approved 8-card order is a '
+      || 'separate, manual step you do from DESK''s Equipment Types reorder buttons AFTER running this '
+      || 'migration and confirming, from THIS row, which slug is genuinely populated.'
 ),
 overall as (
   select
