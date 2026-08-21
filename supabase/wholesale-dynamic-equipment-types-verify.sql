@@ -4,19 +4,20 @@
 -- Unlike this project's usual verify files (which wrap synthetic writes in
 -- begin;...rollback; because they're testing trigger/constraint BEHAVIOR),
 -- this migration made real, permanent changes to real rows (re-pointing
--- PS5/Xbox/Switch's categories, hiding Video Consoles). There is no
+-- PS5/Xbox/Switch's and MacBook's categories, hiding Video Consoles/
+-- MacBook/Gaming Laptops, setting the final visual order). There is no
 -- meaningful "before" snapshot to compare against inside this file, since
 -- the actual before/after transition already happened when the migration
--- committed. So checks 1-8 below are READ-ONLY assertions against the
+-- committed. So checks 1-14 below are READ-ONLY assertions against the
 -- CURRENT (post-migration) real state — proving correctness by structural
 -- invariant, not by count-comparison — same spirit as this project's
--- *-preflight.sql files. Checks 9-11 test the two NEW RPCs' actual behavior
+-- *-preflight.sql files. Checks 15-17 test the two NEW RPCs' actual behavior
 -- using synthetic rows, and DO use this project's standard begin;...
 -- rollback; + nested-block sentinel convention, since those genuinely are
 -- "attempt something and observe whether it's accepted/rejected."
 --
 -- Because of that split, this file is safe to run as many times as you want
--- (checks 1-8 never write anything; checks 9-11 always self-clean via
+-- (checks 1-14 never write anything; checks 15-16 always self-clean via
 -- rollback), but it is NOT a dry run of the migration itself — it assumes
 -- the migration has ALREADY been run for real.
 -- ============================================================================
@@ -119,16 +120,106 @@ select 5, 'video_consoles_hidden_only_if_empty',
     ), '(no video-consoles row found)');
 
 -- ----------------------------------------------------------------------------
--- Check 6 (read-only): the 3 new rows get a collision-free sort_order
--- (strictly greater than every pre-existing row's), and NO pre-existing
--- row's sort_order was touched by this migration. This migration
--- deliberately does NOT assign a final 1-8 order — see its own header for
--- why (an earlier version hardcoded a wrong assumption about which slug is
--- "Laptops"; achieving the exact final order is now a separate, manual,
--- post-migration DESK step).
+-- Check 6 (read-only): macbook-air and macbook-pro (SAME category ids as
+-- before — never recreated) now resolve to the 'laptops' equipment type,
+-- zero categories still point at 'macbook', and 'laptops' carries the
+-- owner-approved display names.
 -- ----------------------------------------------------------------------------
 insert into _wsl_deqt_verify_results
-select 6, 'new_rows_sort_order_collision_free',
+select 6, 'macbook_categories_repointed_to_laptops_with_names',
+  case when (
+    select count(*) from wholesale_categories c
+    join wholesale_equipment_types et on et.id = c.equipment_type_id
+    where c.slug in ('macbook-air', 'macbook-pro') and et.slug = 'laptops' and et.active = true and et.name = 'Laptops' and et.name_es = 'Laptops'
+  ) = 2 and (
+    select count(*) from wholesale_categories c
+    join wholesale_equipment_types et on et.id = c.equipment_type_id
+    where c.slug in ('macbook-air', 'macbook-pro') and et.slug = 'macbook'
+  ) = 0
+  then 'PASS' else 'FAIL' end,
+  'macbook-air and macbook-pro must both resolve to the laptops equipment type (active=true, name=Laptops, '
+    || 'name_es=Laptops), and zero categories may still point at macbook — found ' ||
+    (select count(*) from wholesale_categories c
+     join wholesale_equipment_types et on et.id = c.equipment_type_id
+     where c.slug in ('macbook-air', 'macbook-pro') and et.slug = 'laptops' and et.active = true and et.name = 'Laptops' and et.name_es = 'Laptops')
+    || ' correctly repointed, ' ||
+    (select count(*) from wholesale_categories c
+     join wholesale_equipment_types et on et.id = c.equipment_type_id
+     where c.slug in ('macbook-air', 'macbook-pro') and et.slug = 'macbook')
+    || ' still on macbook';
+
+-- ----------------------------------------------------------------------------
+-- Check 7 (read-only): mirrors check 3, scoped to the macbook-air/macbook-pro
+-- categories that moved onto 'laptops'.
+-- ----------------------------------------------------------------------------
+insert into _wsl_deqt_verify_results
+select 7, 'no_orphaned_services_for_macbook_categories',
+  case when (
+    select count(*) from wholesale_services s
+    where s.category_id in (select id from wholesale_categories where slug in ('macbook-air', 'macbook-pro'))
+      and not exists (select 1 from wholesale_categories c where c.id = s.category_id)
+  ) = 0 then 'PASS' else 'FAIL' end,
+  'every wholesale_services row referencing a macbook-air/macbook-pro category_id still resolves to a real '
+    || 'category row (FK-guaranteed; asserted here directly as documentation of the invariant)';
+
+-- ----------------------------------------------------------------------------
+-- Check 8 (read-only): mirrors check 4, scoped to macbook-air/macbook-pro —
+-- price history (and, by the same non-mutation, every price tier column on
+-- the services themselves) is untouched by the category re-point.
+-- ----------------------------------------------------------------------------
+insert into _wsl_deqt_verify_results
+select 8, 'price_history_for_macbook_categories_intact',
+  case when (
+    select count(*) from wholesale_price_history ph
+    where ph.service_id in (
+      select s.id from wholesale_services s
+      where s.category_id in (select id from wholesale_categories where slug in ('macbook-air', 'macbook-pro'))
+    )
+    and not exists (select 1 from wholesale_services s2 where s2.id = ph.service_id)
+  ) = 0 then 'PASS' else 'FAIL' end,
+  'every wholesale_price_history row for a service under macbook-air/macbook-pro still resolves to a real service';
+
+-- ----------------------------------------------------------------------------
+-- Check 9 (read-only): macbook and gaming-laptops still EXIST as rows
+-- (requirement: never delete them) but are hidden — historical
+-- compatibility, not gone.
+-- ----------------------------------------------------------------------------
+insert into _wsl_deqt_verify_results
+select 9, 'macbook_and_gaming_laptops_hidden_not_deleted',
+  case when (
+    select count(*) from wholesale_equipment_types where slug in ('macbook', 'gaming-laptops') and active = false
+  ) = 2 then 'PASS' else 'FAIL' end,
+  'both macbook and gaming-laptops must still exist as rows (never deleted) with active=false — found: ' ||
+    coalesce((select string_agg(slug || '(active=' || active || ')', ', ' order by slug) from wholesale_equipment_types where slug in ('macbook', 'gaming-laptops')), '(missing)');
+
+-- ----------------------------------------------------------------------------
+-- Check 10 (read-only): at most one photo total between macbook and laptops
+-- — proves the transfer re-pointed the existing wholesale_images row rather
+-- than duplicating it (the unique-per-equipment-type index already
+-- guarantees at most one PER row; this proves the migration didn't somehow
+-- end up with one on each).
+-- ----------------------------------------------------------------------------
+insert into _wsl_deqt_verify_results
+select 10, 'macbook_photo_transferred_no_duplication',
+  case when (
+    (select count(*) from wholesale_images where equipment_type_id = (select id from wholesale_equipment_types where slug = 'macbook'))
+    + (select count(*) from wholesale_images where equipment_type_id = (select id from wholesale_equipment_types where slug = 'laptops'))
+  ) <= 1 then 'PASS' else 'FAIL' end,
+  'at most 1 photo total between macbook and laptops after this migration — macbook has ' ||
+    (select count(*) from wholesale_images where equipment_type_id = (select id from wholesale_equipment_types where slug = 'macbook'))
+    || ', laptops has ' ||
+    (select count(*) from wholesale_images where equipment_type_id = (select id from wholesale_equipment_types where slug = 'laptops'));
+
+-- ----------------------------------------------------------------------------
+-- Check 11 (read-only): NO two equipment_types rows share a sort_order,
+-- checked across the WHOLE table — all 8 visible cards plus the 3 hidden
+-- historical-compatibility rows (video-consoles/macbook/gaming-laptops).
+-- This migration's step 9 assigns an explicit value to all 11 known rows in
+-- one atomic statement specifically so this holds with zero exceptions, not
+-- just among the rows anyone happens to look at.
+-- ----------------------------------------------------------------------------
+insert into _wsl_deqt_verify_results
+select 11, 'sort_order_collision_free_across_all_rows',
   case when (
     select count(*) from (
       select sort_order, count(*) from wholesale_equipment_types group by sort_order having count(*) > 1
@@ -141,45 +232,66 @@ select 6, 'new_rows_sort_order_collision_free',
     ), '(none)');
 
 -- ----------------------------------------------------------------------------
--- Check 7 (read-only): no duplicate slugs among the 8 home-card rows (a
+-- Check 12 (read-only): the 8 ACTIVE equipment_types rows, ordered by
+-- sort_order, are exactly the owner-approved sequence — Microsoldering,
+-- iPhone, iPad, Laptops, PlayStation 5, Xbox Series X, Nintendo Switch /
+-- Switch OLED, Controllers. This is the literal, final proof of "el orden
+-- exacto" — not inferred from individual sort_order values, but the actual
+-- resulting sequence.
+-- ----------------------------------------------------------------------------
+insert into _wsl_deqt_verify_results
+select 12, 'final_visual_order_matches_approved_sequence',
+  case when (
+    select array_agg(slug order by sort_order) from wholesale_equipment_types where active = true
+  ) = array['microsoldering', 'iphone', 'ipad', 'laptops', 'ps5', 'xbox-series-x', 'switch', 'controllers']
+  then 'PASS' else 'FAIL' end,
+  'active equipment_types ordered by sort_order must be exactly [microsoldering, iphone, ipad, laptops, ps5, '
+    || 'xbox-series-x, switch, controllers] — actual: ' ||
+    coalesce((select string_agg(slug, ', ' order by sort_order) from wholesale_equipment_types where active = true), '(none)');
+
+-- ----------------------------------------------------------------------------
+-- Check 13 (read-only): no duplicate slugs among all equipment_types rows (a
 -- structural sanity check that would catch a broken re-run).
 -- ----------------------------------------------------------------------------
 insert into _wsl_deqt_verify_results
-select 7, 'no_duplicate_equipment_type_slugs',
+select 13, 'no_duplicate_equipment_type_slugs',
   case when (select count(*) from wholesale_equipment_types) = (select count(distinct slug) from wholesale_equipment_types)
     then 'PASS' else 'FAIL' end,
   'total rows=' || (select count(*) from wholesale_equipment_types)
     || ', distinct slugs=' || (select count(distinct slug) from wholesale_equipment_types);
 
 -- ----------------------------------------------------------------------------
--- Check 8 (read-only): Microsoldering is untouched by this migration — still
--- the one and only is_tag_lens=true row, slug=microsoldering, active.
--- NOTE: this check used to also assert sort_order = 1 ("first in order").
--- That assumed the migration itself reassigned microsoldering's position —
--- it no longer does (see step 5 in the migration file): only the 3 new
--- ps5/xbox-series-x/switch rows get a sort_order touched by this migration,
--- by design, to avoid guessing at a final visual order. Microsoldering's
--- sort_order is therefore whatever it already was before the migration ran
--- (untouched, not reset to any fixed value) — asserting a specific number
--- here would just reintroduce the same kind of hardcoded assumption this
--- round's audit was designed to eliminate. What this check can honestly
--- assert is that the migration didn't touch the row's identity: still
--- exactly one is_tag_lens row, still slug=microsoldering, still active.
+-- Check 14 (read-only): Microsoldering is untouched in identity AND, now
+-- that the owner has confirmed the exact final order (unlike the prior
+-- round, which deliberately left this unasserted — see the migration file's
+-- own history note), its position: still the one and only is_tag_lens=true
+-- row, slug=microsoldering, active, sort_order=1.
+-- ----------------------------------------------------------------------------
 insert into _wsl_deqt_verify_results
-select 8, 'microsoldering_untouched_identity',
+select 14, 'microsoldering_identity_and_position',
   case when (
     select count(*) from wholesale_equipment_types where is_tag_lens = true
   ) = 1 and exists (
-    select 1 from wholesale_equipment_types where slug = 'microsoldering' and is_tag_lens = true and active = true
+    select 1 from wholesale_equipment_types where slug = 'microsoldering' and is_tag_lens = true and active = true and sort_order = 1
   ) then 'PASS' else 'FAIL' end,
-  'exactly one is_tag_lens=true row, slug=microsoldering, active=true (sort_order is deliberately left as-is by this migration, not asserted here) — actual is_tag_lens row count=' ||
+  'exactly one is_tag_lens=true row, slug=microsoldering, active=true, sort_order=1 — actual is_tag_lens row count=' ||
     (select count(*) from wholesale_equipment_types where is_tag_lens = true);
 
 -- ----------------------------------------------------------------------------
--- Check 9 (functional, self-cleaning): wholesale_swap_equipment_type_sort_order
+-- Check 15 (functional, self-cleaning): wholesale_swap_equipment_type_sort_order
 -- performs a real atomic swap on 2 synthetic rows, and rejects a non-admin
 -- caller / unknown ids.
 -- ----------------------------------------------------------------------------
+-- IMPORTANT: the final "insert into _wsl_deqt_verify_results" below happens
+-- AFTER the inner begin/exception block that raises-and-catches ZZ002, NOT
+-- inside it. PL/pgSQL implements an EXCEPTION clause as an implicit
+-- SAVEPOINT — catching an exception rolls back EVERY database change made
+-- since that block began, including ones that already succeeded (this is
+-- documented PL/pgSQL behavior, not a pglite quirk; confirmed here via a
+-- real run that silently lost this check's own result row when the insert
+-- was placed before the raise, inside the same block). Local variables
+-- survive the rollback, so it's safe to insert the result row afterward
+-- using them.
 do $$
 declare
   v_admin_id uuid;
@@ -190,14 +302,13 @@ declare
   v_swap_ok boolean := false;
   v_bad_admin_rejected boolean := false;
   v_unknown_id_rejected boolean := false;
+  v_skip boolean := false;
 begin
-  begin
-    select id into v_admin_id from profiles where role = 'admin' and status = 'approved' limit 1;
-    if v_admin_id is null then
-      insert into _wsl_deqt_verify_results values (
-        9, 'swap_rpc_functional', 'SKIPPED', 'no approved admin profile exists yet in this project — nothing to test against'
-      );
-    else
+  select id into v_admin_id from profiles where role = 'admin' and status = 'approved' limit 1;
+  if v_admin_id is null then
+    v_skip := true;
+  else
+    begin
       insert into wholesale_equipment_types (slug, name, sort_order) values ('__wsl_deqt_verify__a', '__wsl_deqt_verify__ A', 501)
         returning id into v_id_a;
       insert into wholesale_equipment_types (slug, name, sort_order) values ('__wsl_deqt_verify__b', '__wsl_deqt_verify__ B', 502)
@@ -224,26 +335,35 @@ begin
         when others then v_unknown_id_rejected := true;
       end;
 
-      insert into _wsl_deqt_verify_results values (
-        9, 'swap_rpc_functional',
-        case when v_swap_ok and v_bad_admin_rejected and v_unknown_id_rejected then 'PASS' else 'FAIL' end,
-        'swap_ok=' || v_swap_ok || ', bad_admin_rejected=' || v_bad_admin_rejected || ', unknown_id_rejected=' || v_unknown_id_rejected
-          || ' — expect true, true, true'
-      );
-
       raise exception '__wsl_deqt_verify_cleanup__' using errcode = 'ZZ002';
-    end if;
-  exception
-    when sqlstate 'ZZ002' then null;
-  end;
+    exception
+      when sqlstate 'ZZ002' then null;
+    end;
+  end if;
+
+  if v_skip then
+    insert into _wsl_deqt_verify_results values (
+      15, 'swap_rpc_functional', 'SKIPPED', 'no approved admin profile exists yet in this project — nothing to test against'
+    );
+  else
+    insert into _wsl_deqt_verify_results values (
+      15, 'swap_rpc_functional',
+      case when v_swap_ok and v_bad_admin_rejected and v_unknown_id_rejected then 'PASS' else 'FAIL' end,
+      'swap_ok=' || v_swap_ok || ', bad_admin_rejected=' || v_bad_admin_rejected || ', unknown_id_rejected=' || v_unknown_id_rejected
+        || ' — expect true, true, true'
+    );
+  end if;
 end $$;
 
 -- ----------------------------------------------------------------------------
--- Check 10 (functional, self-cleaning): wholesale_delete_equipment_type
+-- Check 16 (functional, self-cleaning): wholesale_delete_equipment_type
 -- requires confirm=true, refuses a row that still has a category attached,
 -- and refuses a tag-lens row (tested against the REAL Microsoldering row —
 -- safe, since rejection happens before any mutation is attempted).
 -- ----------------------------------------------------------------------------
+-- Same restructuring reason as check 15 above: the result-row insert must
+-- happen AFTER the exception-catching block below, not inside it, or the
+-- ZZ002 catch's implicit-savepoint rollback silently discards it too.
 do $$
 declare
   v_admin_id uuid;
@@ -255,12 +375,11 @@ declare
   v_has_categories_rejected boolean := false;
   v_tag_lens_rejected boolean := false;
   v_empty_delete_ok boolean := false;
+  v_skip boolean := false;
 begin
   select id into v_admin_id from profiles where role = 'admin' and status = 'approved' limit 1;
   if v_admin_id is null then
-    insert into _wsl_deqt_verify_results values (
-      10, 'delete_rpc_functional', 'SKIPPED', 'no approved admin profile exists yet in this project — nothing to test against'
-    );
+    v_skip := true;
   else
     begin
       insert into wholesale_equipment_types (slug, name, sort_order) values ('__wsl_deqt_verify__lonely', '__wsl_deqt_verify__ Lonely', 503)
@@ -307,39 +426,45 @@ begin
       perform wholesale_delete_equipment_type(v_admin_id, v_lonely_id, true);
       v_empty_delete_ok := not exists (select 1 from wholesale_equipment_types where id = v_lonely_id);
 
-      insert into _wsl_deqt_verify_results values (
-        10, 'delete_rpc_functional',
-        case when v_no_confirm_rejected and v_has_categories_rejected and v_tag_lens_rejected and v_empty_delete_ok
-          then 'PASS' else 'FAIL' end,
-        'no_confirm_rejected=' || v_no_confirm_rejected || ', has_categories_rejected=' || v_has_categories_rejected
-          || ', tag_lens_rejected=' || v_tag_lens_rejected || ', empty_delete_ok=' || v_empty_delete_ok
-          || ' — expect true, true, true, true'
-      );
-
       raise exception '__wsl_deqt_verify_cleanup__' using errcode = 'ZZ002';
     exception
       when sqlstate 'ZZ002' then null;
     end;
   end if;
+
+  if v_skip then
+    insert into _wsl_deqt_verify_results values (
+      16, 'delete_rpc_functional', 'SKIPPED', 'no approved admin profile exists yet in this project — nothing to test against'
+    );
+  else
+    insert into _wsl_deqt_verify_results values (
+      16, 'delete_rpc_functional',
+      case when v_no_confirm_rejected and v_has_categories_rejected and v_tag_lens_rejected and v_empty_delete_ok
+        then 'PASS' else 'FAIL' end,
+      'no_confirm_rejected=' || v_no_confirm_rejected || ', has_categories_rejected=' || v_has_categories_rejected
+        || ', tag_lens_rejected=' || v_tag_lens_rejected || ', empty_delete_ok=' || v_empty_delete_ok
+        || ' — expect true, true, true, true'
+    );
+  end if;
 end $$;
 
 -- ----------------------------------------------------------------------------
--- Check 11 (read-only): confirm the real Microsoldering row was never
--- actually deleted by check 10's rejected attempt above (belt-and-suspenders
+-- Check 17 (read-only): confirm the real Microsoldering row was never
+-- actually deleted by check 16's rejected attempt above (belt-and-suspenders
 -- — the rejection itself already guarantees this, this just proves it).
 -- ----------------------------------------------------------------------------
 insert into _wsl_deqt_verify_results
-select 11, 'microsoldering_row_survives_the_rejected_delete_attempt_in_check_10',
+select 17, 'microsoldering_row_survives_the_rejected_delete_attempt_in_check_16',
   case when exists (select 1 from wholesale_equipment_types where slug = 'microsoldering' and is_tag_lens = true) then 'PASS' else 'FAIL' end,
-  'the real microsoldering row must still exist after check 10 attempted (and was rejected) deleting it';
+  'the real microsoldering row must still exist after check 16 attempted (and was rejected) deleting it';
 
 -- ----------------------------------------------------------------------------
 -- Final check: no synthetic __wsl_deqt_verify__ row was left behind by
--- checks 9-10 (both force-rollback their own inserts via the ZZ002
+-- checks 15-16 (both force-rollback their own inserts via the ZZ002
 -- sentinel, but this is a direct proof, not just trust in that mechanism).
 -- ----------------------------------------------------------------------------
 insert into _wsl_deqt_verify_results
-select 12, 'no_synthetic_rows_left_behind',
+select 18, 'no_synthetic_rows_left_behind',
   case when (select count(*) from wholesale_equipment_types where slug like '\_\_wsl\_deqt\_verify\_\_%' escape '\') = 0
     then 'PASS' else 'FAIL' end,
   'select count(*) from wholesale_equipment_types where slug like ''__wsl_deqt_verify__%'' -> ' ||
@@ -366,6 +491,6 @@ from (
 ) t
 order by ord;
 
--- Checks 9-10's synthetic writes are undone here; checks 1-8/11-12 never
+-- Checks 15-16's synthetic writes are undone here; checks 1-14/17-18 never
 -- wrote anything to begin with. Safe to re-run this file any time.
 rollback;

@@ -4,11 +4,14 @@
 -- Small, standalone migration on top of the already-applied wholesale
 -- catalog schema. Makes the 8 wholesale-portal home cards fully DESK-managed:
 -- adds a Spanish name, a normalized photo-crop focus point (X/Y, 0-100), and
--- a full-bleed-photo toggle directly onto wholesale_equipment_types, and
+-- a full-bleed-photo toggle directly onto wholesale_equipment_types;
 -- converts PlayStation 5 / Xbox Series X / Nintendo Switch from categories
 -- nested under a "Video Consoles" equipment type into real, independent
--- wholesale_equipment_types rows — eliminating the client-side
--- PROMOTED_CATEGORY_SLUGS hack entirely rather than parametrizing it.
+-- wholesale_equipment_types rows; and makes 'laptops' the one official
+-- Laptops card by moving macbook's categories (macbook-air, macbook-pro)
+-- onto it and hiding 'macbook'/'gaming-laptops' as historical-compatibility
+-- rows (never deleted). See the migration file's own header for the full
+-- owner-approved decision and the exact final 8-card visual order.
 --
 -- ONE statement, ONE result table — same convention as every other preflight
 -- in this project. Entirely read-only.
@@ -16,14 +19,15 @@
 -- Order of operations:
 --   1. Run this file. Read the check_name/status/details rows and the final
 --      OVERALL STATUS row.
---   2. Read every row under "current catalog snapshot" (checks 6-9) by hand
---      before proceeding — this migration hardcodes ONE slug-based lookup
---      ('video-consoles', for the 3 promoted categories being moved off of
---      it) and otherwise makes NO assumption about which other row is your
---      "Laptops" card (see check 9 — a prior version of this file assumed
---      'gaming-laptops', and that assumption was proven wrong against real
---      seed data). If check 5 or 6 show something other than what you
---      expect, STOP and tell Claude before running the migration.
+--   2. Read every row under "current catalog snapshot" (checks 6-13) by
+--      hand before proceeding — this migration hardcodes slug-based lookups
+--      ('video-consoles' for the 3 promoted categories, 'macbook'/'laptops'
+--      for the Laptops merge) and check 13 specifically flags the one edge
+--      case that needs a human call: macbook AND laptops both already
+--      having their own photo (the migration will not silently overwrite
+--      either one in that case). If check 5, 6, 10, 11, or 13 show
+--      something other than what you expect, STOP and tell Claude before
+--      running the migration.
 --   3. Only if OVERALL STATUS is PASS, run
 --      wholesale-dynamic-equipment-types-migration.sql.
 --   4. Run wholesale-dynamic-equipment-types-verify.sql afterward to confirm
@@ -69,7 +73,9 @@ with raw as (
       where n.nspname = 'public' and p.proname = 'wholesale_delete_equipment_type'
     ) as delete_rpc_already_exists,
     (select count(*) from wholesale_equipment_types where slug in ('ps5', 'xbox-series-x', 'switch')) as promoted_slug_collision_count,
-    (select id from wholesale_equipment_types where slug = 'video-consoles') as video_consoles_id
+    (select id from wholesale_equipment_types where slug = 'video-consoles') as video_consoles_id,
+    (select id from wholesale_equipment_types where slug = 'laptops') as laptops_id,
+    (select id from wholesale_equipment_types where slug = 'macbook') as macbook_id
 ),
 video_consoles_categories as (
   select c.slug, c.name, c.id,
@@ -78,6 +84,13 @@ video_consoles_categories as (
   from wholesale_categories c, raw
   where c.equipment_type_id = raw.video_consoles_id
 ),
+macbook_categories as (
+  select c.slug, c.name, c.id,
+    (select count(*) from wholesale_services s where s.category_id = c.id) as service_count,
+    (select count(*) from wholesale_images i where i.category_id = c.id) as image_count
+  from wholesale_categories c, raw
+  where c.equipment_type_id = raw.macbook_id
+),
 target_categories as (
   select slug, id, equipment_type_id,
     (select count(*) from wholesale_services s where s.category_id = c.id) as service_count,
@@ -85,6 +98,14 @@ target_categories as (
     (select count(*) from wholesale_price_history ph join wholesale_services s on s.id = ph.service_id where s.category_id = c.id) as price_history_count
   from wholesale_categories c
   where c.slug in ('ps5', 'xbox-series-x', 'switch')
+),
+macbook_target_categories as (
+  select slug, id, equipment_type_id,
+    (select count(*) from wholesale_services s where s.category_id = c.id) as service_count,
+    (select count(*) from wholesale_images i where i.category_id = c.id) as image_count,
+    (select count(*) from wholesale_price_history ph join wholesale_services s on s.id = ph.service_id where s.category_id = c.id) as price_history_count
+  from wholesale_categories c
+  where c.slug in ('macbook-air', 'macbook-pro')
 ),
 current_equipment_types as (
   select string_agg(
@@ -199,7 +220,7 @@ checks as (
 
   union all
 
-  select 9, 'equipment_type_real_visibility (READ BY HAND — DO NOT ASSUME, this settles the "which one is Laptops" question)',
+  select 9, 'equipment_type_real_visibility (READ BY HAND)',
     'REVIEW REQUIRED',
     coalesce(
       (select string_agg(
@@ -210,11 +231,67 @@ checks as (
       ) from equipment_type_visibility),
       '(no non-tag-lens equipment types found)'
     )
-      || E'\n\nThis migration does NOT assume which of these is your real "Laptops" card, and does not set a '
-      || 'final sort_order for any pre-existing row — only the 3 new PS5/Xbox/Switch rows get a (collision-'
-      || 'free, appended-at-the-end) placeholder position. Achieving your exact approved 8-card order is a '
-      || 'separate, manual step you do from DESK''s Equipment Types reorder buttons AFTER running this '
-      || 'migration and confirming, from THIS row, which slug is genuinely populated.'
+      || E'\n\nThis is what originally surfaced that ''laptops''/''gaming-laptops'' were both empty while '
+      || '''macbook'' had the real content. The owner has since decided (see checks 10-13 and the migration''s '
+      || 'own header): ''laptops'' becomes the one official card, macbook''s categories move onto it, and '
+      || '''macbook''/''gaming-laptops'' are hidden as historical compatibility rows. This row is now '
+      || 'informational — confirm it still matches reality (no new services added to macbook/laptops/'
+      || 'gaming-laptops since the decision was made) before running the migration.'
+
+  union all
+
+  select 10, 'laptops_and_macbook_equipment_types_found',
+    case when laptops_id is not null and macbook_id is not null then 'PASS' else 'FAIL' end,
+    'wholesale_equipment_types row with slug=''laptops'' ' ||
+      case when laptops_id is not null then 'found (id=' || laptops_id || ')' else 'NOT FOUND — the migration''s hardcoded reference will not match anything' end
+      || E'; slug=''macbook'' ' ||
+      case when macbook_id is not null then 'found (id=' || macbook_id || ')' else 'NOT FOUND — the migration''s hardcoded reference will not match anything' end
+  from raw
+
+  union all
+
+  select 11, 'macbook_current_categories (READ BY HAND)',
+    'REVIEW REQUIRED',
+    coalesce(
+      (select string_agg(slug || ' (name=' || name || ', services=' || service_count || ', images=' || image_count || ')', E'\n' order by slug) from macbook_categories),
+      '(none found — macbook has zero categories already)'
+    ) || E'\n\nExpected: exactly macbook-air, macbook-pro and nothing else. If any OTHER category is listed '
+      || 'here, it will move to ''laptops'' too (the migration re-points every category currently under '
+      || 'macbook, not just these two by name) — stop and tell Claude before running the migration if that''s '
+      || 'not what you want.'
+
+  union all
+
+  select 12, 'macbook_categories_found_with_current_relations (READ BY HAND)',
+    case when (select count(*) from macbook_target_categories) = 2 then 'PASS' else 'FAIL' end,
+    coalesce(
+      (select string_agg(slug || ' (id=' || id || ', equipment_type_id=' || equipment_type_id || ', services=' || service_count || ', images=' || image_count || ', price_history_rows=' || price_history_count || ')', E'\n' order by slug) from macbook_target_categories),
+      '(none found at all)'
+    ) || ' — expected exactly 2 rows (macbook-air, macbook-pro); this is the exact before-state the migration '
+      || 'must preserve (same category id, same services, same price_history, same price tiers) after '
+      || 're-pointing equipment_type_id to ''laptops'''
+
+  union all
+
+  select 13, 'macbook_and_laptops_photo_collision_check',
+    case when (
+      (select count(*) from wholesale_images where equipment_type_id = raw.macbook_id) > 0
+      and (select count(*) from wholesale_images where equipment_type_id = raw.laptops_id) > 0
+    ) then 'REVIEW REQUIRED' else 'PASS' end,
+    case when (
+      (select count(*) from wholesale_images where equipment_type_id = raw.macbook_id) > 0
+      and (select count(*) from wholesale_images where equipment_type_id = raw.laptops_id) > 0
+    ) then
+      'BOTH macbook and laptops already have their own photo. The migration''s photo-transfer step will NOT '
+        || 'overwrite laptops'' existing photo (guarded by the unique-per-equipment-type index) — macbook''s '
+        || 'photo will simply stay attached to the now-hidden macbook row, unused. If you want macbook''s '
+        || 'photo to become the Laptops card''s photo instead, replace it from DESK after the migration runs.'
+    else
+      'macbook photos=' || (select count(*) from wholesale_images where equipment_type_id = raw.macbook_id)
+        || ', laptops photos=' || (select count(*) from wholesale_images where equipment_type_id = raw.laptops_id)
+        || ' — no collision, the migration''s photo transfer (if macbook has one) will apply cleanly'
+    end
+  from raw
 ),
 overall as (
   select
@@ -234,8 +311,9 @@ from (
     'OVERALL STATUS',
     overall.status,
     'PASS = safe to run wholesale-dynamic-equipment-types-migration.sql as-is. REVIEW REQUIRED = read every '
-      || 'flagged row by hand (especially 6 and 8) and confirm the migration''s hardcoded slug references match '
-      || 'before proceeding — this file cannot verify that automatically. FAIL = fix the flagged row(s) first.'
+      || 'flagged row by hand (especially 6, 8, 11, and 13) and confirm the migration''s hardcoded slug '
+      || 'references match before proceeding — this file cannot verify that automatically. FAIL = fix the '
+      || 'flagged row(s) first.'
   from overall
 ) t
 order by ord;

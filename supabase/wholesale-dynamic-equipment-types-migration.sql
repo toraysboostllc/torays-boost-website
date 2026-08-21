@@ -3,7 +3,7 @@
 -- wholesale-dynamic-equipment-types-preflight.sql reports OVERALL STATUS
 -- PASS (or every REVIEW REQUIRED row has been read and confirmed correct).
 -- ============================================================================
--- Two independent things happen in this one migration:
+-- Three independent things happen in this one migration:
 --
 --   1. Three new columns on wholesale_equipment_types make every home card's
 --      presentation fully DESK-administrable: `name_es` (Spanish display
@@ -19,6 +19,19 @@
 --      Website's client-side PROMOTED_CATEGORY_SLUGS hack, rather than
 --      making that hack data-driven. See the mapping table below.
 --
+--   3. The "Laptops" card question, settled by the owner after reviewing
+--      this round's audit (real seed data proved 'laptops'/'gaming-laptops'
+--      are both empty placeholders while 'macbook' has the only real,
+--      populated laptop-adjacent categories today — see the audit report
+--      for the full options considered). Decision: 'laptops' becomes the
+--      one official card. Its categories (macbook-air, macbook-pro) and all
+--      their services/prices/tiers/history move onto it from 'macbook' by
+--      re-pointing, never recreating. 'macbook' and 'gaming-laptops' are
+--      hidden (active=false), NEVER deleted — kept as historical
+--      compatibility rows so nothing that ever referenced them by id
+--      breaks. Windows/gaming laptops can be added later from DESK, inside
+--      this same 'laptops' card.
+--
 -- CATEGORY -> EQUIPMENT TYPE MAPPING (explicit, per requirement):
 --   wholesale_categories row untouched (same id, same slug, same services,
 --   same price_history) — only its equipment_type_id FK is repointed:
@@ -26,12 +39,23 @@
 --     categories.slug = 'ps5'           : video-consoles -> NEW equipment_types row, slug 'ps5'
 --     categories.slug = 'xbox-series-x' : video-consoles -> NEW equipment_types row, slug 'xbox-series-x'
 --     categories.slug = 'switch'        : video-consoles -> NEW equipment_types row, slug 'switch'
+--     categories.slug = 'macbook-air'   : macbook -> EXISTING equipment_types row, slug 'laptops'
+--     categories.slug = 'macbook-pro'   : macbook -> EXISTING equipment_types row, slug 'laptops'
 --
 --   Nothing else moves. No service is duplicated, re-created, or re-parented
 --   — every wholesale_services row keeps the exact same category_id it had
 --   before this migration; every wholesale_price_history row keeps the exact
---   same service_id. Only the CATEGORY's own parent (equipment_type_id)
---   changes, once, for exactly these 3 rows.
+--   same service_id, and every price-tier column on those services is
+--   untouched (tiers live on the service row itself, which this migration
+--   never writes to). Only the CATEGORY's own parent (equipment_type_id)
+--   changes, once, for exactly these 5 rows. 'macbook' and 'gaming-laptops'
+--   are hidden, not deleted — their ids remain valid, queryable rows.
+--
+-- FINAL VISUAL ORDER (owner-approved, assigned atomically in one statement
+-- in step 9 below — see that step for why one statement is what makes this
+-- collision-free with no transient state, not just "no error"):
+--   1 Microsoldering, 2 iPhone, 3 iPad, 4 Laptops, 5 PlayStation 5,
+--   6 Xbox Series X, 7 Nintendo Switch / Switch OLED, 8 Controllers.
 --
 -- CUTOVER SAFETY (requirement: zero window with duplicate or missing cards):
 -- This migration does NOT by itself create a duplicate-card risk against the
@@ -103,7 +127,7 @@ alter table wholesale_equipment_types add column if not exists full_bleed_photo 
 --    the same as the English name for all 3 — these are brand names,
 --    identical in both languages by design, not a missing-translation gap.
 --    sort_order set to a temporary placeholder here; the real final order
---    for all 8 cards is assigned explicitly in step 4 below, in one place,
+--    for all 8 cards is assigned explicitly in step 9 below, in one place,
 --    so the "visual order" requirement has exactly one source of truth in
 --    this file rather than being implied by insertion order.
 -- ----------------------------------------------------------------------------
@@ -142,56 +166,11 @@ where wholesale_images.category_id = c.id
   and c.slug in ('ps5', 'xbox-series-x', 'switch');
 
 -- ----------------------------------------------------------------------------
--- 5. Placeholder sort_order for the 3 new rows ONLY — appended strictly after
---    every existing row, guaranteed collision-free with anything already in
---    the table. This migration deliberately does NOT touch any pre-existing
---    equipment type's sort_order, and deliberately does NOT attempt to
---    reproduce a specific requested 8-card visual order by guessing which
---    slug ("laptops", "gaming-laptops", or something else) corresponds to
---    which card name.
---
---    WHY: an earlier version of this migration hardcoded sort_order = 1..8
---    against 8 specific slugs, including an assumption that 'gaming-laptops'
---    was the "Laptops" card. Running this file's own preflight against a
---    faithful replay of the real seed + migration history (see the audit
---    that accompanies this round) proved that assumption WRONG: both
---    'laptops' and 'gaming-laptops' are seeded as empty, zero-service
---    placeholder categories ("Diagnostic-only categories — no services yet,
---    prices pending", per scripts/wholesaleCatalogSeed.data.js's own
---    comment) and are therefore NOT visible cards at all today — while
---    'macbook' (never mentioned in the approved 8-card list) DOES have real,
---    populated categories and IS a visible card today. Hardcoding the old
---    per-slug sort_order assignment silently produced sort_order collisions
---    (ipad/macbook both at 3, laptops/gaming-laptops both at 4,
---    video-consoles/xbox-series-x both at 6) without erroring, because
---    sort_order has no uniqueness constraint — exactly the kind of
---    quietly-wrong result a real audit exists to catch before it reaches
---    production.
---
---    Achieving the exact requested visual order is therefore a DELIBERATE,
---    SEPARATE, manual step — via DESK's existing Equipment Types reorder
---    buttons (now atomic, see wholesale_swap_equipment_type_sort_order
---    below) — performed AFTER you've confirmed, from real production data,
---    which slug is genuinely your "Laptops" card. See this round's audit
---    report for the exact options.
--- ----------------------------------------------------------------------------
-update wholesale_equipment_types set sort_order = (
-  select coalesce(max(sort_order), 0) + 1 from wholesale_equipment_types
-), updated_at = now() where slug = 'ps5';
-update wholesale_equipment_types set sort_order = (
-  select coalesce(max(sort_order), 0) + 1 from wholesale_equipment_types
-), updated_at = now() where slug = 'xbox-series-x';
-update wholesale_equipment_types set sort_order = (
-  select coalesce(max(sort_order), 0) + 1 from wholesale_equipment_types
-), updated_at = now() where slug = 'switch';
-
--- ----------------------------------------------------------------------------
--- 6. Hide "Video Consoles" if (and only if) it now has zero categories left.
+-- 5. Hide "Video Consoles" if (and only if) it now has zero categories left.
 --    Never deleted — same "hide, don't delete" posture as everywhere else in
 --    this schema. Guarded by NOT EXISTS so this is safe to re-run, and safe
 --    even if Video Consoles unexpectedly still has other categories (it
---    simply stays active in that case, matching preflight check 6's
---    warning).
+--    simply stays active in that case, matching preflight's warning).
 -- ----------------------------------------------------------------------------
 update wholesale_equipment_types set active = false, updated_at = now()
 where slug = 'video-consoles'
@@ -200,7 +179,90 @@ where slug = 'video-consoles'
   );
 
 -- ----------------------------------------------------------------------------
--- 7. Atomic reorder RPC — replaces the existing swapSortOrder() two-PATCH
+-- 6. Re-point macbook's 2 EXISTING category rows (macbook-air, macbook-pro)
+--    onto the 'laptops' equipment type. Same category ids, same services,
+--    same price_history, same price tiers — nothing recreated, exactly the
+--    same technique step 3 above uses for ps5/xbox-series-x/switch. Guarded
+--    so a second run only touches rows that still need it.
+-- ----------------------------------------------------------------------------
+update wholesale_categories set equipment_type_id = (
+  select id from wholesale_equipment_types where slug = 'laptops' and is_tag_lens = false
+), updated_at = now()
+where equipment_type_id = (select id from wholesale_equipment_types where slug = 'macbook' and is_tag_lens = false)
+  and equipment_type_id is distinct from (
+    select id from wholesale_equipment_types where slug = 'laptops' and is_tag_lens = false
+  );
+
+-- ----------------------------------------------------------------------------
+-- 7. Re-own macbook's equipment-type-level photo (if any) onto 'laptops' —
+--    re-pointing the existing wholesale_images row's owner column, never
+--    duplicating the Storage object or inserting a new images row. Guarded
+--    by NOT EXISTS so this never fires if 'laptops' already has its own
+--    photo (the unique partial index on equipment_type_id would otherwise
+--    reject a second one) — see this round's audit/preflight for how to
+--    resolve that case by hand if it ever applies. No-op if macbook has no
+--    photo, which matches current operational state.
+-- ----------------------------------------------------------------------------
+update wholesale_images set
+  equipment_type_id = (select id from wholesale_equipment_types where slug = 'laptops')
+where equipment_type_id = (select id from wholesale_equipment_types where slug = 'macbook')
+  and not exists (
+    select 1 from wholesale_images where equipment_type_id = (select id from wholesale_equipment_types where slug = 'laptops')
+  );
+
+-- ----------------------------------------------------------------------------
+-- 8. Set 'laptops'' display names and hide 'macbook'/'gaming-laptops' as
+--    historical-compatibility rows. Never deleted — same posture as Video
+--    Consoles above; their ids stay valid so nothing that ever referenced
+--    them breaks. Windows/gaming laptops can be added later from DESK,
+--    inside this same 'laptops' card, without any further migration.
+-- ----------------------------------------------------------------------------
+update wholesale_equipment_types set
+  name = 'Laptops', name_es = 'Laptops', updated_at = now()
+where slug = 'laptops'
+  and (name is distinct from 'Laptops' or name_es is distinct from 'Laptops');
+
+update wholesale_equipment_types set active = false, updated_at = now()
+where slug in ('macbook', 'gaming-laptops') and active = true;
+
+-- ----------------------------------------------------------------------------
+-- 9. Final visual order — ONE atomic UPDATE ... FROM (VALUES ...) statement
+--    assigning an explicit, distinct sort_order to every one of this
+--    table's known rows (all 11: the 8 approved cards, plus the 3 hidden
+--    historical-compatibility rows pushed out of the 1-8 range). This is
+--    what "transactional and collision-free, no temporary state" means in
+--    practice: Postgres evaluates every row's NEW value from the OLD
+--    snapshot before applying any of them in a single UPDATE, so there is
+--    no intermediate moment — not even within this migration's own
+--    transaction — where two rows share a sort_order. Compare this to the
+--    previous (superseded) design, which updated 3 rows one statement at a
+--    time and deliberately left every pre-existing row untouched because,
+--    at the time, nobody had confirmed which slug was really "Laptops" —
+--    that ambiguity is now resolved (see this round's audit), so this step
+--    can safely assign the complete, exact, owner-approved order in one
+--    place instead of deferring it to a manual post-migration DESK step.
+-- ----------------------------------------------------------------------------
+update wholesale_equipment_types t set
+  sort_order = m.new_sort_order,
+  updated_at = now()
+from (values
+  ('microsoldering',   1),
+  ('iphone',           2),
+  ('ipad',             3),
+  ('laptops',          4),
+  ('ps5',              5),
+  ('xbox-series-x',    6),
+  ('switch',           7),
+  ('controllers',      8),
+  ('macbook',        101),
+  ('gaming-laptops', 102),
+  ('video-consoles', 103)
+) as m(slug, new_sort_order)
+where t.slug = m.slug
+  and t.sort_order is distinct from m.new_sort_order;
+
+-- ----------------------------------------------------------------------------
+-- 10. Atomic reorder RPC — replaces the existing swapSortOrder() two-PATCH
 --    pattern (two independent, non-transactional REST calls) for equipment
 --    types specifically. One transaction, row-locked, real atomicity.
 -- ----------------------------------------------------------------------------
@@ -234,7 +296,7 @@ revoke execute on function public.wholesale_swap_equipment_type_sort_order(uuid,
 grant execute on function public.wholesale_swap_equipment_type_sort_order(uuid, uuid, uuid) to service_role;
 
 -- ----------------------------------------------------------------------------
--- 8. Delete RPC — real deletion, but only for a genuinely empty equipment
+-- 11. Delete RPC — real deletion, but only for a genuinely empty equipment
 --    type, and only with an explicit confirmation flag. "Related data
 --    exists" is answered by exactly one question: does ANY wholesale_
 --    categories row still point at this equipment type? If yes, refuse --
