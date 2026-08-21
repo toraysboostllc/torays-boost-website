@@ -8,16 +8,16 @@
 -- MacBook/Gaming Laptops, setting the final visual order). There is no
 -- meaningful "before" snapshot to compare against inside this file, since
 -- the actual before/after transition already happened when the migration
--- committed. So checks 1-14 below are READ-ONLY assertions against the
+-- committed. So checks 1-15 below are READ-ONLY assertions against the
 -- CURRENT (post-migration) real state — proving correctness by structural
 -- invariant, not by count-comparison — same spirit as this project's
--- *-preflight.sql files. Checks 15-17 test the two NEW RPCs' actual behavior
+-- *-preflight.sql files. Checks 16-18 test the two NEW RPCs' actual behavior
 -- using synthetic rows, and DO use this project's standard begin;...
 -- rollback; + nested-block sentinel convention, since those genuinely are
 -- "attempt something and observe whether it's accepted/rejected."
 --
 -- Because of that split, this file is safe to run as many times as you want
--- (checks 1-14 never write anything; checks 15-16 always self-clean via
+-- (checks 1-15 never write anything; checks 16-17 always self-clean via
 -- rollback), but it is NOT a dry run of the migration itself — it assumes
 -- the migration has ALREADY been run for real.
 -- ============================================================================
@@ -278,7 +278,34 @@ select 14, 'microsoldering_identity_and_position',
     (select count(*) from wholesale_equipment_types where is_tag_lens = true);
 
 -- ----------------------------------------------------------------------------
--- Check 15 (functional, self-cleaning): wholesale_swap_equipment_type_sort_order
+-- Check 15 (read-only): the generic source_mode/source_tag_id configuration
+-- (step 12 of the migration) is correctly backfilled — microsoldering is
+-- source_mode='tag_lens' pointing at the real 'microsoldering' tag row, it
+-- is the ONLY tag_lens row, and no 'direct' row carries a stray
+-- source_tag_id. This is what makes the Website's card-building logic able
+-- to read source_mode instead of hardcoding is_tag_lens/the microsoldering
+-- slug — see api/_lib/wholesaleDb.js.
+-- ----------------------------------------------------------------------------
+insert into _wsl_deqt_verify_results
+select 15, 'microsoldering_source_mode_configured',
+  case when exists (
+    select 1 from wholesale_equipment_types et
+    where et.slug = 'microsoldering' and et.source_mode = 'tag_lens'
+      and et.source_tag_id = (select id from wholesale_tags where slug = 'microsoldering')
+  ) and (
+    select count(*) from wholesale_equipment_types where source_mode = 'tag_lens'
+  ) = 1 and (
+    select count(*) from wholesale_equipment_types where source_mode = 'direct' and source_tag_id is not null
+  ) = 0
+  then 'PASS' else 'FAIL' end,
+  'microsoldering must be source_mode=''tag_lens'' with source_tag_id pointing at the real microsoldering tag; '
+    || 'every other row must be source_mode=''direct'' with source_tag_id null — exactly one tag_lens row found=' ||
+    (select count(*) from wholesale_equipment_types where source_mode = 'tag_lens')
+    || ', stray direct+source_tag_id rows=' ||
+    (select count(*) from wholesale_equipment_types where source_mode = 'direct' and source_tag_id is not null);
+
+-- ----------------------------------------------------------------------------
+-- Check 16 (functional, self-cleaning): wholesale_swap_equipment_type_sort_order
 -- performs a real atomic swap on 2 synthetic rows, and rejects a non-admin
 -- caller / unknown ids.
 -- ----------------------------------------------------------------------------
@@ -343,11 +370,11 @@ begin
 
   if v_skip then
     insert into _wsl_deqt_verify_results values (
-      15, 'swap_rpc_functional', 'SKIPPED', 'no approved admin profile exists yet in this project — nothing to test against'
+      16, 'swap_rpc_functional', 'SKIPPED', 'no approved admin profile exists yet in this project — nothing to test against'
     );
   else
     insert into _wsl_deqt_verify_results values (
-      15, 'swap_rpc_functional',
+      16, 'swap_rpc_functional',
       case when v_swap_ok and v_bad_admin_rejected and v_unknown_id_rejected then 'PASS' else 'FAIL' end,
       'swap_ok=' || v_swap_ok || ', bad_admin_rejected=' || v_bad_admin_rejected || ', unknown_id_rejected=' || v_unknown_id_rejected
         || ' — expect true, true, true'
@@ -356,7 +383,7 @@ begin
 end $$;
 
 -- ----------------------------------------------------------------------------
--- Check 16 (functional, self-cleaning): wholesale_delete_equipment_type
+-- Check 17 (functional, self-cleaning): wholesale_delete_equipment_type
 -- requires confirm=true, refuses a row that still has a category attached,
 -- and refuses a tag-lens row (tested against the REAL Microsoldering row —
 -- safe, since rejection happens before any mutation is attempted).
@@ -434,11 +461,11 @@ begin
 
   if v_skip then
     insert into _wsl_deqt_verify_results values (
-      16, 'delete_rpc_functional', 'SKIPPED', 'no approved admin profile exists yet in this project — nothing to test against'
+      17, 'delete_rpc_functional', 'SKIPPED', 'no approved admin profile exists yet in this project — nothing to test against'
     );
   else
     insert into _wsl_deqt_verify_results values (
-      16, 'delete_rpc_functional',
+      17, 'delete_rpc_functional',
       case when v_no_confirm_rejected and v_has_categories_rejected and v_tag_lens_rejected and v_empty_delete_ok
         then 'PASS' else 'FAIL' end,
       'no_confirm_rejected=' || v_no_confirm_rejected || ', has_categories_rejected=' || v_has_categories_rejected
@@ -449,22 +476,22 @@ begin
 end $$;
 
 -- ----------------------------------------------------------------------------
--- Check 17 (read-only): confirm the real Microsoldering row was never
--- actually deleted by check 16's rejected attempt above (belt-and-suspenders
+-- Check 18 (read-only): confirm the real Microsoldering row was never
+-- actually deleted by check 17's rejected attempt above (belt-and-suspenders
 -- — the rejection itself already guarantees this, this just proves it).
 -- ----------------------------------------------------------------------------
 insert into _wsl_deqt_verify_results
-select 17, 'microsoldering_row_survives_the_rejected_delete_attempt_in_check_16',
+select 18, 'microsoldering_row_survives_the_rejected_delete_attempt_in_check_17',
   case when exists (select 1 from wholesale_equipment_types where slug = 'microsoldering' and is_tag_lens = true) then 'PASS' else 'FAIL' end,
-  'the real microsoldering row must still exist after check 16 attempted (and was rejected) deleting it';
+  'the real microsoldering row must still exist after check 17 attempted (and was rejected) deleting it';
 
 -- ----------------------------------------------------------------------------
 -- Final check: no synthetic __wsl_deqt_verify__ row was left behind by
--- checks 15-16 (both force-rollback their own inserts via the ZZ002
+-- checks 16-17 (both force-rollback their own inserts via the ZZ002
 -- sentinel, but this is a direct proof, not just trust in that mechanism).
 -- ----------------------------------------------------------------------------
 insert into _wsl_deqt_verify_results
-select 18, 'no_synthetic_rows_left_behind',
+select 19, 'no_synthetic_rows_left_behind',
   case when (select count(*) from wholesale_equipment_types where slug like '\_\_wsl\_deqt\_verify\_\_%' escape '\') = 0
     then 'PASS' else 'FAIL' end,
   'select count(*) from wholesale_equipment_types where slug like ''__wsl_deqt_verify__%'' -> ' ||
@@ -491,6 +518,6 @@ from (
 ) t
 order by ord;
 
--- Checks 15-16's synthetic writes are undone here; checks 1-14/17-18 never
+-- Checks 16-17's synthetic writes are undone here; checks 1-15/18-19 never
 -- wrote anything to begin with. Safe to re-run this file any time.
 rollback;

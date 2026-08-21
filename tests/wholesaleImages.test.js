@@ -394,8 +394,13 @@ describe("wholesale-prices images: Equipment Type / category with no active serv
 
 describe("Microsoldering: a plain member of equipmentTypes[], never a separate response channel or a hardcoded object", () => {
   function seedMicrosolderingType(overrides = {}) {
-    const type = seedEquipmentType({ slug: "microsoldering", name: "Microsoldering", is_tag_lens: true, sort_order: 1, ...overrides });
-    fake.db.wholesale_tags.push({ id: fake.nextId(), slug: "microsoldering", name: "Microsoldering" });
+    const tag = { id: fake.nextId(), slug: "microsoldering", name: "Microsoldering" };
+    fake.db.wholesale_tags.push(tag);
+    const type = seedEquipmentType({
+      slug: "microsoldering", name: "Microsoldering", is_tag_lens: true,
+      source_mode: "tag_lens", source_tag_id: tag.id,
+      sort_order: 1, ...overrides,
+    });
     return type;
   }
   function tagService(serviceId) {
@@ -403,10 +408,10 @@ describe("Microsoldering: a plain member of equipmentTypes[], never a separate r
     fake.db.wholesale_service_tags.push({ service_id: serviceId, tag_id: tag.id });
   }
   function microCard(res) {
-    return res.body.equipmentTypes.find((e) => e.slug === "microsoldering");
+    return res.body.tagLensEquipmentTypes.find((e) => e.slug === "microsoldering");
   }
 
-  it("appears in equipmentTypes[] once it has at least one tagged, active service — same array, same shape as any other card, no dead-end", async () => {
+  it("appears in tagLensEquipmentTypes once it has at least one tagged, active service — own field, own shape, no dead-end, and NEVER a member of equipmentTypes[] itself", async () => {
     seedShopWithSession();
     seedMicrosolderingType();
     const et = seedEquipmentType({ slug: "iphone" });
@@ -416,8 +421,13 @@ describe("Microsoldering: a plain member of equipmentTypes[], never a separate r
 
     const res = await callPrices();
 
-    expect(res.body.equipmentTypes.map((e) => e.slug)).toContain("microsoldering");
-    expect(res.body.microsoldering).toBeUndefined(); // no separate response key at all
+    expect(res.body.tagLensEquipmentTypes.map((e) => e.slug)).toContain("microsoldering");
+    expect(res.body.equipmentTypes.map((e) => e.slug)).not.toContain("microsoldering");
+    // The TEMPORARY legacy compatibility key is still present alongside the
+    // unified card (see tests/wholesaleDynamicEquipmentTypesApi.test.js for
+    // dedicated coverage of that key) — this test only asserts the unified
+    // shape, which is what the current client actually reads.
+    expect(res.body.microsoldering).toBeTruthy();
   });
 
   it("a tagged, active service appears under the REAL category's own id/slug/name, flattened directly into Microsoldering's own categories — not a fabricated hierarchy, not nested under the real equipment type", async () => {

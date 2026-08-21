@@ -68,6 +68,19 @@ describe("wholesale-dynamic-equipment-types-preflight.sql: read-only gate before
   it("produces a single OVERALL STATUS row", () => {
     expect(preflight).toContain("'OVERALL STATUS'");
   });
+
+  it("check 14 is a HARD GATE (FAIL, not REVIEW REQUIRED) when zero active services are tagged microsoldering — real STOP/NO-GO, not just informational", () => {
+    expect(preflight).toContain("microsoldering_tagged_active_service_count");
+    expect(preflight).toMatch(/case when tagged_active_service_count > 0 then 'PASS' else 'FAIL' end/);
+    expect(preflight).toContain("STOP/NO-GO if 0");
+  });
+
+  it("counts tagged services by joining wholesale_service_tags -> wholesale_services, restricted to active services — not a raw tag-row count", () => {
+    const cte = preflight.match(/microsoldering_tag_status as \(([\s\S]*?)\),\ncurrent_equipment_types/);
+    expect(cte, "microsoldering_tag_status CTE not found").toBeTruthy();
+    expect(cte[1]).toContain("join wholesale_services s on s.id = st.service_id");
+    expect(cte[1]).toContain("s.active = true");
+  });
 });
 
 describe("wholesale-dynamic-equipment-types-migration.sql: schema additions", () => {
@@ -232,6 +245,38 @@ describe("wholesale-dynamic-equipment-types-migration.sql: exact final visual or
   });
 });
 
+describe("wholesale-dynamic-equipment-types-migration.sql: generic source_mode/source_tag_id — Microsoldering stops being a hardcoded special case", () => {
+  it("adds source_mode (default 'direct', CHECK in ('direct','tag_lens')) and source_tag_id (uuid FK to wholesale_tags), idempotently", () => {
+    expect(migration).toMatch(/add column if not exists source_mode text not null default 'direct';/);
+    expect(migration).toMatch(/check \(source_mode in \('direct', 'tag_lens'\)\)/);
+    expect(migration).toMatch(/add column if not exists source_tag_id uuid references wholesale_tags\(id\)/);
+  });
+
+  it("the CHECK constraint enforces the pairing — direct rows can never carry a source_tag_id, tag_lens rows always must", () => {
+    const block = migration.match(/wholesale_equipment_types_source_tag_id_check\s*\n\s*check \(([\s\S]*?)\);/);
+    expect(block, "source_tag_id CHECK not found").toBeTruthy();
+    expect(block[1]).toContain("source_mode = 'direct' and source_tag_id is null");
+    expect(block[1]).toContain("source_mode = 'tag_lens' and source_tag_id is not null");
+  });
+
+  it("backfills the existing tag-lens row (is_tag_lens=true) to source_mode='tag_lens' with source_tag_id pointing at the real 'microsoldering' tag — guarded, idempotent, never touches a 'direct' row", () => {
+    const block = migration.match(/update wholesale_equipment_types set\s*\n\s*source_mode = 'tag_lens',\s*\n\s*source_tag_id = \(select id from wholesale_tags where slug = 'microsoldering'\),\s*\n\s*updated_at = now\(\)\s*\nwhere is_tag_lens = true/);
+    expect(block, "source_mode/source_tag_id backfill UPDATE not found").toBeTruthy();
+  });
+
+  it("never hardcodes the microsoldering EQUIPMENT TYPE slug in this step — only the tag lookup (by tag slug, a different table) and the pre-existing is_tag_lens flag decide which row gets backfilled", () => {
+    const step12 = migration.slice(migration.indexOf("12. Generic tag-lens configuration"), migration.indexOf("commit;"));
+    // The tag LOOKUP (wholesale_tags, a different table) legitimately
+    // references the 'microsoldering' slug — that's not what's being
+    // checked here. What must never appear is a hardcoded reference to
+    // wholesale_equipment_types.slug = 'microsoldering' deciding which
+    // EQUIPMENT TYPE row gets backfilled.
+    expect(step12).not.toMatch(/wholesale_equipment_types\s+set[\s\S]*?where slug = 'microsoldering';/);
+    expect(step12).toContain("where is_tag_lens = true");
+    expect(step12).toContain("select id from wholesale_tags where slug = 'microsoldering'");
+  });
+});
+
 describe("wholesale-dynamic-equipment-types-migration.sql: two new RPCs, no live SAVEPOINT anywhere", () => {
   it("wholesale_swap_equipment_type_sort_order: validates admin, locks both rows, swaps atomically in one transaction, rejects mismatched/unknown ids", () => {
     const fn = migration.match(/wholesale_swap_equipment_type_sort_order\([\s\S]*?\$\$;/)[0];
@@ -323,6 +368,13 @@ describe("wholesale-dynamic-equipment-types-verify.sql: read-only real-data chec
     expect(verify).not.toContain("microsoldering_untouched_identity");
   });
 
+  it("checks source_mode/source_tag_id are correctly configured — exactly one tag_lens row, pointing at the real microsoldering tag, and no 'direct' row carries a stray source_tag_id", () => {
+    expect(verify).toContain("microsoldering_source_mode_configured");
+    expect(verify).toMatch(/et\.source_mode = 'tag_lens'/);
+    expect(verify).toMatch(/et\.source_tag_id = \(select id from wholesale_tags where slug = 'microsoldering'\)/);
+    expect(verify).toMatch(/source_mode = 'direct' and source_tag_id is not null/);
+  });
+
   it("functionally tests the swap RPC and the delete RPC's guards using the ZZ001/ZZ002 sentinel pattern, never a live SAVEPOINT", () => {
     const stripped = stripComments(verify);
     expect(stripped).not.toMatch(/\bsavepoint\b/i);
@@ -333,7 +385,7 @@ describe("wholesale-dynamic-equipment-types-verify.sql: read-only real-data chec
 
   it("attempts to delete the REAL Microsoldering row as part of proving the tag-lens guard, and separately re-confirms it still exists afterward", () => {
     expect(verify).toContain("v_microsoldering_id");
-    expect(verify).toContain("microsoldering_row_survives_the_rejected_delete_attempt_in_check_16");
+    expect(verify).toContain("microsoldering_row_survives_the_rejected_delete_attempt_in_check_17");
   });
 
   it("confirms zero synthetic rows are left behind after the functional checks", () => {
@@ -395,6 +447,12 @@ describe("wholesale-dynamic-equipment-types-rollback.sql: default path non-destr
   it("the destructive delete-equipment-types and drop-columns sections are commented out by default", () => {
     expect(rollback).toMatch(/-- delete from wholesale_equipment_types where slug in \('ps5', 'xbox-series-x', 'switch'\);/);
     expect(rollback).toMatch(/-- alter table wholesale_equipment_types drop column if exists name_es;/);
+  });
+
+  it("dropping source_mode/source_tag_id is also commented out by default, with a warning it must go together with dropping the other 4 columns", () => {
+    expect(rollback).toMatch(/-- alter table wholesale_equipment_types drop column if exists source_tag_id;/);
+    expect(rollback).toMatch(/-- alter table wholesale_equipment_types drop column if exists source_mode;/);
+    expect(rollback).toMatch(/only\s*\n--\s*together with step 7/);
   });
 
   it("the optional macbook photo reversal is commented out by default and only fires on the exact transfer signature (laptops has one, macbook doesn't)", () => {

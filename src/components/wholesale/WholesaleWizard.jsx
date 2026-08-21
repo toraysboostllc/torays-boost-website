@@ -57,15 +57,25 @@ function WizardSteps({ equipoDone, modeloDone, fallaDone, t }) {
  * a purely presentational banner on the Modelo/Falla screens below — never
  * whether or where the card appears, never gated by its slug).
  *
- * `equipmentTypes` is exactly what /api/wholesale-prices already returned
- * when the portal loaded (see WholesalePrices.jsx) — this component never
- * fetches anything itself. Screen history is a simple stack (push forward,
- * pop on Back) instead of hardcoding a back-target per screen.
+ * `equipmentTypes` and `legacyMicrosoldering` are exactly what
+ * /api/wholesale-prices already returned when the portal loaded (see
+ * WholesalePrices.jsx) — this component never fetches anything itself.
+ * `tagLensEquipmentTypes` (e.g. Microsoldering) is the PRIMARY channel for
+ * tag-lens cards, kept as its own array at the wire level — see
+ * api/_lib/wholesaleDb.js and buildWholesaleWizardCatalog's own header for
+ * why. `legacyMicrosoldering` is a TEMPORARY compatibility fallback only,
+ * consulted solely when `tagLensEquipmentTypes` itself is absent — see
+ * buildWholesaleWizardCatalog's own header for what it's for and when to
+ * delete it. Screen history is a simple stack (push forward, pop on Back)
+ * instead of hardcoding a back-target per screen.
  */
-export function WholesaleWizard({ equipmentTypes, onScreenChange }) {
+export function WholesaleWizard({ equipmentTypes, tagLensEquipmentTypes, legacyMicrosoldering, onScreenChange }) {
   const { t, language } = useWholesaleLocale();
 
-  const topEquipoList = useMemo(() => buildWholesaleWizardCatalog(equipmentTypes), [equipmentTypes]);
+  const topEquipoList = useMemo(
+    () => buildWholesaleWizardCatalog(equipmentTypes, undefined, tagLensEquipmentTypes, legacyMicrosoldering),
+    [equipmentTypes, tagLensEquipmentTypes, legacyMicrosoldering]
+  );
 
   const [screenStack, setScreenStack] = useState(["top"]);
   const screen = screenStack[screenStack.length - 1];

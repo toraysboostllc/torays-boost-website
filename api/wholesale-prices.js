@@ -108,6 +108,8 @@ export default async function handler(req, res) {
   res.status(200).json({
     shopName: shop.name,
     equipmentTypes: catalog.equipmentTypes,
+    tagLensEquipmentTypes: catalog.tagLensEquipmentTypes,
+    // LEGACY, TEMPORARY — see api/_lib/wholesaleDb.js's own comment.
     microsoldering: catalog.microsoldering,
     salesModule: catalog.salesModule,
   });

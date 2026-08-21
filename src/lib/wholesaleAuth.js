@@ -69,9 +69,14 @@ export async function fetchWholesaleCatalog() {
   return {
     ok: true,
     shopName: data.shopName,
-    // Microsoldering is a plain member of equipmentTypes[] (is_tag_lens
-    // true) — see api/_lib/wholesaleDb.js — never a separate response key.
     equipmentTypes: data.equipmentTypes || [],
+    // Primary channel for tag-lens cards (e.g. Microsoldering) — kept as
+    // its own array by the server on purpose, see api/_lib/wholesaleDb.js.
+    tagLensEquipmentTypes: data.tagLensEquipmentTypes || [],
+    // TEMPORARY compatibility passthrough — see buildWholesaleWizardCatalog's
+    // header for what this is for (an old server only) and when to delete
+    // it. Not read anywhere else in this file.
+    legacyMicrosoldering: data.microsoldering || null,
     salesModule: data.salesModule || null,
   };
 }

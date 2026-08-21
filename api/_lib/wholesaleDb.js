@@ -275,16 +275,13 @@ export async function signImagePaths(env, storagePaths) {
   return byPath;
 }
 
-export async function findMicrosolderingTagId(env) {
-  const tags = await rest(env, `wholesale_tags?slug=eq.microsoldering&select=id`);
-  return tags[0]?.id || null;
-}
-
-/** Which of the given (already active-filtered) service ids carry the
- *  Microsoldering tag — restricted to those ids at the query level, never
- *  the whole wholesale_service_tags table. Skips the request when there's
- *  no tag row yet or no active service to check against. */
-export async function listMicrosolderingServiceIds(env, tagId, activeServiceIds) {
+/** Which of the given (already active-filtered) service ids carry the given
+ *  tag — restricted to those ids at the query level, never the whole
+ *  wholesale_service_tags table. Skips the request when there's no tag id
+ *  or no active service to check against. Generic — the caller supplies
+ *  `tagId` (a wholesale_equipment_types row's own `source_tag_id`), so this
+ *  function never hardcodes which tag/slug it's looking up. */
+export async function listServiceIdsForTag(env, tagId, activeServiceIds) {
   if (!tagId || !activeServiceIds.length) return new Set();
   const rows = await rest(
     env,
@@ -342,12 +339,17 @@ function toClientService(sv, portalSettings) {
   };
 }
 
-/** Builds the full portal response — equipment-type-grouped catalog plus the
- *  Microsoldering lens — for a logged-in shop. Fixed query count regardless
- *  of catalog size: 3 catalog fetches (equipment types, categories,
- *  services) + 1 portal settings fetch + 1 images fetch + 1 tag lookup + 1
- *  service-tag fetch = 7 Postgres round-trips, plus at most ONE batch
- *  Storage signing call. Never returns `storage_path` — only
+/** Builds the full portal response — equipment-type-grouped catalog, plus
+ *  every tag-lens card (today: Microsoldering) in its own `tagLensEquipment
+ *  Types` field (kept OUT of `equipmentTypes` itself — see that field's own
+ *  comment for the real, tested reason) — for a logged-in shop. Fixed query
+ *  count regardless of catalog size: 3 catalog fetches (equipment types,
+ *  categories, services) + 1
+ *  portal settings fetch + 1 images fetch + 1 service-tag fetch PER tag-lens
+ *  row (today: 1, since there's exactly one) = 6 Postgres round-trips, plus
+ *  at most ONE batch Storage signing call. `source_tag_id` travels with the
+ *  equipment_types row itself, so — unlike before this round — there is no
+ *  separate tag-slug lookup query. Never returns `storage_path` — only
  *  `{ url, alt_text }` per image, or `null`. Every service's
  *  `recommended_price` is resolved here, once, from the SAME portalSettings
  *  row fetched at the top — never refetched per service. */
@@ -359,8 +361,15 @@ export async function buildWholesaleCatalog(env) {
     getPortalSettings(env),
   ]);
 
-  const realEquipmentTypes = equipmentTypes.filter((et) => !et.is_tag_lens);
-  const microsolderingType = equipmentTypes.find((et) => et.is_tag_lens) || null;
+  // source_mode is the primary signal from here on — 'direct' (default,
+  // every existing row and every new row DESK's create form produces) vs
+  // 'tag_lens' (categories computed from a tag instead of equipment_type_id
+  // ownership). is_tag_lens is kept in sync on the one row that has it
+  // (see the migration's step 12) but is no longer read here — this is
+  // what makes card-building generic instead of hardcoded to Microsoldering
+  // specifically.
+  const realEquipmentTypes = equipmentTypes.filter((et) => et.source_mode !== "tag_lens");
+  const tagLensTypes = equipmentTypes.filter((et) => et.source_mode === "tag_lens");
 
   const categoriesByEquipmentType = new Map();
   for (const cat of categories) {
@@ -379,8 +388,7 @@ export async function buildWholesaleCatalog(env) {
   }
 
   // -- images: one fetch for every active owner id, then one batch sign --
-  const equipmentTypeIds = realEquipmentTypes.map((et) => et.id);
-  if (microsolderingType) equipmentTypeIds.push(microsolderingType.id);
+  const equipmentTypeIds = realEquipmentTypes.map((et) => et.id).concat(tagLensTypes.map((et) => et.id));
   const categoryIds = categories.filter((c) => c.equipment_type_id).map((c) => c.id);
 
   const imageRows = await listActiveImagesForOwners(env, equipmentTypeIds, categoryIds);
@@ -419,87 +427,137 @@ export async function buildWholesaleCatalog(env) {
       image_focus_y: et.image_focus_y ?? 50,
       image: imageByEquipmentType.get(et.id) || null,
       is_tag_lens: false,
+      sort_order: et.sort_order,
       categories: (categoriesByEquipmentType.get(et.id) || [])
         .map(toClientCategory)
         .filter((cat) => cat.services.length > 0),
     }))
     .filter((et) => et.categories.length > 0);
 
-  // -- Microsoldering: a REAL, ordinary member of equipmentTypesOut, built
-  //    from the SAME already-active data above (never a separate/looser
-  //    query — a Hidden equipment type/category/service can't reach this
-  //    view either) and pushed into the SAME array every other card comes
-  //    from. There is deliberately no second response key, no separate
-  //    fetch, and no hardcoded slug anywhere in this file that decides
-  //    whether/where this card appears — only `is_tag_lens` on the real row,
-  //    exactly the same flag DESK already lets an admin see (and only DESK
-  //    may ever set it, at row-creation time; nothing here can create a new
-  //    tag-lens row). Its `categories` are the real wholesale_categories
-  //    rows that have at least one Microsoldering-tagged active service —
-  //    same `toClientCategory` shape as every other card, just pre-filtered
-  //    to the tagged subset — so buildWholesaleWizardCatalog
-  //    (src/lib/wholesaleWizardCatalog.js) needs zero special-casing to
-  //    turn this into a normal top-level Equipo with normal Modelo entries.
-  //    A category with a PS5/Xbox/Switch slug flows through the exact same
-  //    promoted/remaining bridge as it does for every other equipment
-  //    type's categories, so a tagged PS5 service still surfaces as one
-  //    Microsoldering model, never as a second top-level PS5 card.
-  if (microsolderingType) {
-    const tagId = await findMicrosolderingTagId(env);
-    const activeServiceIds = services.map((s) => s.id);
-    const taggedServiceIds = await listMicrosolderingServiceIds(env, tagId, activeServiceIds);
+  // -- Tag-lens cards (source_mode='tag_lens') are built from the SAME
+  //    already-active data above (never a separate/looser query) and use
+  //    the SAME per-card shape as equipmentTypesOut's entries — but are
+  //    returned in their OWN `tagLensEquipmentTypes` field, deliberately
+  //    NOT pushed into `equipmentTypes` itself. This is NOT a step back
+  //    toward hardcoding: nothing here is tied to Microsoldering's slug or
+  //    tag (each row supplies its own `source_tag_id`, so a second
+  //    tag-lens row DESK configures later works identically), and the
+  //    CURRENT client (src/lib/wholesaleWizardCatalog.js) merges this
+  //    field into the exact same buildWholesaleWizardCatalog pipeline as
+  //    equipmentTypes, sorted by the same sort_order — one function, one
+  //    shape, one final list. The split exists ONLY at the wire level, for
+  //    a real, confirmed reason: the OLD client (pre-this-round, still
+  //    possibly running in an already-open browser tab) calls its OWN
+  //    unmodified buildWholesaleWizardCatalog directly on `equipmentTypes`
+  //    with zero awareness of is_tag_lens — if a tag-lens card were mixed
+  //    into that same array, old code would render it a SECOND time
+  //    (once via its own hardcoded `microsoldering` tile, once via its
+  //    generic per-equipment-type loop), a real, verified duplicate-id bug
+  //    caught by testing this exact scenario, not assumed. Keeping tag-lens
+  //    cards out of `equipmentTypes` entirely is what makes "old client +
+  //    new server" and "stale tab mid-deploy" both safe, unconditionally.
+  //
+  //    LEGACY COMPATIBILITY (TEMPORARY, remove after the deploy-transition
+  //    window — see this round's audit report for the removal plan): the
+  //    response ALSO carries a top-level `microsoldering` key, in the OLD
+  //    pre-unification NESTED shape (equipmentType -> category -> tagged
+  //    services — different from tagLensEquipmentTypes' flat shape),
+  //    computed from this SAME pass so it can never drift. This is for the
+  //    OLD client specifically (it only ever reads `data.microsoldering`,
+  //    never `data.tagLensEquipmentTypes`); the CURRENT client only falls
+  //    back to it when `tagLensEquipmentTypes` itself is absent (an old
+  //    SERVER — see wholesaleWizardCatalog.js). Only ever populated from a
+  //    row literally slugged 'microsoldering', since that is the one shape
+  //    the old client's hardcoded reader understands; a hypothetical
+  //    second tag-lens row has no legacy shape to be compatible with and
+  //    does not get one.
+  const tagLensEquipmentTypesOut = [];
+  let legacyMicrosoldering = null;
 
-    const microsolderingCategories = categories
-      .filter((cat) => cat.equipment_type_id) // only real, owned categories — never guessed at
-      .map((cat) => {
-        const taggedServices = (servicesByCategory.get(cat.id) || [])
-          .filter((sv) => taggedServiceIds.has(sv.id))
-          .map((sv) => toClientService(sv, portalSettings));
-        if (taggedServices.length === 0) return null;
-        return {
-          id: cat.id,
-          slug: cat.slug,
-          name: cat.name,
-          notes: cat.notes ?? null,
-          diagnostic_fee: cat.diagnostic_fee ?? null,
-          diagnostic_description: cat.diagnostic_description ?? null,
-          image: imageByCategory.get(cat.id) || null,
-          services: taggedServices,
-        };
-      })
-      .filter(Boolean);
+  for (const tagLensType of tagLensTypes) {
+    const activeServiceIds = services.map((s) => s.id);
+    const taggedServiceIds = await listServiceIdsForTag(env, tagLensType.source_tag_id, activeServiceIds);
+
+    const taggedCategoryEntries = [];
+    for (const cat of categories) {
+      if (!cat.equipment_type_id) continue; // only real, owned categories — never guessed at
+      const taggedServices = (servicesByCategory.get(cat.id) || [])
+        .filter((sv) => taggedServiceIds.has(sv.id))
+        .map((sv) => toClientService(sv, portalSettings));
+      if (taggedServices.length === 0) continue;
+      const owningEt = realEquipmentTypes.find((et) => et.id === cat.equipment_type_id);
+      if (!owningEt) continue; // the category's real owner is itself hidden/tag-lens — never surfaced
+      taggedCategoryEntries.push({ cat, taggedServices, owningEt });
+    }
+
+    const flatCategories = taggedCategoryEntries.map(({ cat, taggedServices }) => ({
+      id: cat.id,
+      slug: cat.slug,
+      name: cat.name,
+      notes: cat.notes ?? null,
+      diagnostic_fee: cat.diagnostic_fee ?? null,
+      diagnostic_description: cat.diagnostic_description ?? null,
+      image: imageByCategory.get(cat.id) || null,
+      services: taggedServices,
+    }));
 
     // Same "hide if empty" rule applied uniformly to every other equipment
-    // type above — a Microsoldering row with zero currently-tagged active
+    // type above — a tag-lens row with zero currently-tagged active
     // services produces no card at all, not an empty one.
-    if (microsolderingCategories.length > 0) {
-      equipmentTypesOut.push({
-        id: microsolderingType.id,
-        slug: microsolderingType.slug,
-        name: microsolderingType.name,
-        name_es: microsolderingType.name_es || null,
-        full_bleed_photo: Boolean(microsolderingType.full_bleed_photo),
-        image_focus_x: microsolderingType.image_focus_x ?? 50,
-        image_focus_y: microsolderingType.image_focus_y ?? 50,
-        image: imageByEquipmentType.get(microsolderingType.id) || null,
+    if (flatCategories.length > 0) {
+      tagLensEquipmentTypesOut.push({
+        id: tagLensType.id,
+        slug: tagLensType.slug,
+        name: tagLensType.name,
+        name_es: tagLensType.name_es || null,
+        full_bleed_photo: Boolean(tagLensType.full_bleed_photo),
+        image_focus_x: tagLensType.image_focus_x ?? 50,
+        image_focus_y: tagLensType.image_focus_y ?? 50,
+        image: imageByEquipmentType.get(tagLensType.id) || null,
         is_tag_lens: true,
-        categories: microsolderingCategories,
+        sort_order: tagLensType.sort_order,
+        categories: flatCategories,
       });
+    }
+
+    if (tagLensType.slug === "microsoldering") {
+      // Regroup the SAME tagged categories by their real owning equipment
+      // type — this is the only structural difference from the shape
+      // above: nested, not flat. Built even when flatCategories is empty
+      // (equipmentTypes: []), matching the old client's own expected
+      // "graceful empty state", not a missing key.
+      const byOwningType = new Map();
+      for (const { cat, taggedServices, owningEt } of taggedCategoryEntries) {
+        if (!byOwningType.has(owningEt.id)) byOwningType.set(owningEt.id, { id: owningEt.id, name: owningEt.name, categories: [] });
+        byOwningType.get(owningEt.id).categories.push({ id: cat.id, slug: cat.slug, name: cat.name, services: taggedServices });
+      }
+      legacyMicrosoldering = {
+        id: tagLensType.id,
+        slug: tagLensType.slug,
+        name: tagLensType.name,
+        name_es: tagLensType.name_es || null,
+        full_bleed_photo: Boolean(tagLensType.full_bleed_photo),
+        image_focus_x: tagLensType.image_focus_x ?? 50,
+        image_focus_y: tagLensType.image_focus_y ?? 50,
+        image: imageByEquipmentType.get(tagLensType.id) || null,
+        sort_order: tagLensType.sort_order,
+        equipmentTypes: [...byOwningType.values()],
+      };
     }
   }
 
-  // Microsoldering is pushed above regardless of its real sort_order, so
-  // the array is re-sorted here against the ORIGINAL wholesale_equipment_
-  // types.sort_order (looked up by id, not re-derived) — the single source
-  // of truth DESK's reorder buttons already write to for every card,
-  // Microsoldering included. This is what makes the final card order react
-  // to a DESK reorder with zero code change, on this card the same as any
-  // other.
-  const sortOrderById = new Map(equipmentTypes.map((et) => [et.id, et.sort_order]));
-  equipmentTypesOut.sort((a, b) => (sortOrderById.get(a.id) ?? 0) - (sortOrderById.get(b.id) ?? 0));
-
   return {
     equipmentTypes: equipmentTypesOut,
+    // Same per-card shape as `equipmentTypes`, PRIMARY channel for tag-lens
+    // cards for the current client — see the block above for why this is a
+    // separate field rather than merged into `equipmentTypes` itself. Both
+    // arrays carry `sort_order`, so the client can merge and sort them into
+    // one final list without a second server-side pass.
+    tagLensEquipmentTypes: tagLensEquipmentTypesOut,
+    // LEGACY, TEMPORARY — see the block above for what this is and the
+    // removal plan. The current client only consults it as a fallback, when
+    // tagLensEquipmentTypes itself is absent (an old server).
+    microsoldering: legacyMicrosoldering,
     // Read-only for the portal — shops never write either of these. Falls
     // back to safe, conservative defaults (maintenance + blocked, no
     // rounding) if the singleton settings row is somehow missing, rather

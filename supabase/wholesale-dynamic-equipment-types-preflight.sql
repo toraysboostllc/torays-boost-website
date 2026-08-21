@@ -19,15 +19,19 @@
 -- Order of operations:
 --   1. Run this file. Read the check_name/status/details rows and the final
 --      OVERALL STATUS row.
---   2. Read every row under "current catalog snapshot" (checks 6-13) by
+--   2. Read every row under "current catalog snapshot" (checks 6-14) by
 --      hand before proceeding — this migration hardcodes slug-based lookups
 --      ('video-consoles' for the 3 promoted categories, 'macbook'/'laptops'
 --      for the Laptops merge) and check 13 specifically flags the one edge
 --      case that needs a human call: macbook AND laptops both already
 --      having their own photo (the migration will not silently overwrite
---      either one in that case). If check 5, 6, 10, 11, or 13 show
---      something other than what you expect, STOP and tell Claude before
---      running the migration.
+--      either one in that case). Check 14 is a HARD GATE, not informational
+--      — with zero active services currently tagged 'microsoldering',
+--      OVERALL STATUS is FAIL and the migration must not run yet (it would
+--      succeed, but Microsoldering would end up with zero content, a
+--      silent no-op the owner has said must stop the migration instead).
+--      If check 5, 6, 10, 11, 13, or 14 show something other than what you
+--      expect, STOP and tell Claude before running the migration.
 --   3. Only if OVERALL STATUS is PASS, run
 --      wholesale-dynamic-equipment-types-migration.sql.
 --   4. Run wholesale-dynamic-equipment-types-verify.sql afterward to confirm
@@ -106,6 +110,16 @@ macbook_target_categories as (
     (select count(*) from wholesale_price_history ph join wholesale_services s on s.id = ph.service_id where s.category_id = c.id) as price_history_count
   from wholesale_categories c
   where c.slug in ('macbook-air', 'macbook-pro')
+),
+microsoldering_tag_status as (
+  select
+    (select id from wholesale_tags where slug = 'microsoldering') as tag_id,
+    (
+      select count(*) from wholesale_service_tags st
+      join wholesale_services s on s.id = st.service_id
+      where st.tag_id = (select id from wholesale_tags where slug = 'microsoldering')
+        and s.active = true
+    ) as tagged_active_service_count
 ),
 current_equipment_types as (
   select string_agg(
@@ -292,6 +306,22 @@ checks as (
         || ' — no collision, the migration''s photo transfer (if macbook has one) will apply cleanly'
     end
   from raw
+
+  union all
+
+  -- Hard gate, not informational: with zero active services tagged
+  -- 'microsoldering', the Microsoldering card would have no content at all
+  -- post-migration (same "hide if empty" rule as any other equipment
+  -- type) — a silent, invisible no-op the owner explicitly said must STOP
+  -- the migration rather than pass quietly. Tag at least one active
+  -- service as Microsoldering from DESK, then re-run this preflight.
+  select 14, 'microsoldering_tagged_active_service_count',
+    case when tagged_active_service_count > 0 then 'PASS' else 'FAIL' end,
+    'active services tagged ''microsoldering'' -> ' || tagged_active_service_count
+      || ' — must be > 0. STOP/NO-GO if 0: the Microsoldering card would have zero content post-migration '
+      || '(same hide-if-empty rule every other equipment type gets). Tag at least one active service as '
+      || 'Microsoldering from DESK, then re-run this preflight, before running the migration.'
+  from microsoldering_tag_status
 ),
 overall as (
   select
@@ -313,7 +343,8 @@ from (
     'PASS = safe to run wholesale-dynamic-equipment-types-migration.sql as-is. REVIEW REQUIRED = read every '
       || 'flagged row by hand (especially 6, 8, 11, and 13) and confirm the migration''s hardcoded slug '
       || 'references match before proceeding — this file cannot verify that automatically. FAIL = fix the '
-      || 'flagged row(s) first.'
+      || 'flagged row(s) first — check 14 (zero services tagged microsoldering) is the one FAIL that is only '
+      || 'fixed from DESK (tag a service), not by changing the migration.'
   from overall
 ) t
 order by ord;

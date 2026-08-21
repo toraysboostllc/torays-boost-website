@@ -3,7 +3,7 @@
 -- wholesale-dynamic-equipment-types-preflight.sql reports OVERALL STATUS
 -- PASS (or every REVIEW REQUIRED row has been read and confirmed correct).
 -- ============================================================================
--- Three independent things happen in this one migration:
+-- Four independent things happen in this one migration:
 --
 --   1. Three new columns on wholesale_equipment_types make every home card's
 --      presentation fully DESK-administrable: `name_es` (Spanish display
@@ -31,6 +31,12 @@
 --      compatibility rows so nothing that ever referenced them by id
 --      breaks. Windows/gaming laptops can be added later from DESK, inside
 --      this same 'laptops' card.
+--
+--   4. Microsoldering becomes a genuinely uniform, DESK-administrable row
+--      instead of a special-cased "tag, not an equipment type" — via a new
+--      generic `source_mode`/`source_tag_id` pair (step 12) any tag-based
+--      card can use, not something hardcoded to Microsoldering's slug or
+--      tag. See step 12's own comment for the full design.
 --
 -- CATEGORY -> EQUIPMENT TYPE MAPPING (explicit, per requirement):
 --   wholesale_categories row untouched (same id, same slug, same services,
@@ -354,5 +360,57 @@ end;
 $$;
 revoke execute on function public.wholesale_delete_equipment_type(uuid, uuid, boolean) from public, anon, authenticated;
 grant execute on function public.wholesale_delete_equipment_type(uuid, uuid, boolean) to service_role;
+
+-- ----------------------------------------------------------------------------
+-- 12. Generic tag-lens configuration — source_mode + source_tag_id. Replaces
+--    the implicit "is_tag_lens = a special, hardcoded-to-Microsoldering
+--    card" framing with an explicit, generic mechanism ANY future tag-based
+--    card can reuse without a new column or a new code branch:
+--
+--      source_mode = 'direct'    Normal card — categories come from
+--                                 wholesale_categories.equipment_type_id,
+--                                 exactly as today. The default for every
+--                                 row, including every NEW row DESK's
+--                                 existing "create equipment type" form
+--                                 produces — that form never sets this
+--                                 column explicitly, so a brand-new card is
+--                                 'direct' with zero DESK code change.
+--      source_mode = 'tag_lens'  Categories are computed by flattening every
+--                                 real category with >=1 active service
+--                                 tagged `source_tag_id` — exactly the
+--                                 mechanism Microsoldering already used,
+--                                 now named and configurable rather than
+--                                 hardcoded to one row/one tag slug.
+--
+--    is_tag_lens is left untouched — still a real column, still read by
+--    DESK's existing delete-guard and admin category-select filters. This
+--    migration keeps the two in sync for the one row that exists today;
+--    nothing in this schema lets them drift apart, since DESK's create flow
+--    never sets either column and there is no path today that creates a
+--    second tag-lens row.
+-- ----------------------------------------------------------------------------
+alter table wholesale_equipment_types add column if not exists source_mode text not null default 'direct';
+alter table wholesale_equipment_types drop constraint if exists wholesale_equipment_types_source_mode_check;
+alter table wholesale_equipment_types add constraint wholesale_equipment_types_source_mode_check
+  check (source_mode in ('direct', 'tag_lens'));
+
+alter table wholesale_equipment_types add column if not exists source_tag_id uuid references wholesale_tags(id) on delete restrict;
+alter table wholesale_equipment_types drop constraint if exists wholesale_equipment_types_source_tag_id_check;
+alter table wholesale_equipment_types add constraint wholesale_equipment_types_source_tag_id_check
+  check (
+    (source_mode = 'direct' and source_tag_id is null)
+    or (source_mode = 'tag_lens' and source_tag_id is not null)
+  );
+
+-- Backfill: the one existing tag-lens row (Microsoldering) gets
+-- source_mode='tag_lens' and source_tag_id pointed at the real
+-- 'microsoldering' wholesale_tags row. Idempotent — a second run only
+-- touches a row that still needs it.
+update wholesale_equipment_types set
+  source_mode = 'tag_lens',
+  source_tag_id = (select id from wholesale_tags where slug = 'microsoldering'),
+  updated_at = now()
+where is_tag_lens = true
+  and source_mode is distinct from 'tag_lens';
 
 commit;

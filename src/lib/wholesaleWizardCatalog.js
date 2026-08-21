@@ -77,10 +77,8 @@ function cardPresentation(source) {
  * follow-up that deletes this bridge) don't have to mutate module state.
  *
  * Every returned Equipo has the same shape regardless of whether it's a
- * (legacy-bridge) promoted category, a real equipment type, or the
- * Microsoldering tag-lens row (see api/_lib/wholesaleDb.js — it's a plain
- * member of the `equipmentTypes` array passed in here, not a separate
- * channel; this function has no special case for it at all):
+ * (legacy-bridge) promoted category, a real equipment type, or a tag-lens
+ * row like Microsoldering:
  *   { id, slug, name, nameEs, fullBleedPhoto, imageFocusX, imageFocusY,
  *     image, sourceEquipmentTypeId, isTagLens, models: WizardModel[] }
  * `models` is always length >= 1. The wizard shows a "Modelo" selection
@@ -91,18 +89,48 @@ function cardPresentation(source) {
  * An equipment type whose categories are ALL promoted away (e.g. "Video
  * Consoles", pre-migration) is dropped entirely from the returned list — it
  * would otherwise render as an empty card with nothing behind it.
+ *
+ * `tagLensEquipmentTypes` (3rd param, e.g. Microsoldering) arrives as its
+ * OWN array from the API — see api/_lib/wholesaleDb.js's own comment for
+ * why it's not simply concatenated server-side into `equipmentTypes`
+ * itself (a real, tested duplicate-card bug for an old cached client tab).
+ * This function is what actually unifies them: both arrays are merged and
+ * sorted by `sort_order` BEFORE the single loop below runs, so a tag-lens
+ * row flows through the exact same promoted/remaining logic as any other
+ * equipment type — genuinely one pipeline, the split is a wire-level
+ * concern only.
+ *
+ * `legacyMicrosoldering`, 4th param, TEMPORARY (see its own comment at the
+ * usage site below): a fallback for when `tagLensEquipmentTypes` itself is
+ * absent (an old, pre-this-round server) — this function only ever
+ * CONSULTS it as a fallback, never as a primary source.
  */
-export function buildWholesaleWizardCatalog(equipmentTypes, promotedSlugs = PROMOTED_CATEGORY_SLUGS) {
+export function buildWholesaleWizardCatalog(
+  equipmentTypes,
+  promotedSlugs = PROMOTED_CATEGORY_SLUGS,
+  tagLensEquipmentTypes = [],
+  legacyMicrosoldering = null
+) {
   if (!Array.isArray(equipmentTypes)) return [];
+
+  const combinedEquipmentTypes = [...equipmentTypes, ...(Array.isArray(tagLensEquipmentTypes) ? tagLensEquipmentTypes : [])]
+    // Sorted once, here, by the same sort_order DESK's reorder buttons
+    // write to every row — missing values (e.g. fixtures that predate this
+    // field) fall back to Infinity, a stable no-op that preserves whatever
+    // order the arrays already came in, never throwing or producing NaN.
+    .sort((a, b) => (a.sort_order ?? Infinity) - (b.sort_order ?? Infinity));
 
   // Real top-level equipment-type slugs already present in this response —
   // the dedup signal the bridge uses to never double-produce a card for a
-  // slug that already has its own real row (see file header).
-  const realTopLevelSlugs = new Set(equipmentTypes.map((et) => et.slug).filter(Boolean));
+  // slug that already has its own real row (see file header). Built from
+  // the COMBINED array so a tag-lens card's own flattened categories (which
+  // can legitimately share a slug with a real top-level type, e.g. a
+  // Microsoldering-tagged PS5 service) are deduped against it too.
+  const realTopLevelSlugs = new Set(combinedEquipmentTypes.map((et) => et.slug).filter(Boolean));
 
   const equipoList = [];
 
-  for (const equipmentType of equipmentTypes) {
+  for (const equipmentType of combinedEquipmentTypes) {
     const categories = Array.isArray(equipmentType.categories) ? equipmentType.categories : [];
     const promoted = categories.filter((cat) => promotedSlugs.has(cat.slug) && !realTopLevelSlugs.has(cat.slug));
     const remaining = categories.filter((cat) => !(promotedSlugs.has(cat.slug) && !realTopLevelSlugs.has(cat.slug)));
@@ -139,6 +167,41 @@ export function buildWholesaleWizardCatalog(equipmentTypes, promotedSlugs = PROM
         // same equipoList by this point.
         isTagLens: Boolean(equipmentType.is_tag_lens),
         models: remaining.map(toWizardModel),
+      });
+    }
+  }
+
+  // LEGACY-SERVER COMPATIBILITY BRIDGE — TEMPORARY, same spirit and same
+  // removal obligation as PROMOTED_CATEGORY_SLUGS above (see file header):
+  // exists ONLY for a server that predates `tagLensEquipmentTypes` itself
+  // (an old server rolled back, or genuinely not yet upgraded) — signaled
+  // by that field being absent/empty. On any real, current server this
+  // branch never fires: `tagLensEquipmentTypes` is always present (even as
+  // `[]` when nothing is currently tagged), so `legacyMicrosoldering` is
+  // ignored — this function does NOT depend on the legacy field for its
+  // normal behavior, only falls back to it. DELETE this block (and the
+  // `legacyMicrosoldering` parameter) once the compatibility window has
+  // passed — see the audit report accompanying this round.
+  const hasTagLensChannel = Array.isArray(tagLensEquipmentTypes) && tagLensEquipmentTypes.length > 0;
+  if (!hasTagLensChannel && legacyMicrosoldering && Array.isArray(legacyMicrosoldering.equipmentTypes)) {
+    const models = legacyMicrosoldering.equipmentTypes.flatMap((et) =>
+      Array.isArray(et.categories) ? et.categories.map(toWizardModel) : []
+    );
+    if (models.length > 0) {
+      // Always inserted first — matches the OLD client's own hardcoded
+      // position for this card (see git history), and the approved final
+      // order's own permanent placement (Microsoldering is always card 1).
+      // The legacy object never carries a sort_order this function could
+      // use instead, since it predates that field entirely.
+      equipoList.unshift({
+        id: legacyMicrosoldering.id,
+        slug: legacyMicrosoldering.slug || "microsoldering",
+        name: legacyMicrosoldering.name,
+        ...cardPresentation(legacyMicrosoldering),
+        image: legacyMicrosoldering.image ?? null,
+        sourceEquipmentTypeId: legacyMicrosoldering.id,
+        isTagLens: true,
+        models,
       });
     }
   }

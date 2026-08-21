@@ -38,6 +38,11 @@
 --      migration touched. Only run this if you are abandoning the whole
 --      feature, not just undoing the PS5/Xbox/Switch move and the Laptops
 --      merge.
+--   8. OPTIONAL — drop source_mode/source_tag_id entirely. Only run this
+--      together with step 7 (abandoning the whole feature) — Website's
+--      card-building logic reads source_mode/source_tag_id as its primary
+--      signal, so dropping these without also reverting that code would
+--      break Microsoldering's card, not just undo a migration.
 --
 -- Sections 1-3 are the DEFAULT, executed rollback below — together they
 -- undo every non-optional effect of the migration (both the PS5/Xbox/Switch
@@ -147,5 +152,14 @@ where slug = 'laptops';
 -- alter table wholesale_equipment_types drop column if exists image_focus_y;
 -- alter table wholesale_equipment_types drop column if exists full_bleed_photo;
 -- alter table wholesale_equipment_types drop column if exists name_es;
+
+-- ----------------------------------------------------------------------------
+-- 8. OPTIONAL — drop source_mode/source_tag_id (see warning above — only
+--    together with step 7).
+-- ----------------------------------------------------------------------------
+-- alter table wholesale_equipment_types drop constraint if exists wholesale_equipment_types_source_mode_check;
+-- alter table wholesale_equipment_types drop constraint if exists wholesale_equipment_types_source_tag_id_check;
+-- alter table wholesale_equipment_types drop column if exists source_tag_id;
+-- alter table wholesale_equipment_types drop column if exists source_mode;
 
 commit;

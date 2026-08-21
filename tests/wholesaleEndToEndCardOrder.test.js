@@ -79,9 +79,14 @@ function seedPostMigrationCatalog() {
 
   // 1. Microsoldering — is_tag_lens, no categories of its own. Gets its
   //    content by tagging a real service on a real equipment type below.
-  const microsoldering = seedEquipmentType({ slug: "microsoldering", name: "Microsoldering", is_tag_lens: true, sort_order: 1 });
+  //    source_mode/source_tag_id (not is_tag_lens) is what the server's
+  //    card-building logic actually reads — see api/_lib/wholesaleDb.js.
   const tag = { id: fake.nextId(), slug: "microsoldering", name: "Microsoldering" };
   fake.db.wholesale_tags.push(tag);
+  const microsoldering = seedEquipmentType({
+    slug: "microsoldering", name: "Microsoldering", is_tag_lens: true,
+    source_mode: "tag_lens", source_tag_id: tag.id, sort_order: 1,
+  });
 
   // 2. iPhone
   const iphone = seedEquipmentType({ slug: "iphone", name: "iPhone", sort_order: 2 });
@@ -149,7 +154,7 @@ describe("End-to-end: real server (buildWholesaleCatalog) -> real client (buildW
     const res = await callPrices();
     expect(res.statusCode).toBe(200);
 
-    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes);
+    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes, undefined, res.body.tagLensEquipmentTypes);
 
     expect(cards.map((c) => c.name)).toEqual(APPROVED_ORDER);
   });
@@ -158,7 +163,7 @@ describe("End-to-end: real server (buildWholesaleCatalog) -> real client (buildW
     seedPostMigrationCatalog();
 
     const res = await callPrices();
-    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes);
+    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes, undefined, res.body.tagLensEquipmentTypes);
 
     const ids = cards.map((c) => c.id);
     const slugs = cards.map((c) => c.slug);
@@ -170,7 +175,7 @@ describe("End-to-end: real server (buildWholesaleCatalog) -> real client (buildW
     seedPostMigrationCatalog();
 
     const res = await callPrices();
-    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes);
+    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes, undefined, res.body.tagLensEquipmentTypes);
 
     const laptopsCard = cards.find((c) => c.name === "Laptops");
     expect(laptopsCard.models.map((m) => m.name).sort()).toEqual(["MacBook Air", "MacBook Pro"]);
@@ -180,7 +185,7 @@ describe("End-to-end: real server (buildWholesaleCatalog) -> real client (buildW
     seedPostMigrationCatalog();
 
     const res = await callPrices();
-    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes);
+    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes, undefined, res.body.tagLensEquipmentTypes);
 
     const microCard = cards.find((c) => c.name === "Microsoldering");
     expect(microCard.isTagLens).toBe(true);
@@ -193,7 +198,7 @@ describe("End-to-end: real server (buildWholesaleCatalog) -> real client (buildW
     seedPostMigrationCatalog();
 
     const res = await callPrices();
-    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes);
+    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes, undefined, res.body.tagLensEquipmentTypes);
 
     expect(cards.map((c) => c.name)).not.toContain("MacBook");
     expect(cards.map((c) => c.name)).not.toContain("Gaming Laptops");
@@ -214,7 +219,7 @@ describe("End-to-end: a brand-new DESK-created equipment type appears as a 9th c
     seedService(droneCat.id, { slug: "drone-gimbal-calibration", name: "Gimbal Calibration" });
 
     const res = await callPrices();
-    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes);
+    const cards = buildWholesaleWizardCatalog(res.body.equipmentTypes, undefined, res.body.tagLensEquipmentTypes);
 
     expect(cards).toHaveLength(9);
     expect(cards.map((c) => c.name)).toEqual([...APPROVED_ORDER, "Drone Repair"]);

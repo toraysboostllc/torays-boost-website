@@ -107,14 +107,18 @@ describe("wholesale-prices: equipment type carries name_es/full_bleed_photo/imag
   });
 });
 
-describe("wholesale-prices: Microsoldering is a plain member of equipmentTypes[], sourced from its real row — no separate response key, no hardcoded object", () => {
-  it("appears in equipmentTypes[] carrying id/slug/name/name_es/full_bleed_photo/image_focus_x/image_focus_y from the real is_tag_lens row, with is_tag_lens: true, and its categories pre-filtered to only the tagged services", async () => {
+describe("wholesale-prices: Microsoldering is in its OWN tagLensEquipmentTypes field, sourced generically from source_mode/source_tag_id — never mixed into equipmentTypes[] (a real, tested duplicate-card bug for an old cached client tab otherwise), plus a TEMPORARY legacy compatibility key", () => {
+  it("appears in tagLensEquipmentTypes carrying id/slug/name/name_es/full_bleed_photo/image_focus_x/image_focus_y from the real is_tag_lens row, with is_tag_lens: true and sort_order, and its categories pre-filtered to only the tagged services — never in equipmentTypes[] itself", async () => {
     seedShopWithSession();
+    const tag = { id: fake.nextId(), slug: "microsoldering", name: "Microsoldering" };
+    fake.db.wholesale_tags.push(tag);
     const microsolderingType = seedEquipmentType({
       slug: "microsoldering",
       name: "Microsoldering",
       name_es: "Microsoldadura",
       is_tag_lens: true,
+      source_mode: "tag_lens",
+      source_tag_id: tag.id,
       full_bleed_photo: true,
       image_focus_x: 50,
       image_focus_y: 35,
@@ -127,15 +131,16 @@ describe("wholesale-prices: Microsoldering is a plain member of equipmentTypes[]
     const cat = seedCategory(et.id, { slug: "iphone-board" });
     const taggedService = seedService(cat.id, { name: "Board Repair" });
     seedService(cat.id, { id: fake.nextId(), slug: "screen-repl", name: "Screen Replacement" });
-    const tag = { id: fake.nextId(), slug: "microsoldering", name: "Microsoldering" };
-    fake.db.wholesale_tags.push(tag);
     fake.db.wholesale_service_tags.push({ service_id: taggedService.id, tag_id: tag.id });
 
     const res = await callPrices();
 
-    expect(res.body.microsoldering).toBeUndefined(); // no separate response key at all
-    const microCard = res.body.equipmentTypes.find((e) => e.id === microsolderingType.id);
-    expect(microCard).toBeTruthy();
+    // Never a member of equipmentTypes[] — that's the whole point of the split.
+    expect(res.body.equipmentTypes.find((e) => e.id === microsolderingType.id)).toBeUndefined();
+
+    expect(res.body.tagLensEquipmentTypes).toHaveLength(1);
+    const microCard = res.body.tagLensEquipmentTypes[0];
+    expect(microCard.id).toBe(microsolderingType.id);
     expect(microCard.slug).toBe("microsoldering");
     expect(microCard.name).toBe("Microsoldering");
     expect(microCard.name_es).toBe("Microsoldadura");
@@ -143,6 +148,7 @@ describe("wholesale-prices: Microsoldering is a plain member of equipmentTypes[]
     expect(microCard.image_focus_x).toBe(50);
     expect(microCard.image_focus_y).toBe(35);
     expect(microCard.is_tag_lens).toBe(true);
+    expect(microCard.sort_order).toBe(1);
     // Its one category is the real iphone-board row, but with ONLY the
     // tagged service — the untagged "Screen Replacement" never leaks in.
     expect(microCard.categories).toHaveLength(1);
@@ -150,25 +156,79 @@ describe("wholesale-prices: Microsoldering is a plain member of equipmentTypes[]
     expect(microCard.categories[0].services.map((s) => s.name)).toEqual(["Board Repair"]);
 
     // The real iPhone card, meanwhile, is untouched and unfiltered — both
-    // services still there, is_tag_lens: false.
+    // services still there, is_tag_lens: false, own sort_order carried too.
     const iphoneCard = res.body.equipmentTypes.find((e) => e.id === et.id);
     expect(iphoneCard.is_tag_lens).toBe(false);
+    expect(iphoneCard.sort_order).toBe(2);
     expect(iphoneCard.categories[0].services.map((s) => s.name).sort()).toEqual(["Board Repair", "Screen Replacement"]);
+  });
 
-    // sort_order controls final position, Microsoldering included — it was
-    // seeded at sort_order 1 (before iPhone's 2), and lands first here too.
-    expect(res.body.equipmentTypes[0].id).toBe(microsolderingType.id);
+  it("ALSO returns the TEMPORARY legacy `microsoldering` compatibility key, nested equipmentType -> category -> tagged services, computed from the SAME tagged data — for a stale pre-deploy client tab only; the current client never reads it", async () => {
+    seedShopWithSession();
+    const tag = { id: fake.nextId(), slug: "microsoldering", name: "Microsoldering" };
+    fake.db.wholesale_tags.push(tag);
+    const microsolderingType = seedEquipmentType({
+      slug: "microsoldering", name: "Microsoldering", is_tag_lens: true,
+      source_mode: "tag_lens", source_tag_id: tag.id, sort_order: 1,
+    });
+    const et = seedEquipmentType({ id: fake.nextId(), slug: "iphone", name: "iPhone", sort_order: 2 });
+    const cat = seedCategory(et.id, { slug: "iphone-board" });
+    const taggedService = seedService(cat.id, { name: "Board Repair" });
+    fake.db.wholesale_service_tags.push({ service_id: taggedService.id, tag_id: tag.id });
+
+    const res = await callPrices();
+
+    expect(res.body.microsoldering).toBeTruthy();
+    expect(res.body.microsoldering.id).toBe(microsolderingType.id);
+    expect(res.body.microsoldering.equipmentTypes).toHaveLength(1);
+    expect(res.body.microsoldering.equipmentTypes[0].id).toBe(et.id);
+    expect(res.body.microsoldering.equipmentTypes[0].name).toBe("iPhone");
+    expect(res.body.microsoldering.equipmentTypes[0].categories[0].slug).toBe("iphone-board");
+    expect(res.body.microsoldering.equipmentTypes[0].categories[0].services.map((s) => s.name)).toEqual(["Board Repair"]);
+  });
+
+  it("legacy key is a non-null object with an EMPTY equipmentTypes[] when the row is active but nothing is tagged — matches the old client's own expected graceful-empty-state shape", async () => {
+    seedShopWithSession();
+    const tag = { id: fake.nextId(), slug: "microsoldering", name: "Microsoldering" };
+    fake.db.wholesale_tags.push(tag);
+    seedEquipmentType({ slug: "microsoldering", name: "Microsoldering", is_tag_lens: true, source_mode: "tag_lens", source_tag_id: tag.id });
+    const et = seedEquipmentType({ id: fake.nextId(), slug: "iphone", name: "iPhone" });
+    const cat = seedCategory(et.id);
+    seedService(cat.id); // untagged
+
+    const res = await callPrices();
+
+    expect(res.body.microsoldering).not.toBeNull();
+    expect(res.body.microsoldering.equipmentTypes).toEqual([]);
+    // The unified card, unlike the legacy key, does NOT appear when empty.
+    expect(res.body.tagLensEquipmentTypes).toEqual([]);
+    expect(res.body.equipmentTypes.map((e) => e.slug)).not.toContain("microsoldering");
+  });
+
+  it("legacy key is null when no tag-lens row exists at all or it's hidden — never a crash", async () => {
+    seedShopWithSession();
+    const et = seedEquipmentType({ id: fake.nextId(), slug: "iphone", name: "iPhone" });
+    const cat = seedCategory(et.id);
+    seedService(cat.id);
+
+    const res = await callPrices();
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.microsoldering).toBeNull();
   });
 
   it("produces no card at all when nothing is currently tagged — never an empty-but-present card, same 'hide if empty' rule every other equipment type gets", async () => {
     seedShopWithSession();
-    const microsolderingType = seedEquipmentType({ slug: "microsoldering", name: "Microsoldering", is_tag_lens: true });
+    const tag = { id: fake.nextId(), slug: "microsoldering", name: "Microsoldering" };
+    fake.db.wholesale_tags.push(tag);
+    const microsolderingType = seedEquipmentType({ slug: "microsoldering", name: "Microsoldering", is_tag_lens: true, source_mode: "tag_lens", source_tag_id: tag.id });
     const et = seedEquipmentType({ id: fake.nextId(), slug: "iphone", name: "iPhone" });
     const cat = seedCategory(et.id);
     seedService(cat.id); // no tag attached at all
 
     const res = await callPrices();
 
+    expect(res.body.tagLensEquipmentTypes).toEqual([]);
     expect(res.body.equipmentTypes.find((e) => e.id === microsolderingType.id)).toBeUndefined();
   });
 });
