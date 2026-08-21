@@ -39,6 +39,10 @@ const FILES = [
   "wholesale-retention-migration.sql",
   "wholesale-retention-verify.sql",
   "wholesale-retention-rollback.sql",
+  "wholesale-dynamic-equipment-types-preflight.sql",
+  "wholesale-dynamic-equipment-types-migration.sql",
+  "wholesale-dynamic-equipment-types-verify.sql",
+  "wholesale-dynamic-equipment-types-rollback.sql",
 ];
 
 /** Strips `-- ...` line comments and single-quoted string literals (SQL
@@ -117,14 +121,13 @@ end $$;
     expect(/\brollback\s+to\b/i.test(regions[0])).toBe(true);
   });
 
-  // The two *-preflight.sql files are pure read-only SELECT scripts (a
-  // single WITH ... SELECT) with no writes of any kind — they never wrap
-  // in begin;/commit;/rollback; at all, by design (nothing to roll back).
-  // Only the migration/verify/rollback files use top-level transaction
-  // control.
+  // Every *-preflight.sql file is a pure read-only SELECT script (a single
+  // WITH ... SELECT) with no writes of any kind — they never wrap in
+  // begin;/commit;/rollback; at all, by design (nothing to roll back). Only
+  // the migration/verify/rollback files use top-level transaction control.
   const FILES_WITH_TOP_LEVEL_TXN = FILES.filter((f) => !f.endsWith("-preflight.sql"));
 
-  it("the 2 preflight files remain pure read-only (no begin;/commit;/rollback; at all — nothing to wrap)", () => {
+  it("every *-preflight.sql file remains pure read-only (no begin;/commit;/rollback; at all — nothing to wrap)", () => {
     for (const file of FILES.filter((f) => f.endsWith("-preflight.sql"))) {
       const raw = readFileSync(join(supabaseDir, file), "utf8");
       const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
