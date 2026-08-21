@@ -140,10 +140,10 @@ describe("WholesalePrices page: wizard-driven portal, server-trust (no client-si
     expect(src).not.toMatch(/microsoldering=\{/);
   });
 
-  it("WholesaleWizard renders every card from ONE unified list — Microsoldering included, via its is_tag_lens-derived isTagLens flag, never a separate conditional block", () => {
+  it("WholesaleWizard renders every card from ONE unified list — Microsoldering included, via its catalog_mode-derived isDirectServices flag, never a separate conditional block", () => {
     expect(wizardSrc).not.toMatch(/\{microsoldering && \(/);
     expect(wizardSrc).toContain("topEquipoList.map((equipo)");
-    expect(wizardSrc).toContain("featured={equipo.isTagLens}");
+    expect(wizardSrc).toContain("featured={equipo.isDirectServices}");
   });
 
   it("does not re-filter equipmentTypes/services by an active/hidden flag client-side — trusts the server's already-filtered response", () => {
@@ -624,15 +624,15 @@ describe("wholesalePortal.css: Microsoldering tile is 'featured' via border/shad
     expect(rule).not.toMatch(/\bwidth:|\bheight:|padding:|transform:/);
   });
 
-  it("EquipmentTypeCard applies wsp-card-featured only when the featured prop is passed, and the wizard derives it from each card's own isTagLens flag — never a hardcoded slug/handler check", () => {
+  it("EquipmentTypeCard applies wsp-card-featured only when the featured prop is passed, and the wizard derives it from each card's own isDirectServices flag — never a hardcoded slug/handler check", () => {
     const cardSrc = read("src/components/wholesale/EquipmentTypeCard.jsx");
     const wizardSrc = read("src/components/wholesale/WholesaleWizard.jsx");
     expect(cardSrc).toMatch(/featured \? " wsp-card-featured" : ""/);
     // The top-level grid's single EquipmentTypeCard call is featured
-    // data-driven (`featured={equipo.isTagLens}`) — every card, including
+    // data-driven (`featured={equipo.isDirectServices}`) — every card, including
     // Microsoldering, passes through the exact same JSX, not a second
     // hardcoded call with `featured` fixed to true.
-    expect(wizardSrc).toContain("featured={equipo.isTagLens}");
+    expect(wizardSrc).toContain("featured={equipo.isDirectServices}");
   });
 });
 

@@ -41,7 +41,6 @@ function WholesalePricesContent() {
     status: "loading",
     shopName: "",
     equipmentTypes: [],
-    tagLensEquipmentTypes: [],
     // TEMPORARY compatibility passthrough — see buildWholesaleWizardCatalog's
     // header. Not read here, only forwarded to WholesaleWizard.
     legacyMicrosoldering: null,
@@ -88,7 +87,6 @@ function WholesalePricesContent() {
         status: "ready",
         shopName: result.shopName,
         equipmentTypes: result.equipmentTypes,
-        tagLensEquipmentTypes: result.tagLensEquipmentTypes,
         legacyMicrosoldering: result.legacyMicrosoldering,
         salesModule: result.salesModule,
         errorMessage: "",
@@ -125,7 +123,6 @@ function WholesalePricesContent() {
       status: "loading",
       shopName: "",
       equipmentTypes: [],
-      tagLensEquipmentTypes: [],
       legacyMicrosoldering: null,
       salesModule: null,
       errorMessage: "",
@@ -252,7 +249,6 @@ function WholesalePricesContent() {
         <div className="wsp-wizard-sales-group">
           <WholesaleWizard
             equipmentTypes={state.equipmentTypes}
-            tagLensEquipmentTypes={state.tagLensEquipmentTypes}
             legacyMicrosoldering={state.legacyMicrosoldering}
             onScreenChange={setWizardScreen}
           />

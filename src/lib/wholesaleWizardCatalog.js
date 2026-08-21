@@ -77,10 +77,10 @@ function cardPresentation(source) {
  * follow-up that deletes this bridge) don't have to mutate module state.
  *
  * Every returned Equipo has the same shape regardless of whether it's a
- * (legacy-bridge) promoted category, a real equipment type, or a tag-lens
- * row like Microsoldering:
+ * (legacy-bridge) promoted category, a grouped equipment type, or a
+ * direct_services row like Microsoldering:
  *   { id, slug, name, nameEs, fullBleedPhoto, imageFocusX, imageFocusY,
- *     image, sourceEquipmentTypeId, isTagLens, models: WizardModel[] }
+ *     image, sourceEquipmentTypeId, isDirectServices, models: WizardModel[] }
  * `models` is always length >= 1. The wizard shows a "Modelo" selection
  * step only when models.length > 1 — a promoted category always has
  * exactly 1 model (itself), so it auto-advances straight to "Falla" without
@@ -90,30 +90,21 @@ function cardPresentation(source) {
  * Consoles", pre-migration) is dropped entirely from the returned list — it
  * would otherwise render as an empty card with nothing behind it.
  *
- * `tagLensEquipmentTypes` (3rd param, e.g. Microsoldering) arrives as its
- * OWN array from the API — see api/_lib/wholesaleDb.js's own comment for
- * why it's not simply concatenated server-side into `equipmentTypes`
- * itself (a real, tested duplicate-card bug for an old cached client tab).
- * This function is what actually unifies them: both arrays are merged and
- * sorted by `sort_order` BEFORE the single loop below runs, so a tag-lens
- * row flows through the exact same promoted/remaining logic as any other
- * equipment type — genuinely one pipeline, the split is a wire-level
- * concern only.
- *
- * `legacyMicrosoldering`, 4th param, TEMPORARY (see its own comment at the
- * usage site below): a fallback for when `tagLensEquipmentTypes` itself is
- * absent (an old, pre-this-round server) — this function only ever
- * CONSULTS it as a fallback, never as a primary source.
+ * `legacyMicrosoldering`, 3rd param, TEMPORARY (see its own comment at the
+ * usage site below): a fallback for when the server predates
+ * catalog_mode='direct_services' cards being included in `equipmentTypes`
+ * at all (an old server, pre wholesale-catalog-architecture-fix) — this
+ * function only ever CONSULTS it when Microsoldering isn't already present
+ * in `equipmentTypes`, never as a primary source.
  */
 export function buildWholesaleWizardCatalog(
   equipmentTypes,
   promotedSlugs = PROMOTED_CATEGORY_SLUGS,
-  tagLensEquipmentTypes = [],
   legacyMicrosoldering = null
 ) {
   if (!Array.isArray(equipmentTypes)) return [];
 
-  const combinedEquipmentTypes = [...equipmentTypes, ...(Array.isArray(tagLensEquipmentTypes) ? tagLensEquipmentTypes : [])]
+  const combinedEquipmentTypes = [...equipmentTypes]
     // Sorted once, here, by the same sort_order DESK's reorder buttons
     // write to every row — missing values (e.g. fixtures that predate this
     // field) fall back to Infinity, a stable no-op that preserves whatever
@@ -122,10 +113,9 @@ export function buildWholesaleWizardCatalog(
 
   // Real top-level equipment-type slugs already present in this response —
   // the dedup signal the bridge uses to never double-produce a card for a
-  // slug that already has its own real row (see file header). Built from
-  // the COMBINED array so a tag-lens card's own flattened categories (which
-  // can legitimately share a slug with a real top-level type, e.g. a
-  // Microsoldering-tagged PS5 service) are deduped against it too.
+  // slug that already has its own real row (see file header), AND the
+  // signal the legacy-Microsoldering fallback below uses to know whether
+  // it's even needed.
   const realTopLevelSlugs = new Set(combinedEquipmentTypes.map((et) => et.slug).filter(Boolean));
 
   const equipoList = [];
@@ -144,9 +134,10 @@ export function buildWholesaleWizardCatalog(
         image: category.image ?? equipmentType.image ?? null,
         sourceEquipmentTypeId: equipmentType.id,
         // A promoted category is always a real, ordinary category — never
-        // the tag-lens row itself (that never has a promotable category of
-        // its own) — so this is always false here, never data-driven.
-        isTagLens: false,
+        // a direct_services row itself (that never has a promotable
+        // category of its own) — so this is always false here, never
+        // data-driven.
+        isDirectServices: false,
         models: [toWizardModel(category)],
       });
     }
@@ -159,13 +150,14 @@ export function buildWholesaleWizardCatalog(
         ...cardPresentation(equipmentType),
         image: equipmentType.image ?? null,
         sourceEquipmentTypeId: equipmentType.id,
-        // Data-driven, never a hardcoded slug check — true only for the one
-        // real wholesale_equipment_types row with is_tag_lens=true (see
-        // api/_lib/wholesaleDb.js). Purely presentational downstream (an
-        // optional distinguishing banner/border) — never gates whether or
-        // where this card appears; it's already an ordinary member of this
-        // same equipoList by this point.
-        isTagLens: Boolean(equipmentType.is_tag_lens),
+        // Data-driven, never a hardcoded slug check — true only for a row
+        // with catalog_mode='direct_services' (see api/_lib/wholesaleDb.js
+        // and wholesale-catalog-architecture-fix-migration.sql). Purely
+        // presentational downstream (an optional distinguishing
+        // banner/border) — never gates whether or where this card appears;
+        // it's already an ordinary member of this same equipoList by this
+        // point.
+        isDirectServices: equipmentType.catalog_mode === "direct_services",
         models: remaining.map(toWizardModel),
       });
     }
@@ -173,17 +165,18 @@ export function buildWholesaleWizardCatalog(
 
   // LEGACY-SERVER COMPATIBILITY BRIDGE — TEMPORARY, same spirit and same
   // removal obligation as PROMOTED_CATEGORY_SLUGS above (see file header):
-  // exists ONLY for a server that predates `tagLensEquipmentTypes` itself
-  // (an old server rolled back, or genuinely not yet upgraded) — signaled
-  // by that field being absent/empty. On any real, current server this
-  // branch never fires: `tagLensEquipmentTypes` is always present (even as
-  // `[]` when nothing is currently tagged), so `legacyMicrosoldering` is
-  // ignored — this function does NOT depend on the legacy field for its
-  // normal behavior, only falls back to it. DELETE this block (and the
+  // exists ONLY for a server that predates catalog_mode='direct_services'
+  // cards being included in `equipmentTypes` at all — signaled by
+  // Microsoldering's slug simply not being present in this response yet.
+  // On any real, current server this branch never fires: Microsoldering is
+  // always a normal member of `equipmentTypes` (even when it has zero
+  // content and is therefore absent from the array — same "hide if empty"
+  // rule every other card gets), so `legacyMicrosoldering` is ignored —
+  // this function does NOT depend on the legacy field for its normal
+  // behavior, only falls back to it. DELETE this block (and the
   // `legacyMicrosoldering` parameter) once the compatibility window has
   // passed — see the audit report accompanying this round.
-  const hasTagLensChannel = Array.isArray(tagLensEquipmentTypes) && tagLensEquipmentTypes.length > 0;
-  if (!hasTagLensChannel && legacyMicrosoldering && Array.isArray(legacyMicrosoldering.equipmentTypes)) {
+  if (!realTopLevelSlugs.has("microsoldering") && legacyMicrosoldering && Array.isArray(legacyMicrosoldering.equipmentTypes)) {
     const models = legacyMicrosoldering.equipmentTypes.flatMap((et) =>
       Array.isArray(et.categories) ? et.categories.map(toWizardModel) : []
     );
@@ -200,7 +193,7 @@ export function buildWholesaleWizardCatalog(
         ...cardPresentation(legacyMicrosoldering),
         image: legacyMicrosoldering.image ?? null,
         sourceEquipmentTypeId: legacyMicrosoldering.id,
-        isTagLens: true,
+        isDirectServices: true,
         models,
       });
     }

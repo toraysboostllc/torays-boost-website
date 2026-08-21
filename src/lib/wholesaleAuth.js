@@ -70,9 +70,6 @@ export async function fetchWholesaleCatalog() {
     ok: true,
     shopName: data.shopName,
     equipmentTypes: data.equipmentTypes || [],
-    // Primary channel for tag-lens cards (e.g. Microsoldering) — kept as
-    // its own array by the server on purpose, see api/_lib/wholesaleDb.js.
-    tagLensEquipmentTypes: data.tagLensEquipmentTypes || [],
     // TEMPORARY compatibility passthrough — see buildWholesaleWizardCatalog's
     // header for what this is for (an old server only) and when to delete
     // it. Not read anywhere else in this file.

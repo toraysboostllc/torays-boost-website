@@ -68,9 +68,9 @@ describe("WholesaleWizard.jsx: Microsoldering is a plain Equipo, not a fake/sepa
     expect(wizardSrc).not.toMatch(/handleSelectEquipo\(equipo, \{/); // no second-argument options object anymore
   });
 
-  it("the optional informational banner on the Modelo/Falla screens is gated by the real row's is_tag_lens-derived isTagLens flag, never a hardcoded slug — and never decides whether the card exists", () => {
-    expect(wizardSrc).toMatch(/selectedEquipo\.isTagLens && \(/);
-    expect(wizardSrc).toMatch(/selectedEquipo\?\.isTagLens && \(/);
+  it("the optional informational banner on the Modelo/Falla screens is gated by the real row's catalog_mode-derived isDirectServices flag, never a hardcoded slug — and never decides whether the card exists", () => {
+    expect(wizardSrc).toMatch(/selectedEquipo\.isDirectServices && \(/);
+    expect(wizardSrc).toMatch(/selectedEquipo\?\.isDirectServices && \(/);
     expect(wizardSrc).toContain('t("microsoldering.title")');
     expect(wizardSrc).toContain('t("microsoldering.subtitle")');
   });
@@ -81,8 +81,8 @@ describe("WholesaleWizard.jsx: Microsoldering is a plain Equipo, not a fake/sepa
 });
 
 describe("WholesaleWizard.jsx: result panel receives exactly the selection it needs, resets cleanly", () => {
-  it("passes selection.microsoldering/equipoName/modelName and the raw service object to WholesaleResultPanel — microsoldering is derived from the selected equipo's real isTagLens flag, never a separately-tracked hardcoded-slug state", () => {
-    expect(wizardSrc).toMatch(/microsoldering: Boolean\(selectedEquipo\?\.isTagLens\),/);
+  it("passes selection.microsoldering/equipoName/modelName and the raw service object to WholesaleResultPanel — microsoldering is derived from the selected equipo's real isDirectServices flag, never a separately-tracked hardcoded-slug state", () => {
+    expect(wizardSrc).toMatch(/microsoldering: Boolean\(selectedEquipo\?\.isDirectServices\),/);
     expect(wizardSrc).toMatch(/equipoName: selectedEquipo\?\.name,/);
     expect(wizardSrc).toMatch(/modelName: selectedModel\?\.name,/);
     expect(wizardSrc).toContain("service={selectedService}");

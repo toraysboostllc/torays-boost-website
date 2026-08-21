@@ -392,94 +392,84 @@ describe("wholesale-prices images: Equipment Type / category with no active serv
   });
 });
 
-describe("Microsoldering: a plain member of equipmentTypes[], never a separate response channel or a hardcoded object", () => {
+describe("Microsoldering: catalog_mode='direct_services', a plain member of equipmentTypes[] with its own directly-owned services — never a tag-based aggregation of some OTHER equipment type's category", () => {
   function seedMicrosolderingType(overrides = {}) {
-    const tag = { id: fake.nextId(), slug: "microsoldering", name: "Microsoldering" };
-    fake.db.wholesale_tags.push(tag);
-    const type = seedEquipmentType({
-      slug: "microsoldering", name: "Microsoldering", is_tag_lens: true,
-      source_mode: "tag_lens", source_tag_id: tag.id,
+    return seedEquipmentType({
+      slug: "microsoldering", name: "Microsoldering", catalog_mode: "direct_services",
       sort_order: 1, ...overrides,
     });
-    return type;
-  }
-  function tagService(serviceId) {
-    const tag = fake.db.wholesale_tags.find((t) => t.slug === "microsoldering");
-    fake.db.wholesale_service_tags.push({ service_id: serviceId, tag_id: tag.id });
   }
   function microCard(res) {
-    return res.body.tagLensEquipmentTypes.find((e) => e.slug === "microsoldering");
+    return res.body.equipmentTypes.find((e) => e.slug === "microsoldering");
   }
 
-  it("appears in tagLensEquipmentTypes once it has at least one tagged, active service — own field, own shape, no dead-end, and NEVER a member of equipmentTypes[] itself", async () => {
+  it("appears in equipmentTypes[] once its own (DESK-managed, internal) category has at least one active service — a plain member, own catalog_mode, no separate response channel", async () => {
     seedShopWithSession();
-    seedMicrosolderingType();
-    const et = seedEquipmentType({ slug: "iphone" });
-    const cat = seedCategory(et.id);
-    const service = seedService(cat.id);
-    tagService(service.id);
+    const microType = seedMicrosolderingType();
+    const cat = seedCategory(microType.id, { slug: "microsoldering-direct", name: "Microsoldering" });
+    seedService(cat.id, { name: "Board Repair" });
 
     const res = await callPrices();
 
-    expect(res.body.tagLensEquipmentTypes.map((e) => e.slug)).toContain("microsoldering");
-    expect(res.body.equipmentTypes.map((e) => e.slug)).not.toContain("microsoldering");
+    expect(res.body.equipmentTypes.map((e) => e.slug)).toContain("microsoldering");
+    expect(microCard(res).catalog_mode).toBe("direct_services");
     // The TEMPORARY legacy compatibility key is still present alongside the
     // unified card (see tests/wholesaleDynamicEquipmentTypesApi.test.js for
-    // dedicated coverage of that key) — this test only asserts the unified
-    // shape, which is what the current client actually reads.
+    // dedicated coverage of that key).
     expect(res.body.microsoldering).toBeTruthy();
   });
 
-  it("a tagged, active service appears under the REAL category's own id/slug/name, flattened directly into Microsoldering's own categories — not a fabricated hierarchy, not nested under the real equipment type", async () => {
+  it("a grouped equipment type (e.g. iPhone) reports catalog_mode='grouped' — the default, unaffected by Microsoldering existing alongside it", async () => {
     seedShopWithSession();
-    seedMicrosolderingType();
     const et = seedEquipmentType({ slug: "iphone", name: "iPhone" });
-    const cat = seedCategory(et.id, { slug: "iphone-screens", name: "iPhone Screens" });
-    const service = seedService(cat.id, { name: "Board-level micro-soldering repair" });
-    tagService(service.id);
+    const cat = seedCategory(et.id);
+    seedService(cat.id);
+
+    const res = await callPrices();
+
+    expect(res.body.equipmentTypes.find((e) => e.slug === "iphone").catalog_mode).toBe("grouped");
+  });
+
+  it("an active service appears under Microsoldering's own real category id/slug/name — the same real category row, never recreated, never nested under any other equipment type", async () => {
+    seedShopWithSession();
+    const microType = seedMicrosolderingType();
+    const cat = seedCategory(microType.id, { slug: "microsoldering-direct", name: "Microsoldering" });
+    seedService(cat.id, { name: "Board-level micro-soldering repair" });
 
     const res = await callPrices();
 
     const card = microCard(res);
     expect(card.categories).toHaveLength(1);
-    expect(card.categories[0].id).toBe(cat.id); // the SAME real category row, never recreated
-    expect(card.categories[0].slug).toBe("iphone-screens");
-    expect(card.categories[0].name).toBe("iPhone Screens");
+    expect(card.categories[0].id).toBe(cat.id);
+    expect(card.categories[0].slug).toBe("microsoldering-direct");
     expect(card.categories[0].services[0].name).toBe("Board-level micro-soldering repair");
   });
 
-  it("a tagged service that is inactive never appears — and with nothing else tagged, Microsoldering produces no card at all (same 'hide if empty' rule as any other equipment type)", async () => {
+  it("an inactive service never appears — and with nothing else active, Microsoldering produces no card at all (same 'hide if empty' rule as any other equipment type)", async () => {
     seedShopWithSession();
-    seedMicrosolderingType();
-    const et = seedEquipmentType({ slug: "iphone" });
-    const cat = seedCategory(et.id);
-    const service = seedService(cat.id, { active: false });
-    tagService(service.id);
+    const microType = seedMicrosolderingType();
+    const cat = seedCategory(microType.id);
+    seedService(cat.id, { active: false });
 
     const res = await callPrices();
 
     expect(microCard(res)).toBeUndefined();
   });
 
-  it("a tagged service under a Hidden category never appears — Microsoldering produces no card when that was the only tagged service", async () => {
+  it("a service under a Hidden category never appears — Microsoldering produces no card when that was its only category", async () => {
     seedShopWithSession();
-    seedMicrosolderingType();
-    const et = seedEquipmentType({ slug: "iphone" });
-    const cat = seedCategory(et.id, { active: false });
-    const service = seedService(cat.id);
-    tagService(service.id);
+    const microType = seedMicrosolderingType();
+    const cat = seedCategory(microType.id, { active: false });
+    seedService(cat.id);
 
     const res = await callPrices();
 
     expect(microCard(res)).toBeUndefined();
   });
 
-  it("no services tagged at all: Microsoldering produces no card — never an empty-but-present one, unlike the old lens-object design", async () => {
+  it("no category added yet from DESK (fresh, nothing added): Microsoldering produces no card — never an empty-but-present one", async () => {
     seedShopWithSession();
     seedMicrosolderingType();
-    const et = seedEquipmentType({ slug: "iphone" });
-    const cat = seedCategory(et.id);
-    seedService(cat.id); // untagged
 
     const res = await callPrices();
 
@@ -488,11 +478,9 @@ describe("Microsoldering: a plain member of equipmentTypes[], never a separate r
 
   it("Microsoldering equipment type itself hidden: absent from equipmentTypes[] — no card renders at all, exactly like any other hidden equipment type", async () => {
     seedShopWithSession();
-    seedMicrosolderingType({ active: false });
-    const et = seedEquipmentType({ slug: "iphone" });
-    const cat = seedCategory(et.id);
-    const service = seedService(cat.id);
-    tagService(service.id);
+    const microType = seedMicrosolderingType({ active: false });
+    const cat = seedCategory(microType.id);
+    seedService(cat.id);
 
     const res = await callPrices();
 
@@ -515,10 +503,8 @@ describe("Microsoldering: a plain member of equipmentTypes[], never a separate r
     seedShopWithSession();
     const microType = seedMicrosolderingType();
     const image = seedImage({ equipment_type_id: microType.id });
-    const et = seedEquipmentType({ slug: "iphone" });
-    const cat = seedCategory(et.id);
-    const service = seedService(cat.id);
-    tagService(service.id);
+    const cat = seedCategory(microType.id);
+    seedService(cat.id);
 
     const res = await callPrices();
 
@@ -527,35 +513,29 @@ describe("Microsoldering: a plain member of equipmentTypes[], never a separate r
     expect(card.image.url).toContain(image.storage_path);
   });
 
-  it("the service_tags lookup is restricted to active service ids — an inactive service's tag row is fetched but never applied to a rendered result", async () => {
+  it("a Microsoldering SERVICE's own per-service photo is signed and returned on the service object itself — new capability, same signing/gating as equipment-type and category photos", async () => {
     seedShopWithSession();
-    seedMicrosolderingType();
-    const et = seedEquipmentType({ slug: "iphone" });
-    const cat = seedCategory(et.id);
-    const activeService = seedService(cat.id, { slug: "active-one", name: "Active Repair" });
-    const inactiveService = seedService(cat.id, { slug: "inactive-one", name: "Inactive Repair", active: false });
-    tagService(activeService.id);
-    tagService(inactiveService.id);
+    const microType = seedMicrosolderingType();
+    const cat = seedCategory(microType.id);
+    const service = seedService(cat.id, { name: "Charging Port Soldering" });
+    const image = seedImage({ service_id: service.id });
 
     const res = await callPrices();
 
-    const names = microCard(res).categories[0].services.map((s) => s.name);
-    expect(names).toEqual(["Active Repair"]);
+    const returnedService = microCard(res).categories[0].services[0];
+    expect(returnedService.image).not.toBeNull();
+    expect(returnedService.image.url).toContain(image.storage_path);
   });
 
-  it("a tagged service belonging to a PS5-slugged category still flattens into Microsoldering's own categories, never a duplicate top-level PS5 card and never dropped", async () => {
+  it("a Microsoldering service with no photo of its own returns image: null, never a broken/undefined value", async () => {
     seedShopWithSession();
-    seedMicrosolderingType();
-    const et = seedEquipmentType({ slug: "ps5", name: "PlayStation 5" });
-    const cat = seedCategory(et.id, { slug: "ps5", name: "PlayStation 5" });
-    const service = seedService(cat.id, { name: "HDMI board micro-soldering" });
-    tagService(service.id);
+    const microType = seedMicrosolderingType();
+    const cat = seedCategory(microType.id);
+    seedService(cat.id);
 
     const res = await callPrices();
 
-    const card = microCard(res);
-    expect(card.categories.map((c) => c.slug)).toEqual(["ps5"]);
-    expect(res.body.equipmentTypes.filter((e) => e.slug === "ps5")).toHaveLength(1); // the real PS5 card, not duplicated
+    expect(microCard(res).categories[0].services[0].image).toBeNull();
   });
 });
 

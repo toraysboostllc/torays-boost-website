@@ -1,6 +1,7 @@
 /**
  * Vercel Function — returns the wholesale catalog (equipment types →
- * categories → services, plus the Microsoldering lens) for a valid session.
+ * categories → services, including the direct-services Microsoldering card)
+ * for a valid session.
  * Session travels as the HttpOnly `ws_session` cookie set by
  * wholesale-login.js — never a header, never localStorage. Re-checks shop
  * status and device approval on every call (not just at login) so a
@@ -108,7 +109,6 @@ export default async function handler(req, res) {
   res.status(200).json({
     shopName: shop.name,
     equipmentTypes: catalog.equipmentTypes,
-    tagLensEquipmentTypes: catalog.tagLensEquipmentTypes,
     // LEGACY, TEMPORARY — see api/_lib/wholesaleDb.js's own comment.
     microsoldering: catalog.microsoldering,
     salesModule: catalog.salesModule,

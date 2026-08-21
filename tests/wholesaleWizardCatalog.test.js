@@ -220,8 +220,8 @@ describe("buildWholesaleWizardCatalog: backward-compatible dedup bridge — zero
   });
 });
 
-describe("buildWholesaleWizardCatalog: tagLensEquipmentTypes (3rd param) merges into the SAME pipeline, plus a TEMPORARY legacy-server fallback (4th param) for a stale pre-deploy client tab", () => {
-  function fixtureDirectEquipmentTypes() {
+describe("buildWholesaleWizardCatalog: catalog_mode='direct_services' (Microsoldering) is a PLAIN member of equipmentTypes[], plus a TEMPORARY legacy-server fallback (3rd param) for a stale pre-deploy client tab", () => {
+  function fixtureGroupedEquipmentTypes() {
     return [
       {
         id: "et-iphone", slug: "iphone", name: "iPhone", image: null, sort_order: 2,
@@ -229,14 +229,17 @@ describe("buildWholesaleWizardCatalog: tagLensEquipmentTypes (3rd param) merges 
       },
     ];
   }
-  function fixtureTagLensEquipmentTypes() {
-    return [
-      {
-        id: "et-microsoldering", slug: "microsoldering", name: "Microsoldering", name_es: "Microsoldadura",
-        full_bleed_photo: false, image_focus_x: 50, image_focus_y: 50, image: null, is_tag_lens: true, sort_order: 1,
-        categories: [{ id: "cat-iphone", slug: "iphone-15-17", name: "iPhone 15/16/17", notes: null, diagnostic_fee: null, diagnostic_description: null, image: null, services: [{ id: "svc-board", name: "Board Repair" }] }],
-      },
-    ];
+  /** Microsoldering the NEW way: catalog_mode='direct_services', a plain
+   *  entry in equipmentTypes[] with its own single (DESK-managed, internal)
+   *  category holding directly-owned services — never a tag-based
+   *  aggregation of some OTHER equipment type's category. */
+  function fixtureMicrosolderingDirect() {
+    return {
+      id: "et-microsoldering", slug: "microsoldering", name: "Microsoldering", name_es: "Microsoldadura",
+      catalog_mode: "direct_services",
+      full_bleed_photo: false, image_focus_x: 50, image_focus_y: 50, image: null, sort_order: 1,
+      categories: [{ id: "cat-microsoldering-direct", slug: "microsoldering-direct", name: "Microsoldering", notes: null, diagnostic_fee: null, diagnostic_description: null, image: null, services: [{ id: "svc-board", name: "Board Repair" }] }],
+    };
   }
   /** OLD (pre-unification) server's separate `microsoldering` response key
    *  shape: { id, slug, name, ..., equipmentTypes: [{ id, name, categories:
@@ -246,70 +249,50 @@ describe("buildWholesaleWizardCatalog: tagLensEquipmentTypes (3rd param) merges 
       id: "et-microsoldering", slug: "microsoldering", name: "Microsoldering", name_es: "Microsoldadura",
       full_bleed_photo: false, image_focus_x: 50, image_focus_y: 50, image: null,
       equipmentTypes: [
-        { id: "et-iphone", name: "iPhone", categories: [{ id: "cat-iphone", slug: "iphone-15-17", name: "iPhone 15/16/17", services: [{ id: "svc-board", name: "Board Repair" }] }] },
+        { id: "et-microsoldering", name: "Microsoldering", categories: [{ id: "cat-microsoldering-direct", slug: "microsoldering-direct", name: "Microsoldering", services: [{ id: "svc-board", name: "Board Repair" }] }] },
       ],
       ...overrides,
     };
   }
 
-  it("merges tagLensEquipmentTypes and equipmentTypes into ONE list, sorted by sort_order — Microsoldering (sort_order 1) lands before iPhone (sort_order 2)", () => {
-    const wizard = buildWholesaleWizardCatalog(fixtureDirectEquipmentTypes(), undefined, fixtureTagLensEquipmentTypes());
+  it("Microsoldering (direct_services) sorts into the SAME list as grouped types by sort_order — sort_order 1 lands before iPhone's sort_order 2", () => {
+    const wizard = buildWholesaleWizardCatalog([fixtureMicrosolderingDirect(), ...fixtureGroupedEquipmentTypes()]);
     expect(wizard).toHaveLength(2);
     expect(wizard[0].slug).toBe("microsoldering");
-    expect(wizard[0].isTagLens).toBe(true);
-    expect(wizard[0].models.map((m) => m.name)).toEqual(["iPhone 15/16/17"]);
+    expect(wizard[0].isDirectServices).toBe(true);
+    expect(wizard[0].models.map((m) => m.name)).toEqual(["Microsoldering"]);
     expect(wizard[0].models[0].services).toEqual([{ id: "svc-board", name: "Board Repair" }]);
     expect(wizard[1].slug).toBe("iphone");
+    expect(wizard[1].isDirectServices).toBe(false);
   });
 
-  it("tagLensEquipmentTypes present: legacyMicrosoldering is ignored entirely — no duplicate card even if both are supplied", () => {
-    const wizard = buildWholesaleWizardCatalog(fixtureDirectEquipmentTypes(), undefined, fixtureTagLensEquipmentTypes(), fixtureLegacyMicrosoldering());
+  it("Microsoldering already present in equipmentTypes[]: legacyMicrosoldering is ignored entirely — no duplicate card even if both are supplied", () => {
+    const wizard = buildWholesaleWizardCatalog([fixtureMicrosolderingDirect(), ...fixtureGroupedEquipmentTypes()], undefined, fixtureLegacyMicrosoldering());
     const microCards = wizard.filter((e) => e.slug === "microsoldering");
     expect(microCards).toHaveLength(1); // not 2 — the legacy fallback never fired
     expect(microCards[0].id).toBe("et-microsoldering");
   });
 
-  it("tagLensEquipmentTypes absent, no legacyMicrosoldering either (current-shape client talking to a server that never sends either): no Microsoldering card, no crash", () => {
-    const wizard = buildWholesaleWizardCatalog(fixtureDirectEquipmentTypes());
+  it("Microsoldering absent from equipmentTypes[], no legacyMicrosoldering either (current-shape client talking to a server that never sends either): no Microsoldering card, no crash", () => {
+    const wizard = buildWholesaleWizardCatalog(fixtureGroupedEquipmentTypes());
     expect(wizard.map((e) => e.slug)).toEqual(["iphone"]);
   });
 
-  it("tagLensEquipmentTypes absent (old server), legacyMicrosoldering present: falls back to it, producing exactly one Microsoldering card, inserted first", () => {
-    const wizard = buildWholesaleWizardCatalog(fixtureDirectEquipmentTypes(), undefined, [], fixtureLegacyMicrosoldering());
+  it("Microsoldering absent from equipmentTypes[] (old server, pre catalog_mode), legacyMicrosoldering present: falls back to it, producing exactly one Microsoldering card, inserted first", () => {
+    const wizard = buildWholesaleWizardCatalog(fixtureGroupedEquipmentTypes(), undefined, fixtureLegacyMicrosoldering());
     expect(wizard).toHaveLength(2);
     expect(wizard[0].slug).toBe("microsoldering");
-    expect(wizard[0].isTagLens).toBe(true);
+    expect(wizard[0].isDirectServices).toBe(true);
     expect(wizard[1].slug).toBe("iphone");
   });
 
-  it("legacyMicrosoldering present but with an empty equipmentTypes[] (nothing tagged): produces no fallback card, matching the 'hide if empty' rule every other card gets", () => {
-    const wizard = buildWholesaleWizardCatalog(fixtureDirectEquipmentTypes(), undefined, [], fixtureLegacyMicrosoldering({ equipmentTypes: [] }));
+  it("legacyMicrosoldering present but with an empty equipmentTypes[] (nothing added yet from DESK): produces no fallback card, matching the 'hide if empty' rule every other card gets", () => {
+    const wizard = buildWholesaleWizardCatalog(fixtureGroupedEquipmentTypes(), undefined, fixtureLegacyMicrosoldering({ equipmentTypes: [] }));
     expect(wizard.map((e) => e.slug)).toEqual(["iphone"]);
   });
 
   it("legacyMicrosoldering is null: identical to not passing it at all", () => {
-    const wizard = buildWholesaleWizardCatalog(fixtureDirectEquipmentTypes(), undefined, [], null);
+    const wizard = buildWholesaleWizardCatalog(fixtureGroupedEquipmentTypes(), undefined, null);
     expect(wizard.map((e) => e.slug)).toEqual(["iphone"]);
-  });
-
-  it("a tagged category belonging to a slug that ALSO exists as a real top-level equipment type (e.g. PS5, post-migration) still only produces ONE PS5 card overall — the tag-lens card's own model doesn't collide with the real PS5 card's own top-level slug", () => {
-    const equipmentTypes = [
-      { id: "et-ps5", slug: "ps5", name: "PlayStation 5", image: null, sort_order: 2, categories: [{ id: "cat-ps5", slug: "ps5", name: "PlayStation 5", notes: null, diagnostic_fee: null, diagnostic_description: null, image: null, services: [{ id: "svc-hdmi", name: "HDMI Port Replacement" }] }] },
-    ];
-    const tagLens = [
-      { id: "et-microsoldering", slug: "microsoldering", name: "Microsoldering", image: null, is_tag_lens: true, sort_order: 1,
-        categories: [{ id: "cat-ps5", slug: "ps5", name: "PlayStation 5", notes: null, diagnostic_fee: null, diagnostic_description: null, image: null, services: [{ id: "svc-hdmi-tagged", name: "HDMI Port Replacement (tagged)" }] }] },
-    ];
-    const wizard = buildWholesaleWizardCatalog(equipmentTypes, undefined, tagLens);
-    // Real PS5 card (top-level, from equipmentTypes) stays exactly one card...
-    expect(wizard.filter((e) => e.slug === "ps5")).toHaveLength(1);
-    // ...and the Microsoldering card is a SEPARATE card whose own model
-    // happens to reuse the same real category id/slug — never merged into
-    // or duplicating the real PS5 card itself, thanks to the dedup Set
-    // being built from the COMBINED (equipmentTypes + tagLens) array.
-    const micro = wizard.find((e) => e.slug === "microsoldering");
-    expect(micro).toBeTruthy();
-    expect(micro.models.map((m) => m.slug)).toEqual(["ps5"]);
-    expect(wizard).toHaveLength(2);
   });
 });
