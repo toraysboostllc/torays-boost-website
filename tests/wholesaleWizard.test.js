@@ -45,8 +45,9 @@ describe("WholesaleWizard.jsx: Modelo step is skipped only when an Equipo has ex
 });
 
 describe("WholesaleWizard.jsx: back navigation is a real stack, not a hardcoded per-screen target", () => {
-  it("goBack pops the last screen off screenStack rather than switching on the current screen name", () => {
-    expect(wizardSrc).toMatch(/function goBack\(\) \{\s*\n\s*setScreenStack\(\(stack\) => \(stack\.length > 1 \? stack\.slice\(0, -1\) : stack\)\);/);
+  it("goBack delegates to the pure popScreen reducer rather than switching on the current screen name — see wizardScreenStack.test.js for the underflow-proof behind it", () => {
+    expect(wizardSrc).toContain('import { pushScreen, popScreen, resetStack, currentScreen, TOP_SCREEN } from "../../lib/wizardScreenStack.js";');
+    expect(wizardSrc).toMatch(/function goBack\(\) \{\s*\n\s*setScreenStack\(\(stack\) => popScreen\(stack\)\);/);
   });
 
   it("every non-top screen renders exactly one Back button wired to goBack (wrapped for the hover/tap sound)", () => {
@@ -88,8 +89,8 @@ describe("WholesaleWizard.jsx: result panel receives exactly the selection it ne
     expect(wizardSrc).toContain("service={selectedService}");
   });
 
-  it("onConsultAnother resets the full stack and every selection back to the top screen", () => {
-    expect(wizardSrc).toMatch(/function resetToTop\(\) \{\s*\n\s*setScreenStack\(\["top"\]\);/);
+  it("onConsultAnother resets the full stack (via the pure resetStack reducer) and every selection back to the top screen", () => {
+    expect(wizardSrc).toMatch(/function resetToTop\(\) \{\s*\n\s*setScreenStack\(resetStack\(\)\);/);
     expect(wizardSrc).toContain("onConsultAnother={resetToTop}");
   });
 });
@@ -115,7 +116,7 @@ describe("WholesaleWizard.jsx: WizardSteps — Equipo/Modelo/Falla progress indi
 
   it("shows on every selection screen (top, model, fault) and nowhere else — never on progress/result, which have their own state; no separate microsolderingGrid screen exists to list here", () => {
     expect(wizardSrc).toMatch(
-      /const showSteps = screen === "top" \|\| screen === "model" \|\| screen === "fault";/
+      /const showSteps = screen === TOP_SCREEN \|\| screen === "model" \|\| screen === "fault";/
     );
     expect(wizardSrc).not.toMatch(/showSteps[\s\S]{0,20}"progress"/);
     expect(wizardSrc).not.toMatch(/showSteps[\s\S]{0,20}"result"/);
@@ -147,5 +148,36 @@ describe("WholesaleWizard.jsx: interactive hover/tap sound — Back buttons and 
 
   it("equipo/model grids reuse EquipmentTypeCard (which itself wires wholesaleHoverProps — see EquipmentTypeCard's own tests), never a second hover implementation duplicated in this file", () => {
     expect(wizardSrc).not.toContain("playHoverTone");
+  });
+});
+
+describe("WholesaleWizard.jsx: keyboard accessibility — every selectable control is a real <button>", () => {
+  it("the Back button is a real <button type=\"button\">, not a clickable <div>/<span> — free native Tab/Enter/Space support, nothing custom to break", () => {
+    expect((wizardSrc.match(/<button type="button" \{\.\.\.wholesaleHoverProps\(goBack\)\}/g) || []).length).toBe(2);
+  });
+
+  it("every fault-list item is a real <button type=\"button\"> inside a <li>, not a div-with-onClick", () => {
+    expect(wizardSrc).toMatch(/<li key=\{service\.id\}>\s*\n\s*<button\s*\n\s*type="button"/);
+  });
+
+  it("no non-semantic clickable element (div/span carrying onClick) exists anywhere in this file — every interactive surface here is EquipmentTypeCard (see its own test file for its own <button>) or a native <button>", () => {
+    expect(wizardSrc).not.toMatch(/<div[^>]*onClick=/);
+    expect(wizardSrc).not.toMatch(/<span[^>]*onClick=/);
+  });
+});
+
+describe("WholesaleWizard.jsx: mobile — Back button and step indicator are never hidden at any breakpoint", () => {
+  it("the Back button's own class carries no hidden/md:hidden responsive-visibility modifier", () => {
+    expect(wizardSrc).toMatch(/className="wsp-btn wsp-btn-ghost wsp-wizard-back"/);
+    expect(wizardSrc).not.toMatch(/wsp-wizard-back[^"]*\bhidden\b/);
+  });
+
+  it("WizardSteps renders unconditionally on every selection screen — its own <ol> carries no responsive-visibility modifier that could strand a mobile shop mid-flow", () => {
+    expect(wizardSrc).toContain('className="wsp-wizard-steps"');
+    expect(wizardSrc).not.toMatch(/wsp-wizard-steps[^"]*\bhidden\b/);
+  });
+
+  it("the compact 2-column grid (wsp-grid-compact) applies from the smallest breakpoint, confirmed separately in the mobile-first grid describe block above — mobile never falls back to a 1-col-until-640px layout for equipo/model selection", () => {
+    expect((wizardSrc.match(/className="wsp-grid wsp-grid-compact"/g) || []).length).toBe(2); // top equipo grid + model grid
   });
 });

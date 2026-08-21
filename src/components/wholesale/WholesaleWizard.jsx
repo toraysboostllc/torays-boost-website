@@ -4,6 +4,7 @@ import { useWholesaleLocale } from "../../i18n/WholesaleLocaleContext.jsx";
 import { buildWholesaleWizardCatalog } from "../../lib/wholesaleWizardCatalog.js";
 import { translateCatalogLabel } from "../../lib/wholesaleCatalogI18n.js";
 import { wholesaleHoverProps } from "../../lib/wholesaleSound.js";
+import { pushScreen, popScreen, resetStack, currentScreen, TOP_SCREEN } from "../../lib/wizardScreenStack.js";
 import { EquipmentTypeCard } from "./EquipmentTypeCard.jsx";
 import { WholesaleProgressPanel } from "./WholesaleProgressPanel.jsx";
 import { WholesaleResultPanel } from "./WholesaleResultPanel.jsx";
@@ -78,8 +79,8 @@ export function WholesaleWizard({ equipmentTypes, microsolderingEquipmentType, l
     [equipmentTypes, microsolderingEquipmentType, legacyMicrosoldering]
   );
 
-  const [screenStack, setScreenStack] = useState(["top"]);
-  const screen = screenStack[screenStack.length - 1];
+  const [screenStack, setScreenStack] = useState(resetStack());
+  const screen = currentScreen(screenStack);
 
   // Lets the parent page know which screen is showing — used only to
   // conditionally hide the (unrelated) Torays Boost Sales module below the
@@ -94,13 +95,13 @@ export function WholesaleWizard({ equipmentTypes, microsolderingEquipmentType, l
   const [selectedService, setSelectedService] = useState(null);
 
   function goTo(next) {
-    setScreenStack((stack) => [...stack, next]);
+    setScreenStack((stack) => pushScreen(stack, next));
   }
   function goBack() {
-    setScreenStack((stack) => (stack.length > 1 ? stack.slice(0, -1) : stack));
+    setScreenStack((stack) => popScreen(stack));
   }
   function resetToTop() {
-    setScreenStack(["top"]);
+    setScreenStack(resetStack());
     setSelectedEquipo(null);
     setSelectedModel(null);
     setSelectedService(null);
@@ -126,7 +127,7 @@ export function WholesaleWizard({ equipmentTypes, microsolderingEquipmentType, l
     goTo("progress");
   }
 
-  const showSteps = screen === "top" || screen === "model" || screen === "fault";
+  const showSteps = screen === TOP_SCREEN || screen === "model" || screen === "fault";
 
   return (
     <div className="wsp-wizard">
@@ -139,7 +140,7 @@ export function WholesaleWizard({ equipmentTypes, microsolderingEquipmentType, l
         />
       )}
 
-      {screen === "top" && (
+      {screen === TOP_SCREEN && (
         <>
           <h1 className="wsp-wizard-heading">{t("wizard.chooseEquipment")}</h1>
           <p className="wsp-wizard-subtitle">{t("wizard.chooseEquipmentSubtitle")}</p>
