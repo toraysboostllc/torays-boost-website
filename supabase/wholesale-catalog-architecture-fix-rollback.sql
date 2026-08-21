@@ -6,6 +6,13 @@
 -- anything either of THOSE files' own rollbacks would touch beyond what
 -- this fix itself changed.
 -- ============================================================================
+-- Before any of that: a safety gate (step 0, right after begin;) confirms the
+-- database is actually in the CORRECTED state this fix produces — zero
+-- microsoldering tag relationships anywhere, and microsoldering currently
+-- catalog_mode='direct_services' — aborting the whole transaction via RAISE
+-- EXCEPTION if not, rather than reinserting the 56 tags on top of an
+-- unexpected state.
+--
 -- Reverses, in order: (1) macbook-air/macbook-pro re-pointed back to
 -- 'laptops', 'macbook' hidden again; (2) sort_order restored to the 8-card
 -- sequence with macbook pushed back to 101 (gaming-laptops/video-consoles
@@ -25,6 +32,36 @@
 -- ============================================================================
 
 begin;
+
+-- ----------------------------------------------------------------------------
+-- 0. Safety gate — confirm we are starting from the expected CORRECTED
+--    state (this fix's migration actually applied: zero microsoldering tag
+--    relationships remain anywhere, and microsoldering is currently
+--    catalog_mode='direct_services') before reinserting the 56 tag
+--    relationships below. Running this rollback against an unexpected state
+--    — the fix never applied, only partially applied, or already rolled
+--    back and then re-tagged by hand since — could silently duplicate or
+--    misrepresent the restored data. RAISE EXCEPTION aborts the whole
+--    transaction instead of guessing.
+-- ----------------------------------------------------------------------------
+do $$
+declare
+  v_current_tag_count int;
+  v_catalog_mode text;
+begin
+  select count(*) into v_current_tag_count
+  from wholesale_service_tags st
+  join wholesale_tags t on t.id = st.tag_id
+  where t.slug = 'microsoldering';
+  if v_current_tag_count <> 0 then
+    raise exception 'catalog_architecture_rollback_aborted: expected ZERO microsoldering tag relationships before rolling back (the corrected state this fix produces), found % — this is not the expected corrected state; investigate before re-running (has the fix migration actually run? has something re-tagged services since?)', v_current_tag_count;
+  end if;
+
+  select catalog_mode into v_catalog_mode from wholesale_equipment_types where slug = 'microsoldering';
+  if v_catalog_mode is distinct from 'direct_services' then
+    raise exception 'catalog_architecture_rollback_aborted: expected microsoldering.catalog_mode = ''direct_services'' (the corrected state) before rolling back, found % — this is not the expected corrected state; investigate before re-running', coalesce(v_catalog_mode, 'NULL');
+  end if;
+end $$;
 
 -- ----------------------------------------------------------------------------
 -- 1. Re-point macbook-air/macbook-pro back to 'laptops'; hide 'macbook'

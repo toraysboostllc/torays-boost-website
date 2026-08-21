@@ -56,14 +56,16 @@ target56 as (
     '729d78b6-1534-458e-a741-c594a8a8f7d0'
   ]::uuid[]) as service_id
 ),
-target56_tag_status as (
+currently_tagged as (
+  select st.service_id
+  from wholesale_service_tags st
+  join wholesale_tags tag on tag.id = st.tag_id and tag.slug = 'microsoldering'
+),
+tag_set_diff as (
   select
-    (select count(*) from target56) as target_count,
-    (
-      select count(*) from target56 t
-      join wholesale_service_tags st on st.service_id = t.service_id
-      join wholesale_tags tag on tag.id = st.tag_id and tag.slug = 'microsoldering'
-    ) as currently_tagged_count
+    (select count(*) from target56 t where not exists (select 1 from currently_tagged c where c.service_id = t.service_id)) as missing_count,
+    (select count(*) from currently_tagged c where not exists (select 1 from target56 t where t.service_id = c.service_id)) as extra_count,
+    (select count(*) from currently_tagged) as total_tagged_count
 ),
 macbook_categories_current as (
   select c.slug, c.name, c.id, et.slug as current_equipment_type_slug,
@@ -135,12 +137,17 @@ checks as (
 
   union all
 
-  select 5, 'target_56_currently_tagged_microsoldering_count (informational)',
-    'PASS',
-    (select currently_tagged_count from target56_tag_status) || ' / ' || (select target_count from target56_tag_status)
-      || ' of the 56 target ids currently carry the microsoldering tag (expect 56 — the exact count from the prior round''s '
-      || 'verified assignment). Not blocking either way: the DELETE below only removes rows that exist; running it against '
-      || 'fewer than 56 (if some were already manually untagged) is a safe, correct no-op for the missing ones.'
+  select 5, 'microsoldering_tag_set_matches_target_exactly',
+    case when missing_count = 0 and extra_count = 0 then 'PASS' else 'STOP' end,
+    'total_currently_tagged=' || total_tagged_count || ' (target=56), missing=' || missing_count || ', extra=' || extra_count
+      || ' — the CURRENT microsoldering tag set must be EXACTLY the 56 known target ids (56/56 present, 0 missing, 0 '
+      || 'extra) before the migration blindly retracts only those 56 by id. missing > 0 means one or more of the known '
+      || '56 was untagged since the prior verified assignment (the DELETE would then silently no-op on it, but a '
+      || 'mismatch this specific means something changed manually and needs investigating first). extra > 0 means '
+      || 'some OTHER service is ALSO carrying the microsoldering tag — the migration would leave it (and the tag '
+      || 'mechanism, which this fix decommissions) not fully retired. Any difference is real drift since the last '
+      || 'verified state — investigate and resolve it before running the migration; do not proceed on STOP.'
+  from tag_set_diff
 
   union all
 
@@ -212,9 +219,11 @@ report as (
   select check_number, check_name, status, details from checks
   union all
   select 99, 'OVERALL STATUS', overall.status,
-    'PASS = safe to run wholesale-catalog-architecture-fix-migration.sql as-is. FAIL = fix/investigate the flagged '
-      || 'row(s) first — most likely real-world drift since the last verified state. Read every ''(READ BY HAND)'' '
-      || 'row (2, 8, 10) regardless of overall status; check 8 in particular is a content decision, never automated.'
+    'PASS = safe to run wholesale-catalog-architecture-fix-migration.sql as-is. STOP = do NOT run the migration under '
+      || 'any circumstances — check 5 (the microsoldering tag-set exact-match gate) or the zero-rows safety net fired; '
+      || 'this is real drift since the last verified state and must be resolved first. FAIL = fix/investigate the '
+      || 'flagged row(s) first. Read every ''(READ BY HAND)'' row (2, 8, 10) regardless of overall status; check 8 in '
+      || 'particular is a content decision, never automated.'
   from overall
 )
 select check_number, check_name, status, details

@@ -58,7 +58,7 @@ describe("wholesale-catalog-architecture-fix-preflight.sql: read-only gate, expe
       "new_columns_and_index_not_already_present",
       "microsoldering_and_macbook_and_laptops_equipment_types_found",
       "macbook_currently_inactive_and_microsoldering_currently_tag_lens",
-      "target_56_currently_tagged_microsoldering_count",
+      "microsoldering_tag_set_matches_target_exactly",
       "macbook_air_pro_categories_resolve_to_laptops_or_macbook",
       "laptops_own_categories_resolve_as_expected",
       "photo_ownership_snapshot",
@@ -73,10 +73,26 @@ describe("wholesale-catalog-architecture-fix-preflight.sql: read-only gate, expe
     expect(preflight).toMatch(/case when microsoldering_id is not null and macbook_id is not null and laptops_id is not null then 'PASS' else 'FAIL' end/);
   });
 
-  it("check 5 reports how many of the 56 targets currently carry the microsoldering tag, but is explicitly informational (always PASS) — not a hard blocker either way", () => {
-    expect(preflight).toContain("target_56_currently_tagged_microsoldering_count (informational)");
-    expect(preflight).toMatch(/select 5, 'target_56_currently_tagged_microsoldering_count \(informational\)',\s*\n\s*'PASS',/);
-    expect(preflight).toContain("expect 56");
+  it("check 5 (blocking, hardened) requires the CURRENT microsoldering tag set to be EXACTLY the 56 known target ids — 0 missing AND 0 extra — never merely informational, and STOPs (not just FAILs) on any mismatch", () => {
+    expect(preflight).toContain("microsoldering_tag_set_matches_target_exactly");
+    expect(preflight).toMatch(/select 5, 'microsoldering_tag_set_matches_target_exactly',\s*\n\s*case when missing_count = 0 and extra_count = 0 then 'PASS' else 'STOP' end,/);
+  });
+
+  it("check 5 computes missing/extra via a real set-difference (target NOT IN currently_tagged, and vice versa) — not a bare count comparison that a swapped pair of ids could fool", () => {
+    expect(preflight).toMatch(/currently_tagged as \(\s*\n\s*select st\.service_id\s*\n\s*from wholesale_service_tags st\s*\n\s*join wholesale_tags tag on tag\.id = st\.tag_id and tag\.slug = 'microsoldering'\s*\n\s*\),/);
+    expect(preflight).toMatch(/tag_set_diff as \(/);
+    expect(preflight).toMatch(/missing_count/);
+    expect(preflight).toMatch(/extra_count/);
+    expect(preflight).toMatch(/select count\(\*\) from target56 t where not exists \(select 1 from currently_tagged c where c\.service_id = t\.service_id\)\) as missing_count/);
+    expect(preflight).toMatch(/select count\(\*\) from currently_tagged c where not exists \(select 1 from target56 t where t\.service_id = c\.service_id\)\) as extra_count/);
+  });
+
+  it("a check with status STOP propagates to OVERALL STATUS = STOP (checked ahead of FAIL in the overall case expression)", () => {
+    expect(preflight).toMatch(/when bool_or\(status = 'STOP'\) then 'STOP'\s*\n\s*when bool_or\(status = 'FAIL'\) then 'FAIL'/);
+  });
+
+  it("the OVERALL STATUS details row explicitly explains STOP as a hard no-go, distinct from FAIL", () => {
+    expect(preflight).toMatch(/STOP = do NOT run the migration under/);
   });
 
   it("check 9 requires all 9 final target slugs (microsoldering, iphone, ipad, macbook, laptops, ps5, xbox-series-x, switch, controllers) to already exist as rows", () => {
@@ -96,6 +112,34 @@ describe("wholesale-catalog-architecture-fix-migration.sql: forward-only, five i
     const lines = migration.split("\n").map((l) => l.trim()).filter(Boolean);
     expect(lines.find((l) => l === "begin;")).toBeTruthy();
     expect(lines.indexOf("commit;")).toBeGreaterThan(lines.indexOf("begin;"));
+  });
+
+  it("0. (hardening) re-validates, INSIDE the transaction and immediately before the DELETE, that the current microsoldering tag set is EXACTLY the 56 known target ids — RAISE EXCEPTION aborts the whole transaction on any missing or extra", () => {
+    expect(migration).toMatch(/select id into v_tag_id from wholesale_tags where slug = 'microsoldering';/);
+    expect(migration).toMatch(/if v_tag_id is null then\s*\n\s*raise exception 'catalog_architecture_fix_aborted: microsoldering tag not found/);
+    expect(migration).toMatch(/select count\(\*\) into v_total_tagged_count from wholesale_service_tags where tag_id = v_tag_id;/);
+    expect(migration).toMatch(/select count\(\*\) into v_matching_count from wholesale_service_tags where tag_id = v_tag_id and service_id = any\(v_target_ids\);/);
+    expect(migration).toMatch(/if v_matching_count <> 56 then\s*\n\s*raise exception 'catalog_architecture_fix_aborted: expected all 56 known target ids to currently carry the microsoldering tag/);
+    expect(migration).toMatch(/if v_total_tagged_count <> 56 then\s*\n\s*raise exception 'catalog_architecture_fix_aborted: expected exactly 56 total microsoldering-tagged relationships/);
+  });
+
+  it("0b. the step-0 gate's own target-id array is the SAME 56 ids as the DELETE statement below it — a mismatched validation array would be worse than no validation at all", () => {
+    const gateBlock = migration.split("v_target_ids uuid[] := array[")[1]?.split("]::uuid[];")[0] ?? "";
+    const deleteBlock = migration.split("and service_id = any(array[")[1]?.split("]::uuid[]);")[0] ?? "";
+    expect(gateBlock.length).toBeGreaterThan(100);
+    expect(deleteBlock.length).toBeGreaterThan(100);
+    const gateIds = extractUuids(gateBlock);
+    const deleteIds = extractUuids(deleteBlock);
+    expect(gateIds.length).toBe(TARGET56_COUNT);
+    expect(deleteIds.length).toBe(TARGET56_COUNT);
+    expect(gateIds).toEqual(deleteIds);
+  });
+
+  it("0c. the step-0 gate runs strictly BEFORE the DELETE it protects — textually and causally (RAISE EXCEPTION inside a do $$ block propagates out and aborts begin;/commit; before any later statement runs)", () => {
+    const gateIdx = migration.indexOf("-- 0. Safety gate");
+    const deleteIdx = migration.indexOf("delete from wholesale_service_tags");
+    expect(gateIdx).toBeGreaterThan(-1);
+    expect(deleteIdx).toBeGreaterThan(gateIdx);
   });
 
   it("1. retracts exactly 56 microsoldering tag relationships via ONE scoped delete keyed on tag_id + service_id = any(...) — never a bare/unscoped delete on wholesale_service_tags", () => {
@@ -192,18 +236,19 @@ describe("wholesale-catalog-architecture-fix-migration.sql: forward-only, five i
   });
 });
 
-describe("wholesale-catalog-architecture-fix-verify.sql: 14 checks, self-cleaning", () => {
-  it("is wrapped in begin;/rollback; (self-cleaning) — never commit;, since check 12 writes synthetic rows that must never persist", () => {
+describe("wholesale-catalog-architecture-fix-verify.sql: 15 checks, self-cleaning", () => {
+  it("is wrapped in begin;/rollback; (self-cleaning) — never commit;, since check 13 writes synthetic rows that must never persist", () => {
     const lines = verify.split("\n").map((l) => l.trim()).filter(Boolean);
     expect(lines.find((l) => l === "begin;")).toBeTruthy();
     expect(lines[lines.length - 1]).toBe("rollback;");
     expect(verify).not.toMatch(/^commit;$/m);
   });
 
-  it("asserts all 14 checks by name, in order", () => {
+  it("asserts all 15 checks by name, in order", () => {
     const expected = [
       "new_columns_and_index_exist_with_correct_shape",
       "all_56_wrong_tags_retracted",
+      "zero_microsoldering_tag_relationships_exist_anywhere",
       "macbook_categories_restored",
       "no_orphaned_services_for_macbook_categories",
       "laptops_owns_both_its_categories_gaming_laptops_now_empty",
@@ -214,10 +259,11 @@ describe("wholesale-catalog-architecture-fix-verify.sql: 14 checks, self-cleanin
       "final_visual_order_matches_9_card_sequence",
       "no_duplicate_equipment_type_slugs",
       "delete_rpc_generic_zero_categories_rule",
-      "real_microsoldering_row_untouched_by_check_12",
+      "real_microsoldering_row_untouched_by_check_13",
       "no_synthetic_rows_left_behind",
     ];
     expected.forEach((name) => expect(verify).toContain(name));
+    expect(verify).toContain("select 15, 'no_synthetic_rows_left_behind',");
   });
 
   it("check 2 asserts EXACT set equality — 0/56 remaining wrong-tagged, same 56 uuids as the migration's delete list", () => {
@@ -227,26 +273,33 @@ describe("wholesale-catalog-architecture-fix-verify.sql: 14 checks, self-cleanin
     expect(ids).toEqual(extractUuids(migration.split("2. catalog_mode")[0]));
   });
 
-  it("check 10 asserts the exact 9-card active order as an array equality, not a count or subset check", () => {
+  it("check 3 (hardening) is a STRONGER claim than check 2 — zero microsoldering-tagged relationships remain ANYWHERE in the table, not merely that the 56 known targets were retracted", () => {
+    expect(verify).toMatch(/select 3, 'zero_microsoldering_tag_relationships_exist_anywhere',/);
+    expect(verify).toMatch(
+      /case when \(\s*\n\s*select count\(\*\) from wholesale_service_tags st\s*\n\s*join wholesale_tags t on t\.id = st\.tag_id\s*\n\s*where t\.slug = 'microsoldering'\s*\n\s*\) = 0 then 'PASS' else 'FAIL' end,/
+    );
+  });
+
+  it("check 11 asserts the exact 9-card active order as an array equality, not a count or subset check", () => {
     expect(verify).toMatch(
       /= array\['microsoldering', 'iphone', 'ipad', 'macbook', 'laptops', 'ps5', 'xbox-series-x', 'switch', 'controllers'\]/
     );
   });
 
-  it("check 12 exercises the updated delete RPC functionally — empty direct_services row deletable, populated row refused — using synthetic rows cleaned up via an exception-as-savepoint pattern, with the result-row insert placed AFTER the exception block (not inside it)", () => {
+  it("check 13 exercises the updated delete RPC functionally — empty direct_services row deletable, populated row refused — using synthetic rows cleaned up via an exception-as-savepoint pattern, with the result-row insert placed AFTER the exception block (not inside it)", () => {
     expect(verify).toMatch(/__wsl_cafix_verify__empty/);
     expect(verify).toMatch(/__wsl_cafix_verify__populated/);
     expect(verify).toMatch(/perform wholesale_delete_equipment_type\(v_admin_id, v_empty_id, true\);/);
     expect(verify).toMatch(/raise exception '__wsl_cafix_verify_cleanup__' using errcode = 'ZZ002';/);
-    // the check-12 result INSERT must occur textually after the `exception when sqlstate 'ZZ002'` handler,
+    // the check-13 result INSERT must occur textually after the `exception when sqlstate 'ZZ002'` handler,
     // proving it runs outside the implicit-savepoint block rather than being rolled back by it.
     const exceptionIdx = verify.indexOf("exception\n      when sqlstate 'ZZ002' then null;");
-    const resultInsertIdx = verify.indexOf("insert into _wsl_cafix_verify_results values (\n      12,");
+    const resultInsertIdx = verify.indexOf("insert into _wsl_cafix_verify_results values (\n      13,");
     expect(exceptionIdx).toBeGreaterThan(-1);
     expect(resultInsertIdx).toBeGreaterThan(exceptionIdx);
   });
 
-  it("check 14 confirms zero synthetic __wsl_cafix_verify__ rows survive", () => {
+  it("check 15 confirms zero synthetic __wsl_cafix_verify__ rows survive", () => {
     expect(verify).toContain("where slug like '\\_\\_wsl\\_cafix\\_verify\\_\\_%' escape '\\'");
   });
 
@@ -262,6 +315,20 @@ describe("wholesale-catalog-architecture-fix-rollback.sql: scoped, non-destructi
     expect(lines.find((l) => l === "begin;")).toBeTruthy();
     expect(lines.indexOf("commit;")).toBeGreaterThan(lines.indexOf("begin;"));
     expect(rollback).toMatch(/-- alter table wholesale_equipment_types drop column if exists catalog_mode;/);
+  });
+
+  it("0. (hardening) re-validates, INSIDE the transaction and before reinserting the 56 tags, that the database is actually in the expected CORRECTED state — zero microsoldering tag relationships anywhere AND microsoldering.catalog_mode='direct_services' — RAISE EXCEPTION aborts on either mismatch", () => {
+    expect(rollback).toMatch(/select count\(\*\) into v_current_tag_count\s*\n\s*from wholesale_service_tags st\s*\n\s*join wholesale_tags t on t\.id = st\.tag_id\s*\n\s*where t\.slug = 'microsoldering';/);
+    expect(rollback).toMatch(/if v_current_tag_count <> 0 then\s*\n\s*raise exception 'catalog_architecture_rollback_aborted: expected ZERO microsoldering tag relationships/);
+    expect(rollback).toMatch(/select catalog_mode into v_catalog_mode from wholesale_equipment_types where slug = 'microsoldering';/);
+    expect(rollback).toMatch(/if v_catalog_mode is distinct from 'direct_services' then\s*\n\s*raise exception 'catalog_architecture_rollback_aborted: expected microsoldering\.catalog_mode/);
+  });
+
+  it("0b. the safety gate runs strictly BEFORE the 56-tag reinsertion it protects", () => {
+    const gateIdx = rollback.indexOf("-- 0. Safety gate");
+    const reinsertIdx = rollback.indexOf("insert into wholesale_service_tags (service_id, tag_id)");
+    expect(gateIdx).toBeGreaterThan(-1);
+    expect(reinsertIdx).toBeGreaterThan(gateIdx);
   });
 
   it("re-points macbook-air/macbook-pro back to 'laptops' and hides 'macbook' again", () => {

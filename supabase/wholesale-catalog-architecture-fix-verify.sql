@@ -1,10 +1,12 @@
 -- ============================================================================
 -- Verify — run AFTER wholesale-catalog-architecture-fix-migration.sql
 -- ============================================================================
--- Same split as wholesale-dynamic-equipment-types-verify.sql: checks 1-11
--- are READ-ONLY assertions against the CURRENT (post-fix) real state; checks
--- 12-13 exercise the updated wholesale_delete_equipment_type RPC's real
--- behavior using synthetic rows, wrapped in this file's own begin;...
+-- Same split as wholesale-dynamic-equipment-types-verify.sql: checks 1-3 and
+-- 4-12 are READ-ONLY assertions against the CURRENT (post-fix) real state
+-- (check 3 in particular confirms ZERO microsoldering tag relationships
+-- remain ANYWHERE, not merely that the 56 known targets were retracted);
+-- checks 13-14 exercise the updated wholesale_delete_equipment_type RPC's
+-- real behavior using synthetic rows, wrapped in this file's own begin;...
 -- rollback; (self-cleaning). Safe to re-run any time.
 -- ============================================================================
 
@@ -69,11 +71,33 @@ select 2, 'all_56_wrong_tags_retracted',
     coalesce((select string_agg(service_id::text, ', ') from still_tagged), '(none)');
 
 -- ----------------------------------------------------------------------------
--- Check 3 (read-only): macbook-air and macbook-pro resolve to 'macbook',
+-- Check 3 (read-only): ZERO microsoldering tag relationships remain
+-- ANYWHERE in the whole table — a stronger claim than check 2, which only
+-- confirms the 56 known targets specifically. Meaningful precisely because
+-- the migration's own step 0 safety gate already proved (inside the same
+-- transaction, immediately before its DELETE ran) that the tag set was
+-- EXACTLY those 56 beforehand — if that held, deleting exactly those 56
+-- must leave the table at 0, not merely "no longer contains the 56 we knew
+-- about". Catches a service that was ALSO tagged outside the known 56 and
+-- therefore never targeted by the DELETE.
+-- ----------------------------------------------------------------------------
+insert into _wsl_cafix_verify_results
+select 3, 'zero_microsoldering_tag_relationships_exist_anywhere',
+  case when (
+    select count(*) from wholesale_service_tags st
+    join wholesale_tags t on t.id = st.tag_id
+    where t.slug = 'microsoldering'
+  ) = 0 then 'PASS' else 'FAIL' end,
+  'total microsoldering-tagged relationships remaining anywhere = ' || (
+    select count(*) from wholesale_service_tags st join wholesale_tags t on t.id = st.tag_id where t.slug = 'microsoldering'
+  ) || ' (must be 0 — the tag mechanism is fully retired by this fix, not merely reduced to a smaller set)';
+
+-- ----------------------------------------------------------------------------
+-- Check 4 (read-only): macbook-air and macbook-pro resolve to 'macbook',
 -- zero remain on 'laptops'.
 -- ----------------------------------------------------------------------------
 insert into _wsl_cafix_verify_results
-select 3, 'macbook_categories_restored',
+select 4, 'macbook_categories_restored',
   case when (
     select count(*) from wholesale_categories c
     join wholesale_equipment_types et on et.id = c.equipment_type_id
@@ -89,12 +113,12 @@ select 3, 'macbook_categories_restored',
     || ' (expect 0)';
 
 -- ----------------------------------------------------------------------------
--- Check 4 (read-only): mirrors the dynamic-equipment-types-verify pattern —
+-- Check 5 (read-only): mirrors the dynamic-equipment-types-verify pattern —
 -- every service under macbook-air/macbook-pro still resolves to a real
 -- category (never orphaned by the re-point).
 -- ----------------------------------------------------------------------------
 insert into _wsl_cafix_verify_results
-select 4, 'no_orphaned_services_for_macbook_categories',
+select 5, 'no_orphaned_services_for_macbook_categories',
   case when (
     select count(*) from wholesale_services s
     where s.category_id in (select id from wholesale_categories where slug in ('macbook-air', 'macbook-pro'))
@@ -103,14 +127,14 @@ select 4, 'no_orphaned_services_for_macbook_categories',
   'every wholesale_services row referencing a macbook-air/macbook-pro category_id still resolves to a real category row';
 
 -- ----------------------------------------------------------------------------
--- Check 5 (read-only): laptops-normal AND laptops-gamer both resolve to
+-- Check 6 (read-only): laptops-normal AND laptops-gamer both resolve to
 -- 'laptops' — laptops-normal always did; laptops-gamer is re-pointed here
 -- from the separate 'gaming-laptops' equipment type it silently pointed at
 -- since the original navigation migration (see migration file's header).
 -- gaming-laptops itself is now genuinely empty (0 categories).
 -- ----------------------------------------------------------------------------
 insert into _wsl_cafix_verify_results
-select 5, 'laptops_owns_both_its_categories_gaming_laptops_now_empty',
+select 6, 'laptops_owns_both_its_categories_gaming_laptops_now_empty',
   case when (
     select count(*) from wholesale_categories c
     join wholesale_equipment_types et on et.id = c.equipment_type_id
@@ -127,11 +151,11 @@ select 5, 'laptops_owns_both_its_categories_gaming_laptops_now_empty',
   ) || ' (expect 0)';
 
 -- ----------------------------------------------------------------------------
--- Check 6 (read-only): macbook is active with the right names; laptops is
+-- Check 7 (read-only): macbook is active with the right names; laptops is
 -- untouched (still active, still named Laptops).
 -- ----------------------------------------------------------------------------
 insert into _wsl_cafix_verify_results
-select 6, 'macbook_active_with_names_laptops_unaffected',
+select 7, 'macbook_active_with_names_laptops_unaffected',
   case when exists (
     select 1 from wholesale_equipment_types where slug = 'macbook' and active = true and name = 'MacBook' and name_es = 'MacBook'
   ) and exists (
@@ -141,12 +165,12 @@ select 6, 'macbook_active_with_names_laptops_unaffected',
     || ' | laptops: ' || coalesce((select 'active=' || active || ', name=' || name from wholesale_equipment_types where slug = 'laptops'), '(not found)');
 
 -- ----------------------------------------------------------------------------
--- Check 7 (read-only): microsoldering fully decoupled from tag_lens —
+-- Check 8 (read-only): microsoldering fully decoupled from tag_lens —
 -- catalog_mode='direct_services', is_tag_lens=false, source_mode='direct',
 -- source_tag_id null.
 -- ----------------------------------------------------------------------------
 insert into _wsl_cafix_verify_results
-select 7, 'microsoldering_decoupled_from_tag_lens',
+select 8, 'microsoldering_decoupled_from_tag_lens',
   case when exists (
     select 1 from wholesale_equipment_types
     where slug = 'microsoldering' and catalog_mode = 'direct_services' and is_tag_lens = false
@@ -158,11 +182,11 @@ select 7, 'microsoldering_decoupled_from_tag_lens',
   ), '(microsoldering row not found)');
 
 -- ----------------------------------------------------------------------------
--- Check 8 (read-only): exactly one row is catalog_mode='direct_services'
+-- Check 9 (read-only): exactly one row is catalog_mode='direct_services'
 -- (microsoldering) — every other row is the default 'grouped'.
 -- ----------------------------------------------------------------------------
 insert into _wsl_cafix_verify_results
-select 8, 'catalog_mode_direct_services_is_exactly_microsoldering',
+select 9, 'catalog_mode_direct_services_is_exactly_microsoldering',
   case when (
     select count(*) from wholesale_equipment_types where catalog_mode = 'direct_services'
   ) = 1 and exists (
@@ -172,10 +196,10 @@ select 8, 'catalog_mode_direct_services_is_exactly_microsoldering',
     || ' — must be exactly 1, and it must be microsoldering';
 
 -- ----------------------------------------------------------------------------
--- Check 9 (read-only): sort_order collision-free across ALL rows.
+-- Check 10 (read-only): sort_order collision-free across ALL rows.
 -- ----------------------------------------------------------------------------
 insert into _wsl_cafix_verify_results
-select 9, 'sort_order_collision_free_across_all_rows',
+select 10, 'sort_order_collision_free_across_all_rows',
   case when (
     select count(*) from (select sort_order, count(*) from wholesale_equipment_types group by sort_order having count(*) > 1) dupes
   ) = 0 then 'PASS' else 'FAIL' end,
@@ -185,11 +209,11 @@ select 9, 'sort_order_collision_free_across_all_rows',
   ), '(none)');
 
 -- ----------------------------------------------------------------------------
--- Check 10 (read-only): the 9 active equipment_types, ordered by sort_order,
+-- Check 11 (read-only): the 9 active equipment_types, ordered by sort_order,
 -- are exactly the owner-approved sequence.
 -- ----------------------------------------------------------------------------
 insert into _wsl_cafix_verify_results
-select 10, 'final_visual_order_matches_9_card_sequence',
+select 11, 'final_visual_order_matches_9_card_sequence',
   case when (
     select array_agg(slug order by sort_order) from wholesale_equipment_types where active = true
   ) = array['microsoldering', 'iphone', 'ipad', 'macbook', 'laptops', 'ps5', 'xbox-series-x', 'switch', 'controllers']
@@ -197,16 +221,16 @@ select 10, 'final_visual_order_matches_9_card_sequence',
   'actual: ' || coalesce((select string_agg(slug, ', ' order by sort_order) from wholesale_equipment_types where active = true), '(none)');
 
 -- ----------------------------------------------------------------------------
--- Check 11 (read-only): no duplicate slugs (structural sanity).
+-- Check 12 (read-only): no duplicate slugs (structural sanity).
 -- ----------------------------------------------------------------------------
 insert into _wsl_cafix_verify_results
-select 11, 'no_duplicate_equipment_type_slugs',
+select 12, 'no_duplicate_equipment_type_slugs',
   case when (select count(*) from wholesale_equipment_types) = (select count(distinct slug) from wholesale_equipment_types)
     then 'PASS' else 'FAIL' end,
   'total=' || (select count(*) from wholesale_equipment_types) || ', distinct slugs=' || (select count(distinct slug) from wholesale_equipment_types);
 
 -- ----------------------------------------------------------------------------
--- Check 12 (functional, self-cleaning): the updated wholesale_delete_
+-- Check 13 (functional, self-cleaning): the updated wholesale_delete_
 -- equipment_type RPC deletes a genuinely empty synthetic row (mirrors a
 -- fresh, empty catalog_mode='direct_services' card) and refuses a synthetic
 -- row that still has a category attached — the SAME "zero categories" rule
@@ -258,11 +282,11 @@ begin
 
   if v_skip then
     insert into _wsl_cafix_verify_results values (
-      12, 'delete_rpc_generic_zero_categories_rule', 'SKIPPED', 'no approved admin profile exists yet in this project — nothing to test against'
+      13, 'delete_rpc_generic_zero_categories_rule', 'SKIPPED', 'no approved admin profile exists yet in this project — nothing to test against'
     );
   else
     insert into _wsl_cafix_verify_results values (
-      12, 'delete_rpc_generic_zero_categories_rule',
+      13, 'delete_rpc_generic_zero_categories_rule',
       case when v_empty_delete_ok and v_populated_delete_rejected then 'PASS' else 'FAIL' end,
       'empty_direct_services_row_deleted=' || v_empty_delete_ok || ', populated_row_rejected=' || v_populated_delete_rejected
         || ' — expect true, true (no is_tag_lens special case involved in either outcome)'
@@ -271,19 +295,19 @@ begin
 end $$;
 
 -- ----------------------------------------------------------------------------
--- Check 13 (read-only): the real microsoldering row was never touched by
--- check 12's synthetic tests above.
+-- Check 14 (read-only): the real microsoldering row was never touched by
+-- check 13's synthetic tests above.
 -- ----------------------------------------------------------------------------
 insert into _wsl_cafix_verify_results
-select 13, 'real_microsoldering_row_untouched_by_check_12',
+select 14, 'real_microsoldering_row_untouched_by_check_13',
   case when exists (select 1 from wholesale_equipment_types where slug = 'microsoldering') then 'PASS' else 'FAIL' end,
-  'the real microsoldering row must still exist after check 12''s synthetic RPC tests';
+  'the real microsoldering row must still exist after check 13''s synthetic RPC tests';
 
 -- ----------------------------------------------------------------------------
 -- Final check: no synthetic __wsl_cafix_verify__ row left behind.
 -- ----------------------------------------------------------------------------
 insert into _wsl_cafix_verify_results
-select 14, 'no_synthetic_rows_left_behind',
+select 15, 'no_synthetic_rows_left_behind',
   case when (select count(*) from wholesale_equipment_types where slug like '\_\_wsl\_cafix\_verify\_\_%' escape '\') = 0
     then 'PASS' else 'FAIL' end,
   (select count(*) from wholesale_equipment_types where slug like '\_\_wsl\_cafix\_verify\_\_%' escape '\')::text;
@@ -303,6 +327,6 @@ from (
 ) t
 order by ord;
 
--- Check 12's synthetic writes are undone here; every other check never
+-- Check 13's synthetic writes are undone here; every other check never
 -- wrote anything to begin with. Safe to re-run this file any time.
 rollback;
