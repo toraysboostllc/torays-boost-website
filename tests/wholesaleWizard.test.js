@@ -15,14 +15,14 @@ describe("WholesaleWizard.jsx: single data-driven wizard, never fetches, never a
     expect(wizardSrc).not.toMatch(/fetch\(/);
   });
 
-  it("uses buildWholesaleWizardCatalog for BOTH the top-level list and the Microsoldering-scoped list — one adapter, two calls, not two implementations", () => {
+  it("uses buildWholesaleWizardCatalog exactly once, on the single equipmentTypes prop — Microsoldering is a plain member of that same array (see api/_lib/wholesaleDb.js), not a second adapter call over a separate list", () => {
     expect(wizardSrc).toContain('import { buildWholesaleWizardCatalog } from "../../lib/wholesaleWizardCatalog.js"');
-    expect((wizardSrc.match(/buildWholesaleWizardCatalog\(/g) || []).length).toBe(2);
+    expect((wizardSrc.match(/buildWholesaleWizardCatalog\(/g) || []).length).toBe(1);
   });
 
-  it("reuses the existing EquipmentTypeCard component for every grid — equipo, microsoldering entry, and model — never a bespoke card per screen", () => {
+  it("reuses the existing EquipmentTypeCard component for every grid — equipo (Microsoldering included) and model — never a bespoke card per screen", () => {
     expect(wizardSrc).toContain('import { EquipmentTypeCard } from "./EquipmentTypeCard.jsx"');
-    expect((wizardSrc.match(/<EquipmentTypeCard/g) || []).length).toBeGreaterThanOrEqual(3);
+    expect((wizardSrc.match(/<EquipmentTypeCard/g) || []).length).toBe(2);
   });
 
   it("no hardcoded per-device component or branch — no 'PS5' / 'Xbox' / 'Switch' literal string anywhere in this file", () => {
@@ -50,36 +50,39 @@ describe("WholesaleWizard.jsx: back navigation is a real stack, not a hardcoded 
   });
 
   it("every non-top screen renders exactly one Back button wired to goBack (wrapped for the hover/tap sound)", () => {
-    expect((wizardSrc.match(/wholesaleHoverProps\(goBack\)/g) || []).length).toBe(3); // microsolderingGrid, model, fault
+    expect((wizardSrc.match(/wholesaleHoverProps\(goBack\)/g) || []).length).toBe(2); // model, fault — no separate microsolderingGrid screen anymore
   });
 });
 
-describe("WholesaleWizard.jsx: Microsoldadura is a lens, not a fake equipment type", () => {
-  it("clicking the Microsoldadura tile sets isMicrosoldering and navigates to its own equipo grid, never straight to a model/fault screen", () => {
-    expect(wizardSrc).toMatch(/function handleSelectMicrosoldering\(\) \{\s*\n\s*setIsMicrosoldering\(true\);\s*\n\s*goTo\("microsolderingGrid"\);/);
+describe("WholesaleWizard.jsx: Microsoldering is a plain Equipo, not a fake/separate screen", () => {
+  it("there is no separate microsolderingGrid screen, no separate microsoldering-scoped equipo list, and no hardcoded slug/id gate deciding whether the card appears", () => {
+    expect(wizardSrc).not.toContain("microsolderingGrid");
+    expect(wizardSrc).not.toContain("microsolderingEquipoList");
+    expect(wizardSrc).not.toContain("handleSelectMicrosoldering");
+    expect(wizardSrc).not.toMatch(/\{microsoldering && \(/);
+    expect(wizardSrc).not.toMatch(/slug\s*===\s*["']microsoldering["']/);
   });
 
-  it("the Microsoldadura tile uses microsoldering.image and the translated title/subtitle, never hardcoded English/Spanish text", () => {
+  it("clicking ANY equipo (Microsoldering included) goes through the one generic handleSelectEquipo — model screen if it has >1 model, straight to fault if it has exactly 1", () => {
+    expect(wizardSrc).toMatch(/function handleSelectEquipo\(equipo\) \{/);
+    expect(wizardSrc).not.toMatch(/handleSelectEquipo\(equipo, \{/); // no second-argument options object anymore
+  });
+
+  it("the optional informational banner on the Modelo/Falla screens is gated by the real row's is_tag_lens-derived isTagLens flag, never a hardcoded slug — and never decides whether the card exists", () => {
+    expect(wizardSrc).toMatch(/selectedEquipo\.isTagLens && \(/);
+    expect(wizardSrc).toMatch(/selectedEquipo\?\.isTagLens && \(/);
     expect(wizardSrc).toContain('t("microsoldering.title")');
-    expect(wizardSrc).toContain("microsoldering.image");
+    expect(wizardSrc).toContain('t("microsoldering.subtitle")');
   });
 
-  it("the Microsoldadura tile only renders when the server actually returned a microsoldering object — server-trust, same rule as every other equipment type", () => {
-    expect(wizardSrc).toMatch(/\{microsoldering && \(/);
-  });
-
-  it("selecting an equipo from within the Microsoldering branch passes { microsoldering: true } through, distinguishing it from the normal branch", () => {
-    expect(wizardSrc).toMatch(/handleSelectEquipo\(equipo, \{ microsoldering: true \}\)/);
-  });
-
-  it("an empty microsoldering equipo list (no tagged active services) shows an empty state, not a broken/blank grid", () => {
-    expect(wizardSrc).toMatch(/microsolderingEquipoList\.length === 0 \? \(\s*\n\s*<div className="wsp-empty">/);
+  it("an equipo with zero models can't happen for Microsoldering specifically — the server already excludes it from equipmentTypes[] whenever nothing is currently tagged (see api/_lib/wholesaleDb.js and wholesaleImages.test.js's 'hide if empty' coverage) — this file has no client-side empty-lens special case to test", () => {
+    expect(wizardSrc).not.toContain("microsolderingEquipoList.length === 0");
   });
 });
 
 describe("WholesaleWizard.jsx: result panel receives exactly the selection it needs, resets cleanly", () => {
-  it("passes selection.microsoldering/equipoName/modelName and the raw service object to WholesaleResultPanel", () => {
-    expect(wizardSrc).toMatch(/microsoldering: isMicrosoldering,/);
+  it("passes selection.microsoldering/equipoName/modelName and the raw service object to WholesaleResultPanel — microsoldering is derived from the selected equipo's real isTagLens flag, never a separately-tracked hardcoded-slug state", () => {
+    expect(wizardSrc).toMatch(/microsoldering: Boolean\(selectedEquipo\?\.isTagLens\),/);
     expect(wizardSrc).toMatch(/equipoName: selectedEquipo\?\.name,/);
     expect(wizardSrc).toMatch(/modelName: selectedModel\?\.name,/);
     expect(wizardSrc).toContain("service={selectedService}");
@@ -110,9 +113,9 @@ describe("WholesaleWizard.jsx: WizardSteps — Equipo/Modelo/Falla progress indi
     expect(wizardSrc).toMatch(/fallaDone=\{Boolean\(selectedService\)\}/);
   });
 
-  it("shows on every selection screen (top, microsolderingGrid, model, fault) and nowhere else — never on progress/result, which have their own state", () => {
+  it("shows on every selection screen (top, model, fault) and nowhere else — never on progress/result, which have their own state; no separate microsolderingGrid screen exists to list here", () => {
     expect(wizardSrc).toMatch(
-      /const showSteps = screen === "top" \|\| screen === "microsolderingGrid" \|\| screen === "model" \|\| screen === "fault";/
+      /const showSteps = screen === "top" \|\| screen === "model" \|\| screen === "fault";/
     );
     expect(wizardSrc).not.toMatch(/showSteps[\s\S]{0,20}"progress"/);
     expect(wizardSrc).not.toMatch(/showSteps[\s\S]{0,20}"result"/);

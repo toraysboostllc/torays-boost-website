@@ -418,70 +418,88 @@ export async function buildWholesaleCatalog(env) {
       image_focus_x: et.image_focus_x ?? 50,
       image_focus_y: et.image_focus_y ?? 50,
       image: imageByEquipmentType.get(et.id) || null,
+      is_tag_lens: false,
       categories: (categoriesByEquipmentType.get(et.id) || [])
         .map(toClientCategory)
         .filter((cat) => cat.services.length > 0),
     }))
     .filter((et) => et.categories.length > 0);
 
-  // -- Microsoldering lens: reuses the SAME already-active data above, never
-  //    a separate/looser query — a Hidden equipment type/category/service can
-  //    never reach this view either. `microsoldering` stays null when the
-  //    Microsoldering equipment type itself is hidden or missing (no card at
-  //    all); it's an object (possibly with an empty equipmentTypes[]) whenever
-  //    that type is active, even if zero services are currently tagged. --
-  let microsoldering = null;
+  // -- Microsoldering: a REAL, ordinary member of equipmentTypesOut, built
+  //    from the SAME already-active data above (never a separate/looser
+  //    query — a Hidden equipment type/category/service can't reach this
+  //    view either) and pushed into the SAME array every other card comes
+  //    from. There is deliberately no second response key, no separate
+  //    fetch, and no hardcoded slug anywhere in this file that decides
+  //    whether/where this card appears — only `is_tag_lens` on the real row,
+  //    exactly the same flag DESK already lets an admin see (and only DESK
+  //    may ever set it, at row-creation time; nothing here can create a new
+  //    tag-lens row). Its `categories` are the real wholesale_categories
+  //    rows that have at least one Microsoldering-tagged active service —
+  //    same `toClientCategory` shape as every other card, just pre-filtered
+  //    to the tagged subset — so buildWholesaleWizardCatalog
+  //    (src/lib/wholesaleWizardCatalog.js) needs zero special-casing to
+  //    turn this into a normal top-level Equipo with normal Modelo entries.
+  //    A category with a PS5/Xbox/Switch slug flows through the exact same
+  //    promoted/remaining bridge as it does for every other equipment
+  //    type's categories, so a tagged PS5 service still surfaces as one
+  //    Microsoldering model, never as a second top-level PS5 card.
   if (microsolderingType) {
     const tagId = await findMicrosolderingTagId(env);
     const activeServiceIds = services.map((s) => s.id);
     const taggedServiceIds = await listMicrosolderingServiceIds(env, tagId, activeServiceIds);
 
-    const lensEquipmentTypes = realEquipmentTypes
-      .map((et) => ({
-        id: et.id,
-        name: et.name,
-        categories: (categoriesByEquipmentType.get(et.id) || [])
-          .map((cat) => ({
-            id: cat.id,
-            // `slug` (not present in this lens shape before) is required so
-            // buildWholesaleWizardCatalog's PS5/Xbox/Switch promotion logic
-            // (src/lib/wholesaleWizardCatalog.js) behaves identically inside
-            // the Microsoldering branch as it does for the regular catalog —
-            // otherwise a PS5 microsoldering service would only ever surface
-            // nested under "Video Consoles" here, inconsistent with the rest
-            // of the wizard.
-            slug: cat.slug,
-            name: cat.name,
-            services: (servicesByCategory.get(cat.id) || [])
-              .filter((sv) => taggedServiceIds.has(sv.id))
-              .map((sv) => toClientService(sv, portalSettings)),
-          }))
-          .filter((cat) => cat.services.length > 0),
-      }))
-      .filter((et) => et.categories.length > 0);
+    const microsolderingCategories = categories
+      .filter((cat) => cat.equipment_type_id) // only real, owned categories — never guessed at
+      .map((cat) => {
+        const taggedServices = (servicesByCategory.get(cat.id) || [])
+          .filter((sv) => taggedServiceIds.has(sv.id))
+          .map((sv) => toClientService(sv, portalSettings));
+        if (taggedServices.length === 0) return null;
+        return {
+          id: cat.id,
+          slug: cat.slug,
+          name: cat.name,
+          notes: cat.notes ?? null,
+          diagnostic_fee: cat.diagnostic_fee ?? null,
+          diagnostic_description: cat.diagnostic_description ?? null,
+          image: imageByCategory.get(cat.id) || null,
+          services: taggedServices,
+        };
+      })
+      .filter(Boolean);
 
-    microsoldering = {
-      // `id`/`slug`/`name_es`/`full_bleed_photo`/`image_focus_x`/`image_focus_y`
-      // come straight from the real wholesale_equipment_types row DESK
-      // already lets an admin edit exactly like any other card — this
-      // object is no longer just { image, equipmentTypes }, specifically so
-      // WholesaleWizard.jsx never has to hand-write a synthetic entity with
-      // a hardcoded name/no id (see that file's own header comment).
-      id: microsolderingType.id,
-      slug: microsolderingType.slug,
-      name: microsolderingType.name,
-      name_es: microsolderingType.name_es || null,
-      full_bleed_photo: Boolean(microsolderingType.full_bleed_photo),
-      image_focus_x: microsolderingType.image_focus_x ?? 50,
-      image_focus_y: microsolderingType.image_focus_y ?? 50,
-      image: imageByEquipmentType.get(microsolderingType.id) || null,
-      equipmentTypes: lensEquipmentTypes,
-    };
+    // Same "hide if empty" rule applied uniformly to every other equipment
+    // type above — a Microsoldering row with zero currently-tagged active
+    // services produces no card at all, not an empty one.
+    if (microsolderingCategories.length > 0) {
+      equipmentTypesOut.push({
+        id: microsolderingType.id,
+        slug: microsolderingType.slug,
+        name: microsolderingType.name,
+        name_es: microsolderingType.name_es || null,
+        full_bleed_photo: Boolean(microsolderingType.full_bleed_photo),
+        image_focus_x: microsolderingType.image_focus_x ?? 50,
+        image_focus_y: microsolderingType.image_focus_y ?? 50,
+        image: imageByEquipmentType.get(microsolderingType.id) || null,
+        is_tag_lens: true,
+        categories: microsolderingCategories,
+      });
+    }
   }
+
+  // Microsoldering is pushed above regardless of its real sort_order, so
+  // the array is re-sorted here against the ORIGINAL wholesale_equipment_
+  // types.sort_order (looked up by id, not re-derived) — the single source
+  // of truth DESK's reorder buttons already write to for every card,
+  // Microsoldering included. This is what makes the final card order react
+  // to a DESK reorder with zero code change, on this card the same as any
+  // other.
+  const sortOrderById = new Map(equipmentTypes.map((et) => [et.id, et.sort_order]));
+  equipmentTypesOut.sort((a, b) => (sortOrderById.get(a.id) ?? 0) - (sortOrderById.get(b.id) ?? 0));
 
   return {
     equipmentTypes: equipmentTypesOut,
-    microsoldering,
     // Read-only for the portal — shops never write either of these. Falls
     // back to safe, conservative defaults (maintenance + blocked, no
     // rounding) if the singleton settings row is somehow missing, rather

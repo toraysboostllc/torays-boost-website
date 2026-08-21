@@ -107,8 +107,8 @@ describe("wholesale-prices: equipment type carries name_es/full_bleed_photo/imag
   });
 });
 
-describe("wholesale-prices: Microsoldering is sourced from its real row, not a hardcoded object", () => {
-  it("microsoldering carries id/slug/name/name_es/full_bleed_photo/image_focus_x/image_focus_y from the real is_tag_lens row", async () => {
+describe("wholesale-prices: Microsoldering is a plain member of equipmentTypes[], sourced from its real row — no separate response key, no hardcoded object", () => {
+  it("appears in equipmentTypes[] carrying id/slug/name/name_es/full_bleed_photo/image_focus_x/image_focus_y from the real is_tag_lens row, with is_tag_lens: true, and its categories pre-filtered to only the tagged services", async () => {
     seedShopWithSession();
     const microsolderingType = seedEquipmentType({
       slug: "microsoldering",
@@ -118,24 +118,57 @@ describe("wholesale-prices: Microsoldering is sourced from its real row, not a h
       full_bleed_photo: true,
       image_focus_x: 50,
       image_focus_y: 35,
+      sort_order: 1,
     });
-    // a real equipment type + tagged service so the lens has something to show
-    const et = seedEquipmentType({ id: fake.nextId(), slug: "iphone", name: "iPhone" });
+    // a real equipment type + one tagged and one untagged service, so the
+    // Microsoldering card's categories only carry the tagged one while the
+    // real iPhone card still carries both.
+    const et = seedEquipmentType({ id: fake.nextId(), slug: "iphone", name: "iPhone", sort_order: 2 });
     const cat = seedCategory(et.id, { slug: "iphone-board" });
-    const sv = seedService(cat.id, { name: "Board Repair" });
+    const taggedService = seedService(cat.id, { name: "Board Repair" });
+    seedService(cat.id, { id: fake.nextId(), slug: "screen-repl", name: "Screen Replacement" });
     const tag = { id: fake.nextId(), slug: "microsoldering", name: "Microsoldering" };
     fake.db.wholesale_tags.push(tag);
-    fake.db.wholesale_service_tags.push({ service_id: sv.id, tag_id: tag.id });
+    fake.db.wholesale_service_tags.push({ service_id: taggedService.id, tag_id: tag.id });
 
     const res = await callPrices();
 
-    expect(res.body.microsoldering).toBeTruthy();
-    expect(res.body.microsoldering.id).toBe(microsolderingType.id);
-    expect(res.body.microsoldering.slug).toBe("microsoldering");
-    expect(res.body.microsoldering.name).toBe("Microsoldering");
-    expect(res.body.microsoldering.name_es).toBe("Microsoldadura");
-    expect(res.body.microsoldering.full_bleed_photo).toBe(true);
-    expect(res.body.microsoldering.image_focus_x).toBe(50);
-    expect(res.body.microsoldering.image_focus_y).toBe(35);
+    expect(res.body.microsoldering).toBeUndefined(); // no separate response key at all
+    const microCard = res.body.equipmentTypes.find((e) => e.id === microsolderingType.id);
+    expect(microCard).toBeTruthy();
+    expect(microCard.slug).toBe("microsoldering");
+    expect(microCard.name).toBe("Microsoldering");
+    expect(microCard.name_es).toBe("Microsoldadura");
+    expect(microCard.full_bleed_photo).toBe(true);
+    expect(microCard.image_focus_x).toBe(50);
+    expect(microCard.image_focus_y).toBe(35);
+    expect(microCard.is_tag_lens).toBe(true);
+    // Its one category is the real iphone-board row, but with ONLY the
+    // tagged service — the untagged "Screen Replacement" never leaks in.
+    expect(microCard.categories).toHaveLength(1);
+    expect(microCard.categories[0].slug).toBe("iphone-board");
+    expect(microCard.categories[0].services.map((s) => s.name)).toEqual(["Board Repair"]);
+
+    // The real iPhone card, meanwhile, is untouched and unfiltered — both
+    // services still there, is_tag_lens: false.
+    const iphoneCard = res.body.equipmentTypes.find((e) => e.id === et.id);
+    expect(iphoneCard.is_tag_lens).toBe(false);
+    expect(iphoneCard.categories[0].services.map((s) => s.name).sort()).toEqual(["Board Repair", "Screen Replacement"]);
+
+    // sort_order controls final position, Microsoldering included — it was
+    // seeded at sort_order 1 (before iPhone's 2), and lands first here too.
+    expect(res.body.equipmentTypes[0].id).toBe(microsolderingType.id);
+  });
+
+  it("produces no card at all when nothing is currently tagged — never an empty-but-present card, same 'hide if empty' rule every other equipment type gets", async () => {
+    seedShopWithSession();
+    const microsolderingType = seedEquipmentType({ slug: "microsoldering", name: "Microsoldering", is_tag_lens: true });
+    const et = seedEquipmentType({ id: fake.nextId(), slug: "iphone", name: "iPhone" });
+    const cat = seedCategory(et.id);
+    seedService(cat.id); // no tag attached at all
+
+    const res = await callPrices();
+
+    expect(res.body.equipmentTypes.find((e) => e.id === microsolderingType.id)).toBeUndefined();
   });
 });

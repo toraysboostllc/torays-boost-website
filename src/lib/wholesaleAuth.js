@@ -69,8 +69,9 @@ export async function fetchWholesaleCatalog() {
   return {
     ok: true,
     shopName: data.shopName,
+    // Microsoldering is a plain member of equipmentTypes[] (is_tag_lens
+    // true) — see api/_lib/wholesaleDb.js — never a separate response key.
     equipmentTypes: data.equipmentTypes || [],
-    microsoldering: data.microsoldering || null,
     salesModule: data.salesModule || null,
   };
 }

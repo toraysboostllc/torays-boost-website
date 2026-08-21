@@ -118,7 +118,6 @@ describe("Adenda 8, Cambio 4 — Logout: real logout flow first, then cleanup, t
     expect(cleanupBlock).toContain('status: "loading"');
     expect(cleanupBlock).toContain('shopName: ""');
     expect(cleanupBlock).toContain("equipmentTypes: []");
-    expect(cleanupBlock).toContain("microsoldering: null");
     expect(cleanupBlock).toContain("salesModule: null");
   });
 

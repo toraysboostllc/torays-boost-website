@@ -50,23 +50,22 @@ function WizardSteps({ equipoDone, modeloDone, fallaDone, t }) {
  * The single data-driven wizard: Equipo -> Modelo (skipped when an Equipo
  * has only 1 model) -> Falla -> ~3s reveal -> Precio listo. One component
  * for every equipment type, including the 3 promoted PS5/Xbox/Switch
- * categories (see buildWholesaleWizardCatalog's header) and the
- * Microsoldadura branch (same Equipo/Modelo/Falla shape, scoped to tagged
- * services) — never a separate page or hardcoded block per device.
+ * categories (see buildWholesaleWizardCatalog's header) and Microsoldering
+ * — same Equipo/Modelo/Falla shape, same list, same click handler, no
+ * separate screen or hardcoded block. Microsoldering is a plain member of
+ * `equipmentTypes` (its `is_tag_lens`-derived `isTagLens` flag only changes
+ * a purely presentational banner on the Modelo/Falla screens below — never
+ * whether or where the card appears, never gated by its slug).
  *
- * `equipmentTypes` and `microsoldering` are exactly what /api/wholesale-prices
- * already returned when the portal loaded (see WholesalePrices.jsx) — this
- * component never fetches anything itself. Screen history is a simple stack
- * (push forward, pop on Back) instead of hardcoding a back-target per screen.
+ * `equipmentTypes` is exactly what /api/wholesale-prices already returned
+ * when the portal loaded (see WholesalePrices.jsx) — this component never
+ * fetches anything itself. Screen history is a simple stack (push forward,
+ * pop on Back) instead of hardcoding a back-target per screen.
  */
-export function WholesaleWizard({ equipmentTypes, microsoldering, onScreenChange }) {
+export function WholesaleWizard({ equipmentTypes, onScreenChange }) {
   const { t, language } = useWholesaleLocale();
 
   const topEquipoList = useMemo(() => buildWholesaleWizardCatalog(equipmentTypes), [equipmentTypes]);
-  const microsolderingEquipoList = useMemo(
-    () => buildWholesaleWizardCatalog(microsoldering?.equipmentTypes || []),
-    [microsoldering]
-  );
 
   const [screenStack, setScreenStack] = useState(["top"]);
   const screen = screenStack[screenStack.length - 1];
@@ -79,7 +78,6 @@ export function WholesaleWizard({ equipmentTypes, microsoldering, onScreenChange
   useEffect(() => {
     onScreenChange?.(screen);
   }, [screen, onScreenChange]);
-  const [isMicrosoldering, setIsMicrosoldering] = useState(false);
   const [selectedEquipo, setSelectedEquipo] = useState(null);
   const [selectedModel, setSelectedModel] = useState(null);
   const [selectedService, setSelectedService] = useState(null);
@@ -92,20 +90,13 @@ export function WholesaleWizard({ equipmentTypes, microsoldering, onScreenChange
   }
   function resetToTop() {
     setScreenStack(["top"]);
-    setIsMicrosoldering(false);
     setSelectedEquipo(null);
     setSelectedModel(null);
     setSelectedService(null);
   }
 
-  function handleSelectMicrosoldering() {
-    setIsMicrosoldering(true);
-    goTo("microsolderingGrid");
-  }
-
-  function handleSelectEquipo(equipo, { microsoldering: fromMicrosoldering } = {}) {
+  function handleSelectEquipo(equipo) {
     setSelectedEquipo(equipo);
-    setIsMicrosoldering(Boolean(fromMicrosoldering));
     if (equipo.models.length === 1) {
       setSelectedModel(equipo.models[0]);
       goTo("fault");
@@ -124,7 +115,7 @@ export function WholesaleWizard({ equipmentTypes, microsoldering, onScreenChange
     goTo("progress");
   }
 
-  const showSteps = screen === "top" || screen === "microsolderingGrid" || screen === "model" || screen === "fault";
+  const showSteps = screen === "top" || screen === "model" || screen === "fault";
 
   return (
     <div className="wsp-wizard">
@@ -142,70 +133,22 @@ export function WholesaleWizard({ equipmentTypes, microsoldering, onScreenChange
           <h1 className="wsp-wizard-heading">{t("wizard.chooseEquipment")}</h1>
           <p className="wsp-wizard-subtitle">{t("wizard.chooseEquipmentSubtitle")}</p>
           <div className="wsp-grid wsp-grid-compact">
-            {/* Only rendered when the server actually returned a
-                microsoldering object — same server-trust rule as the rest
-                of the portal: never assume the Equipment Type exists just
-                because this component was mounted (it's Hidden/inactive on
-                the server otherwise, exactly like any other equipment
-                type). `featured` gives it a subtle distinguishing border/
-                shadow, never a larger size than the other cards.
-                id/name/nameEs/fullBleedPhoto/imageFocusX/imageFocusY all
-                come straight from the real wholesale_equipment_types row
-                (see api/_lib/wholesaleDb.js) — DESK can rename it, give it
-                a Spanish name, or toggle full-bleed exactly like any other
-                card, with nothing hardcoded here. t("microsoldering.title")
-                is used only as a last-resort fallback for a project that
-                somehow has the tag-lens row active with no name set at all. */}
-            {microsoldering && (
-              <EquipmentTypeCard
-                entity={{
-                  id: microsoldering.id,
-                  slug: microsoldering.slug || "microsoldering",
-                  name: microsoldering.name || t("microsoldering.title"),
-                  nameEs: microsoldering.name_es,
-                  fullBleedPhoto: microsoldering.full_bleed_photo,
-                  imageFocusX: microsoldering.image_focus_x,
-                  imageFocusY: microsoldering.image_focus_y,
-                  image: microsoldering.image,
-                }}
-                onClick={handleSelectMicrosoldering}
-                featured
-              />
-            )}
+            {/* ONE list, ONE map — Microsoldering is just another entry in
+                topEquipoList (it's a plain member of equipmentTypes[], see
+                api/_lib/wholesaleDb.js and this file's own header). Its
+                `isTagLens` flag only decides the `featured` border/shadow
+                here — never whether it appears, never a hardcoded id/slug
+                check. A brand-new equipment type DESK creates shows up the
+                exact same way, with zero code change here. */}
             {topEquipoList.map((equipo) => (
-              <EquipmentTypeCard key={equipo.id} entity={equipo} onClick={() => handleSelectEquipo(equipo)} />
+              <EquipmentTypeCard
+                key={equipo.id}
+                entity={equipo}
+                onClick={() => handleSelectEquipo(equipo)}
+                featured={equipo.isTagLens}
+              />
             ))}
           </div>
-        </>
-      )}
-
-      {screen === "microsolderingGrid" && (
-        <>
-          <button type="button" {...wholesaleHoverProps(goBack)} className="wsp-btn wsp-btn-ghost wsp-wizard-back">
-            <ArrowLeft size={16} />
-            {t("wizard.back")}
-          </button>
-          <div className="wsp-wizard-microsoldering-banner">
-            <Cpu size={18} aria-hidden="true" />
-            <div>
-              <p className="wsp-wizard-microsoldering-title">{t("microsoldering.title")}</p>
-              <p className="wsp-wizard-microsoldering-subtitle">{t("microsoldering.subtitle")}</p>
-            </div>
-          </div>
-          <h1 className="wsp-wizard-heading">{t("wizard.chooseEquipment")}</h1>
-          {microsolderingEquipoList.length === 0 ? (
-            <div className="wsp-empty">{t("wizard.chooseFault")}</div>
-          ) : (
-            <div className="wsp-grid wsp-grid-compact">
-              {microsolderingEquipoList.map((equipo) => (
-                <EquipmentTypeCard
-                  key={equipo.id}
-                  entity={equipo}
-                  onClick={() => handleSelectEquipo(equipo, { microsoldering: true })}
-                />
-              ))}
-            </div>
-          )}
         </>
       )}
 
@@ -215,6 +158,19 @@ export function WholesaleWizard({ equipmentTypes, microsoldering, onScreenChange
             <ArrowLeft size={16} />
             {t("wizard.back")}
           </button>
+          {/* Purely informational — shown for ANY equipo whose real row has
+              is_tag_lens=true (today only Microsoldering), never gated by a
+              hardcoded slug. Explains why models from many device families
+              show up together here. */}
+          {selectedEquipo.isTagLens && (
+            <div className="wsp-wizard-microsoldering-banner">
+              <Cpu size={18} aria-hidden="true" />
+              <div>
+                <p className="wsp-wizard-microsoldering-title">{t("microsoldering.title")}</p>
+                <p className="wsp-wizard-microsoldering-subtitle">{t("microsoldering.subtitle")}</p>
+              </div>
+            </div>
+          )}
           <h1 className="wsp-wizard-heading">{t("wizard.chooseModel")}</h1>
           <div className="wsp-grid wsp-grid-compact">
             {selectedEquipo.models.map((model) => (
@@ -230,6 +186,15 @@ export function WholesaleWizard({ equipmentTypes, microsoldering, onScreenChange
             <ArrowLeft size={16} />
             {t("wizard.back")}
           </button>
+          {selectedEquipo?.isTagLens && (
+            <div className="wsp-wizard-microsoldering-banner">
+              <Cpu size={18} aria-hidden="true" />
+              <div>
+                <p className="wsp-wizard-microsoldering-title">{t("microsoldering.title")}</p>
+                <p className="wsp-wizard-microsoldering-subtitle">{t("microsoldering.subtitle")}</p>
+              </div>
+            </div>
+          )}
           <h1 className="wsp-wizard-heading">{t("wizard.chooseFault")}</h1>
           {selectedModel.services.length === 0 ? (
             <div className="wsp-empty">{t("wizard.chooseFault")}</div>
@@ -256,7 +221,7 @@ export function WholesaleWizard({ equipmentTypes, microsoldering, onScreenChange
       {screen === "result" && selectedService && (
         <WholesaleResultPanel
           selection={{
-            microsoldering: isMicrosoldering,
+            microsoldering: Boolean(selectedEquipo?.isTagLens),
             equipoName: selectedEquipo?.name,
             modelName: selectedModel?.name,
           }}

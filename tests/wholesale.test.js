@@ -353,7 +353,11 @@ describe("wholesale-prices: access gating", () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.equipmentTypes).toHaveLength(1);
     expect(res.body.equipmentTypes[0].categories[0].services[0].name).toBe("Screen Replacement");
-    expect(res.body.microsoldering).toBeNull();
+    // Microsoldering is now a plain member of equipmentTypes[] (is_tag_lens
+    // true) — see api/_lib/wholesaleDb.js — never a separate response key.
+    // No is_tag_lens row was seeded in this fixture, so there's nothing to
+    // add to equipmentTypes[] and no separate key to check for either.
+    expect(res.body.microsoldering).toBeUndefined();
     expect(res.body.categories).toBeUndefined(); // old flat shape is fully replaced, not additive
   });
 });

@@ -41,7 +41,6 @@ function WholesalePricesContent() {
     status: "loading",
     shopName: "",
     equipmentTypes: [],
-    microsoldering: null,
     salesModule: null,
     errorMessage: "",
     legalDocumentId: null,
@@ -85,7 +84,6 @@ function WholesalePricesContent() {
         status: "ready",
         shopName: result.shopName,
         equipmentTypes: result.equipmentTypes,
-        microsoldering: result.microsoldering,
         salesModule: result.salesModule,
         errorMessage: "",
         legalDocumentId: null,
@@ -121,7 +119,6 @@ function WholesalePricesContent() {
       status: "loading",
       shopName: "",
       equipmentTypes: [],
-      microsoldering: null,
       salesModule: null,
       errorMessage: "",
     });
@@ -247,7 +244,6 @@ function WholesalePricesContent() {
         <div className="wsp-wizard-sales-group">
           <WholesaleWizard
             equipmentTypes={state.equipmentTypes}
-            microsoldering={state.microsoldering}
             onScreenChange={setWizardScreen}
           />
 

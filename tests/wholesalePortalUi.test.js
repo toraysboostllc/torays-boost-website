@@ -135,12 +135,15 @@ describe("WholesalePrices page: wizard-driven portal, server-trust (no client-si
     expect(src).not.toMatch(/torays-(bg|surface|navy|red)\b/);
   });
 
-  it("passes microsoldering straight through to WholesaleWizard — the existence check itself now lives there (see next check), not duplicated in this file", () => {
-    expect(src).toContain("microsoldering={state.microsoldering}");
+  it("passes equipmentTypes straight through to WholesaleWizard — no separate microsoldering channel anymore (it's a plain member of that same array, see api/_lib/wholesaleDb.js)", () => {
+    expect(src).toContain("equipmentTypes={state.equipmentTypes}");
+    expect(src).not.toMatch(/microsoldering=\{/);
   });
 
-  it("WholesaleWizard renders the Microsoldering card only when the server actually returned a microsoldering object (never assumes it exists)", () => {
-    expect(wizardSrc).toMatch(/\{microsoldering && \(/);
+  it("WholesaleWizard renders every card from ONE unified list — Microsoldering included, via its is_tag_lens-derived isTagLens flag, never a separate conditional block", () => {
+    expect(wizardSrc).not.toMatch(/\{microsoldering && \(/);
+    expect(wizardSrc).toContain("topEquipoList.map((equipo)");
+    expect(wizardSrc).toContain("featured={equipo.isTagLens}");
   });
 
   it("does not re-filter equipmentTypes/services by an active/hidden flag client-side — trusts the server's already-filtered response", () => {
@@ -148,9 +151,9 @@ describe("WholesalePrices page: wizard-driven portal, server-trust (no client-si
     expect(wizardSrc).not.toMatch(/\.filter\(\s*\(?\w*\)?\s*=>\s*\w*\.active\b/);
   });
 
-  it("reads equipmentTypes/microsoldering from fetchWholesaleCatalog's response shape, not the old flat categories field", () => {
+  it("reads equipmentTypes from fetchWholesaleCatalog's response shape, not the old flat categories field or a separate microsoldering key", () => {
     expect(src).toContain("result.equipmentTypes");
-    expect(src).toContain("result.microsoldering");
+    expect(src).not.toContain("result.microsoldering");
     expect(src).not.toContain("result.categories");
   });
 
@@ -621,21 +624,15 @@ describe("wholesalePortal.css: Microsoldering tile is 'featured' via border/shad
     expect(rule).not.toMatch(/\bwidth:|\bheight:|padding:|transform:/);
   });
 
-  it("EquipmentTypeCard applies wsp-card-featured only when the featured prop is passed, and the wizard passes it only for the Microsoldering tile", () => {
+  it("EquipmentTypeCard applies wsp-card-featured only when the featured prop is passed, and the wizard derives it from each card's own isTagLens flag — never a hardcoded slug/handler check", () => {
     const cardSrc = read("src/components/wholesale/EquipmentTypeCard.jsx");
     const wizardSrc = read("src/components/wholesale/WholesaleWizard.jsx");
     expect(cardSrc).toMatch(/featured \? " wsp-card-featured" : ""/);
-    expect((wizardSrc.match(/featured\b/g) || []).length).toBeGreaterThan(0);
-    // only the Microsoldering EquipmentTypeCard call gets `featured` —
-    // anchored on its onClick handler (unique to this element) rather than
-    // the entity literal's exact shape, since entity is now built from the
-    // real DB row's fields (id/name/nameEs/fullBleedPhoto/...), not a
-    // single-line hardcoded object.
-    const microTileBlock = wizardSrc.slice(
-      wizardSrc.indexOf("onClick={handleSelectMicrosoldering}"),
-      wizardSrc.indexOf("/>", wizardSrc.indexOf("onClick={handleSelectMicrosoldering}"))
-    );
-    expect(microTileBlock).toContain("featured");
+    // The top-level grid's single EquipmentTypeCard call is featured
+    // data-driven (`featured={equipo.isTagLens}`) — every card, including
+    // Microsoldering, passes through the exact same JSX, not a second
+    // hardcoded call with `featured` fixed to true.
+    expect(wizardSrc).toContain("featured={equipo.isTagLens}");
   });
 });
 

@@ -77,9 +77,12 @@ function cardPresentation(source) {
  * follow-up that deletes this bridge) don't have to mutate module state.
  *
  * Every returned Equipo has the same shape regardless of whether it's a
- * (legacy-bridge) promoted category or a real equipment type:
+ * (legacy-bridge) promoted category, a real equipment type, or the
+ * Microsoldering tag-lens row (see api/_lib/wholesaleDb.js — it's a plain
+ * member of the `equipmentTypes` array passed in here, not a separate
+ * channel; this function has no special case for it at all):
  *   { id, slug, name, nameEs, fullBleedPhoto, imageFocusX, imageFocusY,
- *     image, sourceEquipmentTypeId, models: WizardModel[] }
+ *     image, sourceEquipmentTypeId, isTagLens, models: WizardModel[] }
  * `models` is always length >= 1. The wizard shows a "Modelo" selection
  * step only when models.length > 1 — a promoted category always has
  * exactly 1 model (itself), so it auto-advances straight to "Falla" without
@@ -112,6 +115,10 @@ export function buildWholesaleWizardCatalog(equipmentTypes, promotedSlugs = PROM
         ...cardPresentation(null), // categories don't carry these fields — bridge cards are always "off, centered"
         image: category.image ?? equipmentType.image ?? null,
         sourceEquipmentTypeId: equipmentType.id,
+        // A promoted category is always a real, ordinary category — never
+        // the tag-lens row itself (that never has a promotable category of
+        // its own) — so this is always false here, never data-driven.
+        isTagLens: false,
         models: [toWizardModel(category)],
       });
     }
@@ -124,6 +131,13 @@ export function buildWholesaleWizardCatalog(equipmentTypes, promotedSlugs = PROM
         ...cardPresentation(equipmentType),
         image: equipmentType.image ?? null,
         sourceEquipmentTypeId: equipmentType.id,
+        // Data-driven, never a hardcoded slug check — true only for the one
+        // real wholesale_equipment_types row with is_tag_lens=true (see
+        // api/_lib/wholesaleDb.js). Purely presentational downstream (an
+        // optional distinguishing banner/border) — never gates whether or
+        // where this card appears; it's already an ordinary member of this
+        // same equipoList by this point.
+        isTagLens: Boolean(equipmentType.is_tag_lens),
         models: remaining.map(toWizardModel),
       });
     }

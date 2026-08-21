@@ -257,10 +257,11 @@ describe("Cambio 5 — no reserved/wasted white space", () => {
 });
 
 describe("Cambio 6 — broken-image fallback source-scan (see wholesaleEquipmentTypeCard.test.js for full coverage)", () => {
-  it("EquipmentTypeCard is the only image-rendering component reachable from the live wizard — WholesaleWizard imports it for equipment types, models, and Microsoldering alike", () => {
+  it("EquipmentTypeCard is the only image-rendering component reachable from the live wizard — WholesaleWizard imports it for equipment types, models, and Microsoldering alike (Microsoldering is a plain member of the same top-level list, no separate tile)", () => {
     const wizardSrc = read("src/components/wholesale/WholesaleWizard.jsx");
     expect(wizardSrc).toContain('import { EquipmentTypeCard } from "./EquipmentTypeCard.jsx";');
-    // 4 usages: Microsoldering tile, equipment list, model grid, back to model list
-    expect((wizardSrc.match(/<EquipmentTypeCard/g) || []).length).toBeGreaterThanOrEqual(3);
+    // 2 usages: the unified top-level Equipo grid (includes Microsoldering)
+    // and the Modelo grid — one list, one map, no bespoke card per screen.
+    expect((wizardSrc.match(/<EquipmentTypeCard/g) || []).length).toBeGreaterThanOrEqual(2);
   });
 });
