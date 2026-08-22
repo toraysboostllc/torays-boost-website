@@ -29,29 +29,29 @@ import {
   findDeviceByTokenHash,
   createDevice,
   updateDevice,
-  createSession,
+  mintSession,
+  wholesaleSessionCookieOptions,
+  WHOLESALE_SESSION_DAYS,
   logEvent,
   clientIp,
 } from "./_lib/wholesaleDb.js";
 
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 15;
-const SESSION_DAYS = 30;
 const DEVICE_COOKIE_DAYS = 400; // browser-enforced cap on cookie lifetime
 const INVALID_MSG = "Invalid shop name or code.";
 const SHOP_NAME_MAX = 100;
 const CODE_MAX = 128; // real codes are 8 chars — this is just a defensive cap
 const DEVICE_TOKEN_MAX = 128;
 
-function cookieOpts(maxAgeSeconds) {
-  return {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: maxAgeSeconds,
-  };
-}
+// cookieOpts() used to be defined locally here; it's now
+// wholesaleSessionCookieOptions() in _lib/wholesaleDb.js, shared with the
+// silent trusted-device session refresh in wholesale-prices.js — same
+// attributes (httpOnly/secure-in-production/sameSite=lax/path=/), so a
+// freshly-logged-in session cookie and a silently-refreshed one are
+// provably byte-identical in shape, not two independently-maintained
+// definitions.
+const cookieOpts = wholesaleSessionCookieOptions;
 
 export default async function handler(req, res) {
   setPrivateHeaders(res);
@@ -178,14 +178,14 @@ export default async function handler(req, res) {
     return;
   }
 
-  // device.status === "approved" — issue a 30-day session.
-  const sessionToken = randomToken();
-  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000).toISOString();
-  await createSession(env, { shopId: shop.id, deviceId: device.id, tokenHash: sha256Hex(sessionToken), expiresAt });
+  // device.status === "approved" — issue a session via the same
+  // mintSession() helper the silent trusted-device refresh in
+  // wholesale-prices.js also calls, so both paths mint sessions identically.
+  const { sessionToken } = await mintSession(env, { shopId: shop.id, deviceId: device.id, sessionDays: WHOLESALE_SESSION_DAYS });
   await updateDevice(env, device.id, { last_seen_at: new Date().toISOString() });
   await logEvent(env, { shopId: shop.id, deviceId: device.id, event: "login_success", ip, userAgent }).catch(() => {});
 
-  setCookies.push(serialize("ws_session", sessionToken, cookieOpts(SESSION_DAYS * 24 * 60 * 60)));
+  setCookies.push(serialize("ws_session", sessionToken, cookieOpts(WHOLESALE_SESSION_DAYS * 24 * 60 * 60)));
   res.setHeader("Set-Cookie", setCookies);
   res.status(200).json({ status: "ok", shopName: shop.name });
 }

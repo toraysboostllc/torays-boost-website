@@ -11,6 +11,7 @@ import { WholesaleSoundToggle } from "../components/wholesale/WholesaleSoundTogg
 import { WholesaleWizard } from "../components/wholesale/WholesaleWizard.jsx";
 import { WholesaleSalesModule } from "../components/wholesale/WholesaleSalesModule.jsx";
 import { WholesaleLegalAcceptModal } from "../components/wholesale/WholesaleLegalAcceptModal.jsx";
+import { WholesaleEstimateDisclaimerAcceptModal } from "../components/wholesale/WholesaleEstimateDisclaimerAcceptModal.jsx";
 
 /**
  * Same auth/session model as before this round — nothing here changed:
@@ -52,6 +53,11 @@ function WholesalePricesContent() {
     warranty: null,
     errorMessage: "",
     legalDocumentId: null,
+    // Which of the two independent legal gates (master_agreement /
+    // estimate_disclaimer) is currently blocking — see fetchWholesaleCatalog's
+    // own comment in wholesaleAuth.js for how this is derived from the
+    // server's `missing` array.
+    documentType: null,
   });
 
   // Which wizard screen is currently showing — used only to hide the
@@ -82,7 +88,12 @@ function WholesalePricesContent() {
         // tab tried to accept against) re-shows the modal instead of
         // silently granting access.
         if (result.kind === "legal_required") {
-          setState((prev) => ({ ...prev, status: "legal_required", legalDocumentId: result.legalDocumentId }));
+          setState((prev) => ({
+            ...prev,
+            status: "legal_required",
+            legalDocumentId: result.legalDocumentId,
+            documentType: result.documentType,
+          }));
           return;
         }
         setState((prev) => ({ ...prev, status: "error", errorMessage: result.message }));
@@ -159,14 +170,24 @@ function WholesalePricesContent() {
   }
 
   // Blocking gate — replaces the wizard entirely (there is no catalog data
-  // to show behind it yet anyway). onAccepted re-runs loadCatalog(), which
-  // either succeeds (modal unmounts, wizard renders) or, in the unlikely
-  // case the version changed again mid-flow, re-shows this same modal with
-  // the newly-required legalDocumentId. onLogout reuses the exact same
+  // to show behind it yet anyway). Two independent gates can appear here
+  // (master_agreement, estimate_disclaimer — see wholesale-prices.js's own
+  // `missing` array comment); state.documentType picks which modal to
+  // render. onAccepted re-runs loadCatalog(), which either succeeds (modal
+  // unmounts, wizard renders) or, if another gate is still unmet (the
+  // second document type, or the version changed again mid-flow),
+  // re-shows the appropriate modal with the newly-required
+  // legalDocumentId/documentType. onLogout reuses the exact same
   // handleLogout as the rest of this page — always available, independent
-  // of the form's validity, per the modal's own header comment.
+  // of the form's validity, per each modal's own header comment.
   if (state.status === "legal_required") {
-    return (
+    return state.documentType === "estimate_disclaimer" ? (
+      <WholesaleEstimateDisclaimerAcceptModal
+        legalDocumentId={state.legalDocumentId}
+        onAccepted={loadCatalog}
+        onLogout={handleLogout}
+      />
+    ) : (
       <WholesaleLegalAcceptModal
         legalDocumentId={state.legalDocumentId}
         onAccepted={loadCatalog}

@@ -25,6 +25,7 @@ function seedApprovedShopAndDevice(fake, { shopId = fake.nextId(), deviceTokenHa
 function seedPublishedDoc(fake, overrides = {}) {
   const doc = {
     id: fake.nextId(),
+    document_type: "master_agreement",
     version: "1.0",
     status: "published",
     content_en: {},
@@ -179,6 +180,124 @@ describe("GET /api/wholesale-prices: legal-acceptance gate", () => {
     const res = await callPrices(fake);
     expect(res.statusCode).toBe(403);
     expect(res.body.error).toBe("access_revoked");
+  });
+});
+
+describe("GET /api/wholesale-prices: TWO independent legal gates (master_agreement + estimate_disclaimer), never one replacing the other", () => {
+  function seedPublishedEstimateDisclaimer(fake, overrides = {}) {
+    return seedPublishedDoc(fake, {
+      id: fake.nextId(),
+      document_type: "estimate_disclaimer",
+      version: "1.0",
+      content_en: { body: "estimates only" },
+      content_es: { body: "solo estimaciones" },
+      content_hash: "hash-disclaimer",
+      ...overrides,
+    });
+  }
+
+  it("both types published, neither accepted — 403 reports master_agreement FIRST (fixed priority order)", async () => {
+    const fake = createFakeSupabase();
+    seedApprovedShopAndDevice(fake);
+    const masterDoc = seedPublishedDoc(fake);
+    seedPublishedEstimateDisclaimer(fake);
+
+    const res = await callPrices(fake);
+    expect(res.statusCode).toBe(403);
+    expect(res.body.documentType).toBe("master_agreement");
+    expect(res.body.legalDocumentId).toBe(masterDoc.id);
+    expect(res.body.missing).toHaveLength(2);
+    expect(res.body.missing[0].documentType).toBe("master_agreement");
+    expect(res.body.missing[1].documentType).toBe("estimate_disclaimer");
+  });
+
+  it("master_agreement accepted, estimate_disclaimer not — 403 now reports estimate_disclaimer, with exactly one entry in `missing`", async () => {
+    const fake = createFakeSupabase();
+    const { shopId, deviceId } = seedApprovedShopAndDevice(fake);
+    const masterDoc = seedPublishedDoc(fake);
+    const disclaimerDoc = seedPublishedEstimateDisclaimer(fake);
+    fake.db.wholesale_legal_acceptances.push({
+      id: fake.nextId(), shop_id: shopId, device_id: deviceId, legal_document_id: masterDoc.id,
+      representative_name: "Jane Doe", representative_title: "Owner", content_hash: masterDoc.content_hash,
+      locale: "en", accepted_at: new Date().toISOString(),
+    });
+
+    const res = await callPrices(fake);
+    expect(res.statusCode).toBe(403);
+    expect(res.body.documentType).toBe("estimate_disclaimer");
+    expect(res.body.legalDocumentId).toBe(disclaimerDoc.id);
+    expect(res.body.missing).toHaveLength(1);
+  });
+
+  it("estimate_disclaimer accepted, master_agreement not — 403 reports master_agreement (fixed priority holds regardless of which one is actually missing)", async () => {
+    const fake = createFakeSupabase();
+    const { shopId, deviceId } = seedApprovedShopAndDevice(fake);
+    const masterDoc = seedPublishedDoc(fake);
+    const disclaimerDoc = seedPublishedEstimateDisclaimer(fake);
+    fake.db.wholesale_estimate_disclaimer_acceptances.push({
+      id: fake.nextId(), shop_id: shopId, device_id: deviceId, legal_document_id: disclaimerDoc.id,
+      accepts_terms: true, content_hash: disclaimerDoc.content_hash, locale: "en", accepted_at: new Date().toISOString(),
+    });
+
+    const res = await callPrices(fake);
+    expect(res.statusCode).toBe(403);
+    expect(res.body.documentType).toBe("master_agreement");
+    expect(res.body.legalDocumentId).toBe(masterDoc.id);
+  });
+
+  it("both accepted — 200, full catalog, and warranty/salesModule/equipmentTypes all present (no regression from the dual-gate change)", async () => {
+    const fake = createFakeSupabase();
+    const { shopId, deviceId } = seedApprovedShopAndDevice(fake);
+    const masterDoc = seedPublishedDoc(fake);
+    const disclaimerDoc = seedPublishedEstimateDisclaimer(fake);
+    fake.db.wholesale_legal_acceptances.push({
+      id: fake.nextId(), shop_id: shopId, device_id: deviceId, legal_document_id: masterDoc.id,
+      representative_name: "Jane Doe", representative_title: "Owner", content_hash: masterDoc.content_hash,
+      locale: "en", accepted_at: new Date().toISOString(),
+    });
+    fake.db.wholesale_estimate_disclaimer_acceptances.push({
+      id: fake.nextId(), shop_id: shopId, device_id: deviceId, legal_document_id: disclaimerDoc.id,
+      accepts_terms: true, content_hash: disclaimerDoc.content_hash, locale: "en", accepted_at: new Date().toISOString(),
+    });
+
+    const res = await callPrices(fake);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.error).toBeUndefined();
+    expect(res.body.equipmentTypes).toBeDefined();
+  });
+
+  it("only estimate_disclaimer has ever been published (no master_agreement row at all) — gate correctly activates for estimate_disclaimer alone", async () => {
+    const fake = createFakeSupabase();
+    seedApprovedShopAndDevice(fake);
+    const disclaimerDoc = seedPublishedEstimateDisclaimer(fake);
+
+    const res = await callPrices(fake);
+    expect(res.statusCode).toBe(403);
+    expect(res.body.documentType).toBe("estimate_disclaimer");
+    expect(res.body.legalDocumentId).toBe(disclaimerDoc.id);
+    expect(res.body.missing).toHaveLength(1);
+  });
+
+  it("an acceptance recorded against an OLDER, superseded estimate_disclaimer version does not satisfy the gate for the new one — independent of the master_agreement's own superseding", async () => {
+    const fake = createFakeSupabase();
+    const { shopId, deviceId } = seedApprovedShopAndDevice(fake);
+    const masterDoc = seedPublishedDoc(fake);
+    fake.db.wholesale_legal_acceptances.push({
+      id: fake.nextId(), shop_id: shopId, device_id: deviceId, legal_document_id: masterDoc.id,
+      representative_name: "Jane Doe", representative_title: "Owner", content_hash: masterDoc.content_hash,
+      locale: "en", accepted_at: new Date().toISOString(),
+    });
+    const oldDisclaimer = seedPublishedEstimateDisclaimer(fake, { id: "old-disclaimer", version: "1.0", status: "superseded" });
+    const newDisclaimer = seedPublishedEstimateDisclaimer(fake, { id: "new-disclaimer", version: "2.0" });
+    fake.db.wholesale_estimate_disclaimer_acceptances.push({
+      id: fake.nextId(), shop_id: shopId, device_id: deviceId, legal_document_id: oldDisclaimer.id,
+      accepts_terms: true, content_hash: oldDisclaimer.content_hash, locale: "en", accepted_at: new Date().toISOString(),
+    });
+
+    const res = await callPrices(fake);
+    expect(res.statusCode).toBe(403);
+    expect(res.body.documentType).toBe("estimate_disclaimer");
+    expect(res.body.legalDocumentId).toBe(newDisclaimer.id);
   });
 });
 

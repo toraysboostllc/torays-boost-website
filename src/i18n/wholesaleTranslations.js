@@ -137,6 +137,11 @@ export const wholesaleTranslations = {
         repair_warranty_terms: "Wholesale Repair, Diagnostic & Warranty Terms",
         econsent_disclosure: "Electronic Consent & Records Disclosure",
       },
+      // Distinct display title from docNames.pricing_disclaimer above (a
+      // section INSIDE the 6-document master bundle) — this is a genuinely
+      // separate, standalone document (see wholesale-legal-document-types-
+      // migration.sql's own header for why the two are kept apart).
+      estimateDisclaimerTitle: "Estimate Terms & Conditions",
     },
     legalAccept: {
       heading: "Before you continue",
@@ -158,6 +163,18 @@ export const wholesaleTranslations = {
       logout: "Log out",
       errorGeneric: "Could not record your acceptance. Please try again.",
       errorAllBoxes: "All 5 checkboxes must be accepted.",
+      errorSuperseded: "This version is no longer current — please refresh and try again.",
+    },
+    estimateDisclaimerAccept: {
+      heading: "Before you continue",
+      subheading: "Please review and accept the following before viewing wholesale price estimates.",
+      readLink: "Read the Estimate Terms & Conditions",
+      checkboxLabel: "I have read and accept the Terms and Conditions.",
+      accept: "Accept and Enter",
+      accepting: "Recording…",
+      logout: "Log out",
+      errorGeneric: "Could not record your acceptance. Please try again.",
+      errorCheckbox: "You must accept the Terms and Conditions to continue.",
       errorSuperseded: "This version is no longer current — please refresh and try again.",
     },
   },
@@ -281,6 +298,7 @@ export const wholesaleTranslations = {
         repair_warranty_terms: "Términos de Reparación, Diagnóstico y Garantía Mayorista",
         econsent_disclosure: "Aviso de Consentimiento Electrónico y Divulgación de Registros",
       },
+      estimateDisclaimerTitle: "Términos y Condiciones de la Estimación",
     },
     legalAccept: {
       heading: "Antes de continuar",
@@ -302,6 +320,18 @@ export const wholesaleTranslations = {
       logout: "Cerrar sesión",
       errorGeneric: "No pudimos registrar tu aceptación. Por favor intenta de nuevo.",
       errorAllBoxes: "Las 5 casillas deben estar aceptadas.",
+      errorSuperseded: "Esta versión ya no es la vigente — por favor actualiza la página e intenta de nuevo.",
+    },
+    estimateDisclaimerAccept: {
+      heading: "Antes de continuar",
+      subheading: "Por favor revisa y acepta lo siguiente antes de consultar las estimaciones de precios mayoristas.",
+      readLink: "Leer los Términos y Condiciones de la Estimación",
+      checkboxLabel: "He leído y acepto los Términos y Condiciones.",
+      accept: "Aceptar y entrar",
+      accepting: "Registrando…",
+      logout: "Cerrar sesión",
+      errorGeneric: "No pudimos registrar tu aceptación. Por favor intenta de nuevo.",
+      errorCheckbox: "Debes aceptar los Términos y Condiciones para continuar.",
       errorSuperseded: "Esta versión ya no es la vigente — por favor actualiza la página e intenta de nuevo.",
     },
   },

@@ -31,6 +31,7 @@ function seedApprovedShopAndDevice() {
 function seedPublishedDoc(overrides = {}) {
   const doc = {
     id: fake.nextId(),
+    document_type: "master_agreement",
     version: "1.0",
     status: "published",
     content_en: {},

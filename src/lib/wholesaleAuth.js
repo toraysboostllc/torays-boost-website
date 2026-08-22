@@ -36,10 +36,15 @@ export async function wholesaleLogin(shopName, code) {
  * "legal_required" is its own distinct kind, not folded into "auth" — a
  * 403 with error: 'legal_acceptance_required' (see api/wholesale-prices.js)
  * means the session and device are both genuinely fine; the shop just needs
- * to see the clickwrap modal before the catalog is released, which is a
+ * to see one of the legal gates before the catalog is released, which is a
  * completely different UI response than "redirect to the login screen".
- * legalDocumentId/version travel through so the caller can pass them
- * straight to acceptWholesaleLegalTerms() below without a second fetch.
+ * There are now TWO independent gates (the master agreement and the
+ * lightweight Estimate Disclaimer), reported by the server as a `missing`
+ * array in a fixed priority order — `documentType`/`legalDocumentId`/
+ * `version` here mirror `missing[0]` (the single gate the caller should
+ * show right now); accepting it and calling fetchWholesaleCatalog() again
+ * naturally surfaces the next one, if any, with no client-side sequencing
+ * logic needed.
  */
 export async function fetchWholesaleCatalog() {
   let res;
@@ -52,11 +57,16 @@ export async function fetchWholesaleCatalog() {
   const data = await res.json().catch(() => ({}));
 
   if (res.status === 403 && data.error === "legal_acceptance_required") {
+    const missing = Array.isArray(data.missing) && data.missing.length ? data.missing : [
+      { documentType: data.documentType, legalDocumentId: data.legalDocumentId, version: data.version },
+    ];
     return {
       ok: false,
       kind: "legal_required",
-      legalDocumentId: data.legalDocumentId,
-      version: data.version,
+      missing,
+      documentType: missing[0].documentType,
+      legalDocumentId: missing[0].legalDocumentId,
+      version: missing[0].version,
       message: data.message || "Legal acceptance required.",
     };
   }
@@ -136,6 +146,56 @@ export async function acceptWholesaleLegalTerms({ legalDocumentId, representativ
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ legalDocumentId, representativeName, representativeTitle, checkboxes, locale }),
+    });
+  } catch {
+    return { ok: false, message: "Could not reach the server." };
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return { ok: false, error: data.error, message: data.message || "Could not record acceptance." };
+  }
+  return { ok: true };
+}
+
+/**
+ * The lightweight Estimate Disclaimer — a single bilingual body of text,
+ * accepted with one checkbox, independent of and in parallel with the
+ * master agreement above (see wholesale-legal-document-types-migration.sql
+ * for the full "why two document types" reasoning). Same public,
+ * no-auth, never-throws shape as fetchWholesaleLegalDocuments() above.
+ */
+export async function fetchWholesaleEstimateDisclaimer() {
+  let res;
+  try {
+    res = await fetch("/api/wholesale-estimate-disclaimer", { credentials: "same-origin" });
+  } catch {
+    return { ok: false, message: "Could not reach the server." };
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return { ok: false, message: data.message || "Could not load the estimate disclaimer." };
+  }
+  return {
+    ok: true,
+    version: data.version,
+    content_en: data.content_en,
+    content_es: data.content_es,
+    content_hash: data.content_hash,
+    published_at: data.published_at,
+  };
+}
+
+/** Submits the single-checkbox acceptance — no representative name/title,
+ *  matching api/wholesale-accept-estimate-disclaimer.js's own lighter
+ *  payload shape. */
+export async function acceptWholesaleEstimateDisclaimer({ legalDocumentId, accepted, locale }) {
+  let res;
+  try {
+    res = await fetch("/api/wholesale-accept-estimate-disclaimer", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ legalDocumentId, accepted, locale }),
     });
   } catch {
     return { ok: false, message: "Could not reach the server." };

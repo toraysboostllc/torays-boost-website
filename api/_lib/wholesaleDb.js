@@ -185,6 +185,142 @@ export async function getDeviceById(env, id) {
   return rows[0] || null;
 }
 
+/* ===========================================================================
+ * Persistent trusted device — silent session refresh. Reuses the exact same
+ * cookie/token/hash primitives wholesale-login.js already established
+ * (ws_device: 400-day, sha256-hashed, DB-tracked device.status; ws_session:
+ * 30-day, revocable, DB-checked every request) — never a parallel mechanism.
+ * On a return visit where ws_session is missing/expired but ws_device is
+ * still present and approved, wholesale-prices.js calls
+ * attemptSilentDeviceSessionRefresh() below BEFORE giving up with 401, so a
+ * shop that already completed login + device approval once never has to
+ * re-enter Shop Name/Access Code just because 30 days passed, as long as
+ * nothing has explicitly revoked that trust in the meantime (logout, Close
+ * sessions, a code change, a device revoke, or the shop being blocked — see
+ * that function's own header for exactly how each is distinguished from a
+ * plain time-expiry using only columns that already exist).
+ * ===========================================================================
+ */
+
+export const WHOLESALE_SESSION_DAYS = 30; // single source of truth — both
+  // wholesale-login.js's real login and this file's silent refresh mint
+  // sessions with this exact same lifetime, so the two paths can never
+  // silently drift apart.
+
+/** Same cookie attributes wholesale-login.js already sets for both
+ *  ws_session and ws_device (httpOnly/secure-in-production/sameSite=lax/
+ *  path=/) — exported so the silently-refreshed cookie is provably
+ *  byte-identical in shape to a freshly-issued one, not a re-derived
+ *  parallel definition. */
+export function wholesaleSessionCookieOptions(maxAgeSeconds) {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: maxAgeSeconds,
+  };
+}
+
+/** Looks up a device by its token hash alone, with NO shop_id scoping —
+ *  unlike findDeviceByTokenHash() above (used at login, where the shop is
+ *  already known from the shopName field the shop just typed), a bare
+ *  ws_device cookie on a silent-refresh attempt doesn't come with a shop
+ *  name attached, so the shop has to be resolved FROM the device. This
+ *  mirrors findActiveSessionByTokenHash()'s own established "look up by
+ *  hash alone, no extra scoping" convention above — device_token_hash, like
+ *  session_token_hash, is a 32-byte cryptographically random value where a
+ *  cross-shop collision is not a realistic concern. */
+export async function findDeviceByTokenHashAnyShop(env, tokenHash) {
+  const rows = await rest(env, `wholesale_devices?device_token_hash=eq.${tokenHash}&select=*`);
+  return rows[0] || null;
+}
+
+/** The single most recent session ever created for this device, in ANY
+ *  state (active, expired, or revoked) — deliberately not filtered to
+ *  "currently active" the way findActiveSessionByTokenHash() is, because
+ *  attemptSilentDeviceSessionRefresh() below needs to see whether the most
+ *  recent one was ever explicitly revoked, not just whether one happens to
+ *  still be valid right now. */
+export async function findMostRecentSessionForDevice(env, deviceId) {
+  const rows = await rest(env, `wholesale_sessions?device_id=eq.${deviceId}&select=*&order=created_at.desc&limit=1`);
+  return rows[0] || null;
+}
+
+/** Mints and stores a brand-new session for an already-approved device —
+ *  extracted from wholesale-login.js's own inline session-issuing block so
+ *  both the real login path and the silent-refresh path below call the
+ *  SAME code, never two independent reimplementations of "create a session
+ *  token, hash it, store it, hand back the plaintext token to set as a
+ *  cookie." Returns the plaintext token (never stored anywhere itself —
+ *  only its hash is) so the caller can set the ws_session cookie. */
+export async function mintSession(env, { shopId, deviceId, sessionDays }) {
+  const sessionToken = randomToken();
+  const expiresAt = new Date(Date.now() + sessionDays * 24 * 60 * 60 * 1000).toISOString();
+  await createSession(env, { shopId, deviceId, tokenHash: sha256Hex(sessionToken), expiresAt });
+  return { sessionToken, expiresAt };
+}
+
+/** The core of persistent trusted-device login. Returns null (never
+ *  throws) in every case where a silent refresh must NOT happen — which
+ *  includes every existing explicit-revocation cause the owner listed:
+ *
+ *   - Logout: revokeSessionByTokenHash() sets revoked_at on that session
+ *     row. ws_device is deliberately left alone by logout (see
+ *     wholesale-logout.js), so the device itself still looks "approved" —
+ *     but its MOST RECENT session now has revoked_at set, which is exactly
+ *     what the check below catches.
+ *   - Admin uses "Close sessions": revokes every session for the shop the
+ *     same way (revoked_at set), without touching the device at all — same
+ *     signal, same result: declined.
+ *   - Admin changes the Access Code (wholesale_regenerate_shop_code):
+ *     revokes every session AND flips every device to 'revoked' — caught
+ *     by the device.status !== 'approved' check below, independently of
+ *     the session check.
+ *   - Admin revokes/rejects a single device: same device.status check.
+ *   - Shop blocked: same shop.status check already used everywhere else.
+ *   - A device with a cookie that doesn't match any row (new browser, or a
+ *     tampered/bogus token): findDeviceByTokenHashAnyShop returns null.
+ *
+ *  A device that simply has NO session yet (approved by an admin, but the
+ *  shop never actually completed a login on this browser) is treated the
+ *  same as "nothing to have been revoked" — proceed. This function never
+ *  creates a wholesale_devices row under any circumstance; an unrecognized
+ *  device cookie always falls through to the ordinary "please log in"
+ *  path, exactly like having no cookie at all — the "every new device
+ *  starts pending" rule in wholesale-login.js is completely untouched by
+ *  this code path. */
+export async function attemptSilentDeviceSessionRefresh(env, { deviceTokenHash, ip, userAgent }) {
+  const device = await findDeviceByTokenHashAnyShop(env, deviceTokenHash).catch(() => null);
+  if (!device || device.status !== "approved") return null;
+
+  const shop = await getShopById(env, device.shop_id).catch(() => null);
+  if (!shop || shop.status !== "active") return null;
+
+  // Distinguishes "this device's session merely expired by the calendar"
+  // (revoked_at still null — proceed) from "something explicitly ended
+  // this trust" (revoked_at set — decline, exactly as if no device cookie
+  // had been sent at all). No new column needed: revoked_at already means
+  // exactly this everywhere else in the codebase.
+  const mostRecent = await findMostRecentSessionForDevice(env, device.id).catch(() => null);
+  if (mostRecent && mostRecent.revoked_at) return null;
+
+  const { sessionToken } = await mintSession(env, {
+    shopId: shop.id,
+    deviceId: device.id,
+    sessionDays: WHOLESALE_SESSION_DAYS,
+  });
+  await logEvent(env, {
+    shopId: shop.id,
+    deviceId: device.id,
+    event: "session_silently_refreshed",
+    ip,
+    userAgent,
+  }).catch(() => {});
+
+  return { sessionToken, shop, device };
+}
+
 /** Active categories with their active services nested — what a logged-in shop sees.
  *  Kept for tests/wholesaleCatalogSeed.test.js, which verifies the seed data's
  *  visibility independently of the equipment-type/image response shape below —
@@ -587,17 +723,36 @@ export function clientIp(req) {
 
 /** The single currently-live version of the 6-document bundle, or `null`
  *  if nothing has ever been published yet (a fresh install before an admin
- *  runs wholesale_publish_legal_document) — callers must treat `null` as
- *  "the legal-acceptance gate is not active yet", never as an error. The
- *  partial unique index in the migration (idx_wholesale_legal_documents_
- *  one_published) guarantees at most one row can ever have
- *  status=eq.published, so `rows[0]` is always the right (and only) one. */
-export async function getPublishedLegalDocument(env) {
+ *  runs wholesale_publish_legal_document_v2) — callers must treat `null` as
+ *  "the legal-acceptance gate is not active yet for this type", never as an
+ *  error. Since wholesale-legal-document-types-migration.sql, the "at most
+ *  one published row" guarantee is scoped PER document_type
+ *  (idx_wholesale_legal_documents_one_published_per_type) — a bare
+ *  status=eq.published filter with no type would return one row per
+ *  existing type, so `documentType` is always required and `rows[0]` is
+ *  the right (and only) one FOR THAT TYPE. */
+export async function getPublishedLegalDocumentByType(env, documentType) {
   const rows = await rest(
     env,
-    `wholesale_legal_documents?status=eq.published&select=id,version,content_en,content_es,content_hash,published_at`
+    `wholesale_legal_documents?status=eq.published&document_type=eq.${documentType}&select=id,version,content_en,content_es,content_hash,published_at`
   );
   return rows[0] || null;
+}
+
+/** The original master-agreement bundle (6 documents, EN+ES) — kept as its
+ *  own exported name so every existing caller (wholesale-prices.js,
+ *  wholesale-legal-documents.js) needs zero changes; it is now a thin,
+ *  type-scoped call into getPublishedLegalDocumentByType above. */
+export function getPublishedLegalDocument(env) {
+  return getPublishedLegalDocumentByType(env, "master_agreement");
+}
+
+/** The new, lightweight standalone disclaimer — accepted IN PARALLEL with
+ *  the master agreement above, never instead of it. See wholesale-legal-
+ *  document-types-migration.sql's own header for the full "why two
+ *  independent document types" reasoning. */
+export function getPublishedEstimateDisclaimer(env) {
+  return getPublishedLegalDocumentByType(env, "estimate_disclaimer");
 }
 
 /** Whether this shop already has a recorded acceptance of this exact
@@ -608,6 +763,16 @@ export async function hasAcceptedLegalDocument(env, shopId, legalDocumentId) {
   const rows = await rest(
     env,
     `wholesale_legal_acceptances?shop_id=eq.${shopId}&legal_document_id=eq.${legalDocumentId}&select=id&limit=1`
+  );
+  return rows.length > 0;
+}
+
+/** Same shape as hasAcceptedLegalDocument, against the estimate disclaimer's
+ *  own separate acceptances table. */
+export async function hasAcceptedEstimateDisclaimer(env, shopId, legalDocumentId) {
+  const rows = await rest(
+    env,
+    `wholesale_estimate_disclaimer_acceptances?shop_id=eq.${shopId}&legal_document_id=eq.${legalDocumentId}&select=id&limit=1`
   );
   return rows.length > 0;
 }

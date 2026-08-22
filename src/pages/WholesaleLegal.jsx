@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Printer } from "lucide-react";
 import { Logo } from "../components/ui/Logo.jsx";
 import { useSEO } from "../lib/seo.js";
-import { fetchWholesaleLegalDocuments } from "../lib/wholesaleAuth.js";
+import { fetchWholesaleLegalDocuments, fetchWholesaleEstimateDisclaimer } from "../lib/wholesaleAuth.js";
 import { wholesaleHoverProps } from "../lib/wholesaleSound.js";
 import { WholesaleLocaleProvider, useWholesaleLocale } from "../i18n/WholesaleLocaleContext.jsx";
 import { WholesaleLocaleSelector } from "../components/wholesale/WholesaleLocaleSelector.jsx";
@@ -69,6 +69,12 @@ function WholesaleLegalContent() {
   useSEO({ title: "Torays Boost Pro — Legal Documents", noindex: true });
 
   const [state, setState] = useState({ status: "loading", doc: null, errorMessage: "" });
+  // Fetched independently of the master bundle above, and never blocks this
+  // page's own loading/error state — the Estimate Disclaimer is a separate,
+  // independently-published document (see wholesale-legal-document-types-
+  // migration.sql). A shop that hasn't been shown this document yet (none
+  // published) simply gets no extra section, not a page-wide error.
+  const [estimateDoc, setEstimateDoc] = useState(null);
 
   function load() {
     setState({ status: "loading", doc: null, errorMessage: "" });
@@ -78,6 +84,9 @@ function WholesaleLegalContent() {
         return;
       }
       setState({ status: "ready", doc: result, errorMessage: "" });
+    });
+    fetchWholesaleEstimateDisclaimer().then((result) => {
+      setEstimateDoc(result.ok ? result : null);
     });
   }
 
@@ -168,6 +177,23 @@ function WholesaleLegalContent() {
                     />
                   );
                 })}
+                {/* Estimate Disclaimer — a separate, independently-published
+                    document (see wholesale-legal-document-types-migration.sql),
+                    not one of the 6 sections above. Its content_en/content_es
+                    are genuinely {body: "..."} objects (unlike the master
+                    bundle's plain-string sections above), so LegalDocSection's
+                    existing doc?.body read works correctly here without
+                    modification. Renders nothing at all when nothing has been
+                    published for this type yet — never an empty section. */}
+                {estimateDoc && (
+                  <LegalDocSection
+                    docKey="estimate_disclaimer"
+                    fallbackTitle={t("legal.estimateDisclaimerTitle")}
+                    contentEn={estimateDoc.content_en}
+                    contentEs={estimateDoc.content_es}
+                    onPrint={() => printOnly("estimate_disclaimer")}
+                  />
+                )}
               </div>
             </>
           )}

@@ -24,6 +24,9 @@ export function createFakeSupabase() {
     // row into wholesale_legal_documents.
     wholesale_legal_documents: [],
     wholesale_legal_acceptances: [],
+    // Second, independent legal document type — see wholesale-legal-
+    // document-types-migration.sql. Same empty-by-default convention.
+    wholesale_estimate_disclaimer_acceptances: [],
     // Seeded with the same single default row
     // wholesale-pricing-intelligence-migration.sql inserts for real (id=1) —
     // every test starts from the post-migration state, not a fresh-install
@@ -252,6 +255,39 @@ export function createFakeSupabase() {
           understands_tiers_optional: true,
           understands_independent_pricing: true,
           accepts_confidentiality: true,
+          content_hash: doc.content_hash,
+          locale: body.p_locale,
+          ip: body.p_ip ?? null,
+          user_agent: body.p_user_agent ?? null,
+          accepted_at: new Date().toISOString(),
+        });
+        return jsonResponse(200, id);
+      }
+      // Mirrors wholesale_accept_estimate_disclaimer() (see wholesale-legal-
+      // document-types-migration.sql) — single boolean, no representative
+      // name/title, requires the CURRENTLY published estimate_disclaimer row
+      // (rejects a master_agreement id or a superseded one via the same
+      // status/document_type filter the real RPC uses).
+      if (table === "wholesale_accept_estimate_disclaimer") {
+        if (body.p_accepts_terms !== true) return jsonResponse(400, { message: "checkbox_required" });
+        if (body.p_locale !== "en" && body.p_locale !== "es") {
+          return jsonResponse(400, { message: "invalid_locale" });
+        }
+        const doc = db.wholesale_legal_documents.find(
+          (d) => d.id === body.p_legal_document_id && d.status === "published" && d.document_type === "estimate_disclaimer"
+        );
+        if (!doc) return jsonResponse(400, { message: "document_not_published" });
+        const shop = db.wholesale_shops.find((s) => s.id === body.p_shop_id && s.status === "active");
+        if (!shop) return jsonResponse(400, { message: "shop_not_active" });
+
+        const id = nextId();
+        db.wholesale_estimate_disclaimer_acceptances.push({
+          id,
+          shop_id: body.p_shop_id,
+          device_id: body.p_device_id,
+          session_id: body.p_session_id,
+          legal_document_id: body.p_legal_document_id,
+          accepts_terms: true,
           content_hash: doc.content_hash,
           locale: body.p_locale,
           ip: body.p_ip ?? null,
