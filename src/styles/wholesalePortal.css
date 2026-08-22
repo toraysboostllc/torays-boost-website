@@ -988,28 +988,56 @@
 /* Large service photo — placed after the full quote block (cost, tiers,
    recommendation, the "Consult another price" button) and before the
    sibling Torays Boost Sales module (see WholesaleWizard.jsx/
-   WholesalePrices.jsx: this card and that module are adjacent siblings, so
-   the end of this card IS "right above Sales"). Centered, generous but
-   controlled on desktop, edge-to-edge with zero horizontal overflow on
-   mobile — a single width:100%/max-width pair does both without a
-   breakpoint: on a narrow phone the card itself is well under the
-   max-width, so 100% already fills it; on a wide desktop card the
-   max-width caps it instead of stretching edge to edge. height:auto (no
-   fixed aspect-ratio box, unlike the small list/card thumbnails elsewhere
-   in this file) is what preserves the photo's real original proportions —
-   never cropped or distorted to fit a fixed box. */
+   WholesalePrices.jsx: this card and that module are adjacent siblings).
+   margin-bottom here is the deliberate fix for a real visual bug: the
+   photo used to sit flush against this card's own bottom edge (the card's
+   own vertical padding is a `clamp(0px, 0.15vh, 24px)` "no-scroll spec"
+   value that shrinks toward 0 on short viewports — see .wsp-result-panel
+   above), reading as cramped against both this card's edge and the Sales
+   module right below it. >=24px here guarantees real breathing room
+   AFTER the frame regardless of viewport height, without touching that
+   shared no-scroll padding value (which every other screen still
+   depends on) or the separate wizard<->Sales gap in
+   .wsp-wizard-sales-group. */
 .wsp-result-photo-block {
   margin-top: 14px;
-  text-align: center;
+  margin-bottom: 24px;
 }
 
-.wsp-result-photo-large {
-  display: inline-block;
+/* The professional frame itself — soft background, thin border, rounded
+   corners, a very subtle shadow. box-sizing:border-box + max-width so the
+   ~540px desktop cap already includes this frame's own padding (the photo
+   itself is correspondingly a bit narrower than 540px, inside that
+   padding) — one predictable outer size, not two numbers to reconcile.
+   margin:0 auto centers it; width:100% + the max-width is what makes it
+   edge-to-edge (up to the card's own side padding) with zero horizontal
+   overflow on mobile and capped-but-generous on desktop, the same
+   one-rule-handles-both-breakpoints pattern already used elsewhere in
+   this file. */
+.wsp-result-photo-frame {
+  box-sizing: border-box;
+  display: block;
   width: 100%;
-  max-width: 480px;
-  height: auto;
+  max-width: 540px;
+  margin: 0 auto;
+  padding: 14px;
   border-radius: 16px;
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.12);
+  background: var(--wsp-card-bg-hover);
+  border: 1px solid var(--wsp-card-border);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.07);
+}
+
+/* The photo fills the frame's own padding box exactly — height:auto (no
+   fixed aspect-ratio box, unlike the small list/card thumbnails elsewhere
+   in this file) is what preserves the photo's real original proportions,
+   never cropped or distorted to fit a fixed box. A slightly smaller
+   radius than the frame's own 16px gives the nested-inside-a-frame look
+   instead of two identical concentric corners. */
+.wsp-result-photo-large {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
 }
 
 .wsp-result-diagnostic-note {

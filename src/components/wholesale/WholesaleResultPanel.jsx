@@ -285,19 +285,30 @@ export function WholesaleResultPanel({ selection, service, onConsultAnother }) {
           recommendation, this button) and before the sibling Torays Boost
           Sales module that WholesaleWizard.jsx renders right after this
           card. Renders nothing at all when the service has no photo — no
-          empty box. size is intentionally omitted (see ServicePhoto's own
-          header) so the image keeps its real, original aspect ratio;
-          wsp-result-photo-large's own CSS (width:100%, a controlled
-          max-width, height:auto) is what makes it wide-but-controlled on
-          desktop and edge-to-edge with zero horizontal overflow on
-          mobile. */}
+          empty box, no empty frame.
+          wsp-result-photo-block reserves >=24px of space AFTER the frame,
+          before this panel ends — the frame no longer sits flush against
+          the card's own bottom edge or (by extension) the Torays Boost
+          Sales module right below it. wsp-result-photo-frame is the
+          professional soft-background/thin-border/rounded/subtle-shadow
+          container (see wholesalePortal.css); it — not the <img> itself —
+          owns the width:100%/max-width:540px/padding, so the padding
+          visually surrounds the photo rather than the photo touching the
+          frame's edges. size is intentionally omitted on ServicePhoto (see
+          its own header) so the image keeps its real, original aspect
+          ratio — height:auto, never object-fit:cover — filling the
+          frame's own padding box at 100% width, edge-to-edge with zero
+          horizontal overflow on mobile the same way the frame itself
+          already is. */}
       {service.image && (
         <div className="wsp-result-photo-block">
-          <ServicePhoto
-            image={service.image}
-            alt={service.image?.alt_text || translateServiceName(service, language)}
-            className="wsp-result-photo-large"
-          />
+          <div className="wsp-result-photo-frame">
+            <ServicePhoto
+              image={service.image}
+              alt={service.image?.alt_text || translateServiceName(service, language)}
+              className="wsp-result-photo-large"
+            />
+          </div>
         </div>
       )}
     </div>

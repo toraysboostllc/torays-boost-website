@@ -153,6 +153,11 @@ describe("WholesaleResultPanel.jsx: service description near the top, LARGE phot
     expect(between.trim()).toBe("");
   });
 
+  it("the professional frame (soft background/border/shadow, ~540px max-width, padding around the photo) wraps ServicePhoto directly inside the block — no empty frame renders either when there's no photo, since the SAME service.image gate covers both nested divs", () => {
+    const block = panelSrc.slice(photoBlockTagIdx, panelSrc.indexOf("<ServicePhoto", photoBlockTagIdx));
+    expect(block).toContain('<div className="wsp-result-photo-frame">');
+  });
+
   it("passes image={service.image} — never selectedEquipo/equipo/Microsoldering-level image — with a real alt fallback, and size is intentionally omitted so ServicePhoto renders it at its real aspect ratio, not forced into a square", () => {
     const block = panelSrc.slice(photoBlockTagIdx, panelSrc.indexOf("</div>", photoBlockTagIdx) + 6);
     expect(block).toContain("image={service.image}");
@@ -174,18 +179,19 @@ describe("WholesaleResultPanel.jsx: service description near the top, LARGE phot
 });
 
 describe("wholesalePortal.css: new photo/description classes carry no hidden/md:hidden responsive-visibility modifier — never stranded on mobile", () => {
-  it(".wsp-wizard-fault-item-photo / -label, .wsp-result-service-description, and .wsp-result-photo-block / -large all exist and are unconditionally visible", () => {
+  it(".wsp-wizard-fault-item-photo / -label, .wsp-result-service-description, and .wsp-result-photo-block / -frame / -large all exist and are unconditionally visible", () => {
     for (const cls of [
       ".wsp-wizard-fault-item-photo",
       ".wsp-wizard-fault-item-label",
       ".wsp-result-service-description",
       ".wsp-result-photo-block",
+      ".wsp-result-photo-frame",
       ".wsp-result-photo-large",
     ]) {
       expect(cssSrc).toContain(`${cls} {`);
     }
     expect(cssSrc).not.toMatch(/\.wsp-wizard-fault-item-photo\s*\{[^}]*display:\s*none/);
-    expect(cssSrc).not.toMatch(/\.wsp-result-photo-(block|large)\s*\{[^}]*display:\s*none/);
+    expect(cssSrc).not.toMatch(/\.wsp-result-photo-(block|frame|large)\s*\{[^}]*display:\s*none/);
   });
 
   it("the fault-item thumbnail is a fixed square with object-fit so a tall/wide source image never distorts or breaks the row's height on any breakpoint", () => {
@@ -196,14 +202,36 @@ describe("wholesalePortal.css: new photo/description classes carry no hidden/md:
     expect(block).toMatch(/object-fit:\s*cover/);
   });
 
-  it("the LARGE result photo is width:100% + a max-width cap + height:auto — never a fixed square, never a fixed aspect-ratio box: this is what preserves the source photo's real proportions on both desktop (wide but capped) and mobile (100%, no horizontal overflow) with the same rule", () => {
+  it("the LARGE result photo is width:100% + height:auto inside its own frame — never a fixed square, never a fixed aspect-ratio box: this is what preserves the source photo's real proportions on both desktop and mobile (the frame, not the photo itself, owns the max-width cap — see the next test)", () => {
     const idx = cssSrc.indexOf(".wsp-result-photo-large {");
     const block = cssSrc.slice(idx, cssSrc.indexOf("}", idx));
     expect(block).toMatch(/width:\s*100%/);
-    expect(block).toMatch(/max-width:\s*\d+px/);
     expect(block).toMatch(/height:\s*auto/);
     expect(block).not.toMatch(/aspect-ratio/);
     expect(block).not.toMatch(/object-fit:\s*cover/); // cover would crop — this photo must never be cropped
+  });
+
+  it(".wsp-result-photo-frame is the professional container around the photo — soft background, thin border, rounded corners, a very subtle shadow, padding around the image, width:100% capped at ~540px on desktop, centered — reusing existing tokens only", () => {
+    const idx = cssSrc.indexOf(".wsp-result-photo-frame {");
+    expect(idx).toBeGreaterThan(-1);
+    const block = cssSrc.slice(idx, cssSrc.indexOf("}", idx));
+    expect(block).toMatch(/width:\s*100%/);
+    expect(block).toMatch(/max-width:\s*540px/);
+    expect(block).toMatch(/margin:\s*0 auto/);
+    expect(block).toMatch(/padding:\s*\d+px/);
+    expect(block).toMatch(/border-radius:\s*\d+px/);
+    expect(block).toContain("background: var(--wsp-card-bg-hover);");
+    expect(block).toContain("border: 1px solid var(--wsp-card-border);");
+    // Subtle — low, single-digit-percent opacity, never a heavy/dark shadow.
+    expect(block).toMatch(/box-shadow:\s*0 \d+px \d+px rgba\(15, 23, 42, 0\.0\d\)/);
+  });
+
+  it(".wsp-result-photo-block reserves real space (>=24px) AFTER the frame, so it never sits flush against this card's own bottom edge or the Torays Boost Sales module right below it", () => {
+    const idx = cssSrc.indexOf(".wsp-result-photo-block {");
+    const block = cssSrc.slice(idx, cssSrc.indexOf("}", idx));
+    const match = block.match(/margin-bottom:\s*(\d+)px/);
+    expect(match).not.toBeNull();
+    expect(Number(match[1])).toBeGreaterThanOrEqual(24);
   });
 
   it("reuses existing design tokens for the description text color — no new hardcoded hex introduced by this change", () => {
