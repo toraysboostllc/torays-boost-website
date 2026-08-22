@@ -13,13 +13,33 @@ import { WholesaleResultPanel } from "./WholesaleResultPanel.jsx";
 /**
  * Equipo -> Modelo -> Falla progress indicator, shown above every selection
  * screen (never on the progress/result screens, which already communicate
- * their own state). A step is "done" once its real selection exists in
- * state — never a static decoration — so it stays honest even though a
- * 1-model Equipo skips straight past the Modelo screen (see
- * handleSelectEquipo below): that still marks Modelo done, because a model
- * WAS resolved, just not through an extra screen. The CURRENT step (the
- * first one not yet done) additionally gets `wsp-wizard-step-active` so it
- * reads clearly as "you are here", distinct from both done and upcoming.
+ * their own state).
+ *
+ * Each step's "done" state is derived from the CURRENT screen the caller
+ * passes in (see equipoDone/modeloDone/fallaDone at the WizardSteps call
+ * site below) — never from whether a selection object merely still exists
+ * in state. This matters for a real, reported bug: selectedEquipo/
+ * selectedModel/selectedService are only ever CLEARED by resetToTop(), not
+ * by goBack() (goBack only pops the screen stack — see
+ * lib/wizardScreenStack.js), so a shop that picks Equipo -> Modelo -> Falla
+ * and then presses Back twice, landing back on the Equipo grid, would keep
+ * seeing steps 1 and 2 marked "done" and step 3 "active" — the stepper
+ * claiming a position the shop isn't actually looking at — if done-ness
+ * were derived from the stale selection objects instead of from `screen`.
+ * Screen-based done-ness self-corrects the instant Back changes `screen`,
+ * with zero extra state to keep in sync.
+ *
+ * Markup: each `<li>` (`.wsp-wizard-step`) is a flex column with its own
+ * `.wsp-wizard-step-row` wrapping ONLY the circle, centered inside it — the
+ * connecting line to the NEXT step is drawn by that row's own `::after`
+ * (see wholesalePortal.css), spanning from this row's horizontal center to
+ * the next column's center (equal-width flex:1 columns make that exact
+ * math trivial: left:50%, width:100%). The circle sits at a higher
+ * z-index than the line and keeps its own opaque fill, so the line visibly
+ * starts and ends AT the circles rather than crossing through them or
+ * stopping short — never a separate flex-sibling "line" element competing
+ * for row width with the circle, which is what previously pushed the
+ * circle off-center from the label below it.
  */
 function WizardSteps({ equipoDone, modeloDone, fallaDone, t }) {
   const steps = [
@@ -39,7 +59,6 @@ function WizardSteps({ equipoDone, modeloDone, fallaDone, t }) {
             <span className="wsp-wizard-step-circle" aria-hidden="true">
               {step.done ? <Check size={14} /> : i + 1}
             </span>
-            {i < steps.length - 1 && <span className="wsp-wizard-step-line" aria-hidden="true" />}
           </span>
           <span className="wsp-wizard-step-label">{step.label}</span>
         </li>
@@ -134,9 +153,11 @@ export function WholesaleWizard({ equipmentTypes, microsolderingEquipmentType, l
     <div className="wsp-wizard">
       {showSteps && (
         <WizardSteps
-          equipoDone={Boolean(selectedEquipo)}
-          modeloDone={Boolean(selectedModel)}
-          fallaDone={Boolean(selectedService)}
+          // Screen-derived, not selection-derived — see WizardSteps' own
+          // header comment for the real Back-navigation bug this fixes.
+          equipoDone={screen !== TOP_SCREEN}
+          modeloDone={screen === "fault"}
+          fallaDone={screen === "progress" || screen === "result"}
           t={t}
         />
       )}

@@ -1702,6 +1702,11 @@
 }
 
 .wsp-wizard-step {
+  /* Containing block for .wsp-wizard-step-row's ::after connector below —
+     each column owns the line reaching from ITS circle to the NEXT
+     column's circle, so the line is a property of a step, not a separate
+     free-floating element. */
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1709,17 +1714,63 @@
   min-width: 0;
 }
 
+/* Wraps ONLY the circle (never the line — see ::after below), centered
+   within the full column width via justify-content. Its own height
+   naturally matches the circle's height (single flex child), which is
+   exactly what lets the ::after connector below target the circle's
+   vertical center with a plain top:50% — no separate height calculation
+   to keep in sync with the circle's own clamp() sizing. This centering is
+   what keeps the circle directly above its label: both are now centered
+   within the same equal-width column, instead of the circle sitting at
+   the row's left edge (pushed there by a same-row "line" sibling
+   competing for width) while only the label was ever actually centered. */
 .wsp-wizard-step-row {
+  position: relative;
   display: flex;
   align-items: center;
+  justify-content: center;
   width: 100%;
+}
+
+/* Connects THIS circle to the NEXT column's circle. Equal-width flex:1
+   columns make the math exact: left:50% starts at this row's own center
+   (the circle); width:100% extends it exactly one more column-width,
+   landing precisely on the next column's center too — no per-breakpoint
+   pixel math. The circle's higher z-index + opaque fill (below) sits on
+   top of both this line's start and the next circle sits on top of its
+   end, so the line visibly begins and ends AT the circles rather than
+   crossing through them or stopping short of them. Hidden on the last
+   step (nothing to connect to on its right). */
+.wsp-wizard-step-row::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--wsp-card-border);
+  transform: translateY(-50%);
+  z-index: 0;
+}
+
+.wsp-wizard-step:last-child .wsp-wizard-step-row::after {
+  display: none;
+}
+
+.wsp-wizard-step-done .wsp-wizard-step-row::after {
+  background: var(--wsp-blue);
 }
 
 /* The circle keeps its own opaque light fill in every state (done/active/
    upcoming) — that opaque backing is what makes its text/border colors
    safe regardless of the photo behind the wizard panel, so none of the
-   three circle rules below needed to change for the new background. */
+   three circle rules below needed to change for the new background. Also
+   what makes the connecting line above read as touching, not crossing,
+   the circle: the circle's own opaque background occludes the line's
+   endpoint beneath it. */
 .wsp-wizard-step-circle {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1756,17 +1807,6 @@
 .wsp-wizard-step-active .wsp-wizard-step-label {
   color: var(--wsp-card-text);
   font-weight: 700;
-}
-
-.wsp-wizard-step-line {
-  flex: 1;
-  height: 2px;
-  margin: 0 4px;
-  background: var(--wsp-card-border);
-}
-
-.wsp-wizard-step-done .wsp-wizard-step-line {
-  background: var(--wsp-blue);
 }
 
 .wsp-wizard-step-label {

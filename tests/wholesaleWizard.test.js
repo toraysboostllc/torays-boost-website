@@ -108,10 +108,16 @@ describe("WholesaleWizard.jsx: WizardSteps — Equipo/Modelo/Falla progress indi
     expect(wizardSrc).toContain('t("wizard.stepIssue")');
   });
 
-  it("each step's done state is a REAL selection check, never a hardcoded true — equipo/modelo/falla independently reflect selectedEquipo/selectedModel/selectedService", () => {
-    expect(wizardSrc).toMatch(/equipoDone=\{Boolean\(selectedEquipo\)\}/);
-    expect(wizardSrc).toMatch(/modeloDone=\{Boolean\(selectedModel\)\}/);
-    expect(wizardSrc).toMatch(/fallaDone=\{Boolean\(selectedService\)\}/);
+  it("each step's done state is derived from the CURRENT screen, never a hardcoded true and never from stale selection objects that survive Back — real, reported bug: goBack() only pops the screen stack (see lib/wizardScreenStack.js), it never clears selectedEquipo/selectedModel/selectedService, so a done-check based on those alone would still show step 3 active after backing all the way up to the Equipo grid", () => {
+    expect(wizardSrc).toMatch(/equipoDone=\{screen !== TOP_SCREEN\}/);
+    expect(wizardSrc).toMatch(/modeloDone=\{screen === "fault"\}/);
+    expect(wizardSrc).toMatch(/fallaDone=\{screen === "progress" \|\| screen === "result"\}/);
+  });
+
+  it("landing back on the top (Equipo) screen — screen === TOP_SCREEN — makes every step's done-check false, regardless of what selectedEquipo/selectedModel/selectedService still hold", () => {
+    expect(wizardSrc).not.toMatch(/equipoDone=\{Boolean\(selectedEquipo\)\}/);
+    expect(wizardSrc).not.toMatch(/modeloDone=\{Boolean\(selectedModel\)\}/);
+    expect(wizardSrc).not.toMatch(/fallaDone=\{Boolean\(selectedService\)\}/);
   });
 
   it("shows on every selection screen (top, model, fault) and nowhere else — never on progress/result, which have their own state; no separate microsolderingGrid screen exists to list here", () => {
