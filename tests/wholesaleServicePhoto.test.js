@@ -60,10 +60,17 @@ describe("ServicePhoto.jsx: accessibility and no-layout-shift basics", () => {
     expect(photoSrc).toContain("alt={alt}");
   });
 
-  it("uses loading=\"lazy\" and explicit width/height (derived from the size prop, never a CSS-only box) — belt-and-suspenders against layout shift, same convention as EquipmentTypeCard/CategoryDrilldown", () => {
+  it('uses loading="lazy" always', () => {
     expect(photoSrc).toContain('loading="lazy"');
-    expect(photoSrc).toContain("width={size}");
-    expect(photoSrc).toContain("height={size}");
+  });
+
+  it("reserves explicit equal width/height (belt-and-suspenders against layout shift, same convention as EquipmentTypeCard/CategoryDrilldown) ONLY when a fixed `size` is given — the small square thumbnails (Falla list)", () => {
+    expect(photoSrc).toContain("{...(size ? { width: size, height: size } : {})}");
+  });
+
+  it("omitting `size` (the large result-panel photo) renders with NO width/height attributes at all — never forced into a square, so the image keeps its real original aspect ratio and CSS (width:100%/height:auto) controls its scale instead", () => {
+    expect(photoSrc).not.toMatch(/width=\{size\}/);
+    expect(photoSrc).not.toMatch(/height=\{size\}/);
   });
 });
 
@@ -98,7 +105,7 @@ describe("WholesaleWizard.jsx: Falla list shows a per-service thumbnail + locali
   });
 });
 
-describe("WholesaleResultPanel.jsx: service photo + description shown in the result/detail panel, generic for any service", () => {
+describe("WholesaleResultPanel.jsx: service description near the top, LARGE photo near the bottom — never both in the same spot, never duplicated", () => {
   it("imports ServicePhoto, resolveServiceDescription, and translateServiceName", () => {
     expect(panelSrc).toContain('import { ServicePhoto } from "./ServicePhoto.jsx";');
     expect(panelSrc).toContain(
@@ -106,48 +113,82 @@ describe("WholesaleResultPanel.jsx: service photo + description shown in the res
     );
   });
 
-  it("renders the service-meta block right after the breadcrumb and before the price reveal, gated on having EITHER a photo or a description — never an empty block", () => {
+  it("the description paragraph sits right after the breadcrumb and before the price reveal, rendered only when resolveServiceDescription returns something — no image here at all anymore", () => {
     const breadcrumbIdx = panelSrc.indexOf('<p className="wsp-result-breadcrumb">');
-    const metaIdx = panelSrc.indexOf("wsp-result-service-meta");
+    const descIdx = panelSrc.indexOf("wsp-result-service-description");
     const priceIdx = panelSrc.indexOf("isQuote ? (");
     expect(breadcrumbIdx).toBeGreaterThan(-1);
-    expect(metaIdx).toBeGreaterThan(breadcrumbIdx);
-    expect(metaIdx).toBeLessThan(priceIdx);
-    expect(panelSrc).toContain("{(service.image || resolveServiceDescription(service, language)) && (");
-  });
-
-  it("passes image={service.image} with a real alt fallback, and only renders the description paragraph when resolveServiceDescription returns something", () => {
-    expect(panelSrc).toContain("image={service.image}");
-    expect(panelSrc).toMatch(/alt=\{service\.image\?\.alt_text \|\| translateServiceName\(service, language\)\}/);
+    expect(descIdx).toBeGreaterThan(breadcrumbIdx);
+    expect(descIdx).toBeLessThan(priceIdx);
     expect(panelSrc).toContain("{resolveServiceDescription(service, language) && (");
     expect(panelSrc).toContain('<p className="wsp-result-service-description">{resolveServiceDescription(service, language)}</p>');
+    // No <ServicePhoto> between the breadcrumb and the price reveal anymore
+    // — exactly ONE render site for the photo now, near the bottom (see
+    // below), never a small duplicate up here too.
+    const topRegion = panelSrc.slice(breadcrumbIdx, priceIdx);
+    expect(topRegion).not.toContain("<ServicePhoto");
   });
 
-  it("no hardcoded device/service name anywhere near the service-meta block — fully data-driven off the service object", () => {
-    const idx = panelSrc.indexOf("wsp-result-service-meta");
-    const block = panelSrc.slice(idx, panelSrc.indexOf("isQuote ? (", idx));
+  // Anchored to the actual JSX opening tag (className="wsp-result-photo-
+  // block") rather than the bare class name — this file's own explanatory
+  // comments mention that class name in prose (see the header comment right
+  // above the JSX), and a bare substring search would match that prose
+  // first, well before the real markup.
+  const photoBlockTagIdx = panelSrc.indexOf('<div className="wsp-result-photo-block">');
+
+  it('the LARGE photo block sits AFTER the "Consult another price" button and before the component\'s closing </div> — below the full quote (cost, tiers, recommendation, the button), which is where WholesaleWizard.jsx/WholesalePrices.jsx render the sibling Torays Boost Sales module right after this card', () => {
+    const buttonIdx = panelSrc.indexOf("wsp-result-consult-another");
+    const closingDivIdx = panelSrc.lastIndexOf("</div>");
+    expect(buttonIdx).toBeGreaterThan(-1);
+    expect(photoBlockTagIdx).toBeGreaterThan(buttonIdx);
+    expect(photoBlockTagIdx).toBeLessThan(closingDivIdx);
+  });
+
+  it("the large photo is gated on service.image alone — renders nothing at all (no empty box) when the selected service has no photo", () => {
+    const gateIdx = panelSrc.lastIndexOf("{service.image && (", photoBlockTagIdx);
+    expect(gateIdx).toBeGreaterThan(-1);
+    // The gate immediately guards this exact block — only whitespace
+    // between the opening `(` of the gate and the block's own tag.
+    const between = panelSrc.slice(gateIdx + "{service.image && (".length, photoBlockTagIdx);
+    expect(between.trim()).toBe("");
+  });
+
+  it("passes image={service.image} — never selectedEquipo/equipo/Microsoldering-level image — with a real alt fallback, and size is intentionally omitted so ServicePhoto renders it at its real aspect ratio, not forced into a square", () => {
+    const block = panelSrc.slice(photoBlockTagIdx, panelSrc.indexOf("</div>", photoBlockTagIdx) + 6);
+    expect(block).toContain("image={service.image}");
+    expect(block).toMatch(/alt=\{service\.image\?\.alt_text \|\| translateServiceName\(service, language\)\}/);
+    expect(block).not.toMatch(/size=\{/);
+    expect(block).not.toContain("selectedEquipo");
+    expect(block).not.toContain("equipo.image");
+  });
+
+  it("no hardcoded device/service name anywhere in the actual rendered description or large-photo JSX (comments explaining the design are allowed to mention them in prose — only real code is checked)", () => {
+    const descTagIdx = panelSrc.indexOf('<p className="wsp-result-service-description">');
+    const descLine = panelSrc.slice(descTagIdx, panelSrc.indexOf("\n", descTagIdx));
+    const photoBlock = panelSrc.slice(photoBlockTagIdx, panelSrc.indexOf("</div>", photoBlockTagIdx) + 6);
     for (const literal of ["microsoldering", "Microsoldering", "PS5", "iPad", "iPhone", "MacBook", "Xbox", "Switch", "HDMI"]) {
-      expect(block).not.toContain(literal);
+      expect(descLine).not.toContain(literal);
+      expect(photoBlock).not.toContain(literal);
     }
   });
 });
 
 describe("wholesalePortal.css: new photo/description classes carry no hidden/md:hidden responsive-visibility modifier — never stranded on mobile", () => {
-  it(".wsp-wizard-fault-item-photo / -label and .wsp-result-service-meta / -photo / -description all exist and are unconditionally visible", () => {
+  it(".wsp-wizard-fault-item-photo / -label, .wsp-result-service-description, and .wsp-result-photo-block / -large all exist and are unconditionally visible", () => {
     for (const cls of [
       ".wsp-wizard-fault-item-photo",
       ".wsp-wizard-fault-item-label",
-      ".wsp-result-service-meta",
-      ".wsp-result-service-photo",
       ".wsp-result-service-description",
+      ".wsp-result-photo-block",
+      ".wsp-result-photo-large",
     ]) {
       expect(cssSrc).toContain(`${cls} {`);
     }
     expect(cssSrc).not.toMatch(/\.wsp-wizard-fault-item-photo\s*\{[^}]*display:\s*none/);
-    expect(cssSrc).not.toMatch(/\.wsp-result-service-meta\s*\{[^}]*display:\s*none/);
+    expect(cssSrc).not.toMatch(/\.wsp-result-photo-(block|large)\s*\{[^}]*display:\s*none/);
   });
 
-  it("the fault-item photo is a fixed square with object-fit so a tall/wide source image never distorts or breaks the row's height on any breakpoint", () => {
+  it("the fault-item thumbnail is a fixed square with object-fit so a tall/wide source image never distorts or breaks the row's height on any breakpoint", () => {
     const idx = cssSrc.indexOf(".wsp-wizard-fault-item-photo {");
     const block = cssSrc.slice(idx, cssSrc.indexOf("}", idx));
     expect(block).toMatch(/width:\s*40px/);
@@ -155,10 +196,17 @@ describe("wholesalePortal.css: new photo/description classes carry no hidden/md:
     expect(block).toMatch(/object-fit:\s*cover/);
   });
 
-  it("reuses existing design tokens for the new placeholder/text colors — no new hardcoded hex introduced by this change", () => {
-    const photoIdx = cssSrc.indexOf(".wsp-wizard-fault-item-photo {");
-    const photoBlock = cssSrc.slice(photoIdx, cssSrc.indexOf("}", photoIdx));
-    expect(photoBlock).toContain("var(--wsp-placeholder-bg-start)");
+  it("the LARGE result photo is width:100% + a max-width cap + height:auto — never a fixed square, never a fixed aspect-ratio box: this is what preserves the source photo's real proportions on both desktop (wide but capped) and mobile (100%, no horizontal overflow) with the same rule", () => {
+    const idx = cssSrc.indexOf(".wsp-result-photo-large {");
+    const block = cssSrc.slice(idx, cssSrc.indexOf("}", idx));
+    expect(block).toMatch(/width:\s*100%/);
+    expect(block).toMatch(/max-width:\s*\d+px/);
+    expect(block).toMatch(/height:\s*auto/);
+    expect(block).not.toMatch(/aspect-ratio/);
+    expect(block).not.toMatch(/object-fit:\s*cover/); // cover would crop — this photo must never be cropped
+  });
+
+  it("reuses existing design tokens for the description text color — no new hardcoded hex introduced by this change", () => {
     const descIdx = cssSrc.indexOf(".wsp-result-service-description {");
     const descBlock = cssSrc.slice(descIdx, cssSrc.indexOf("}", descIdx));
     expect(descBlock).toContain("var(--wsp-card-text-soft)");

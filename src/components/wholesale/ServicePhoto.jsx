@@ -23,6 +23,18 @@ import { useEffect, useState } from "react";
  * browser's broken-image icon — keyed by URL value (not a bare boolean) so
  * a fresh catalog fetch with a NEW signed URL gets a real chance to load
  * again instead of staying stuck failed forever.
+ *
+ * `size`, when given, renders a FIXED SQUARE thumbnail (explicit equal
+ * width/height attributes — belt-and-suspenders against layout shift for a
+ * small list icon, same convention as EquipmentTypeCard/CategoryDrilldown).
+ * Omitting `size` (the large result-panel photo) skips those attributes
+ * entirely, so the image renders at its real, original aspect ratio —
+ * never force-cropped into a square — with `className` alone (via CSS
+ * width/height:auto) controlling how it scales. There is no real width/
+ * height metadata to reserve space with ahead of load for that case (the
+ * API only ever returns { url, alt_text }), so some layout shift there is
+ * an accepted, standard tradeoff for a below-the-fold detail image, never
+ * a reason to force an incorrect square crop instead.
  */
 export function ServicePhoto({ image, alt, size, className }) {
   const url = image?.url || null;
@@ -38,8 +50,7 @@ export function ServicePhoto({ image, alt, size, className }) {
       src={url}
       alt={alt}
       loading="lazy"
-      width={size}
-      height={size}
+      {...(size ? { width: size, height: size } : {})}
       className={className}
       onError={() => setFailedUrl(url)}
     />

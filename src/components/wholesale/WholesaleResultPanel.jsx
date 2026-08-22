@@ -120,24 +120,14 @@ export function WholesaleResultPanel({ selection, service, onConsultAnother }) {
 
       <p className="wsp-result-breadcrumb">{breadcrumb}</p>
 
-      {/* Service photo + description — same dynamic { url, alt_text } shape
-          and DESK-editable description_en/description_es fields every
-          service can carry (see api/_lib/wholesaleDb.js's toClientService),
-          never conditional on which service/equipo this is. Renders nothing
-          at all when the service has neither, so a service with no photo or
-          description looks exactly like this panel always has. */}
-      {(service.image || resolveServiceDescription(service, language)) && (
-        <div className="wsp-result-service-meta">
-          <ServicePhoto
-            image={service.image}
-            alt={service.image?.alt_text || translateServiceName(service, language)}
-            size={72}
-            className="wsp-result-service-photo"
-          />
-          {resolveServiceDescription(service, language) && (
-            <p className="wsp-result-service-description">{resolveServiceDescription(service, language)}</p>
-          )}
-        </div>
+      {/* Service description — DESK-editable description_en/description_es
+          (see api/_lib/wholesaleDb.js's toClientService), never conditional
+          on which service/equipo this is. Renders nothing at all when the
+          service has none. The photo itself renders separately, LARGE, at
+          the bottom of this card (see wsp-result-photo-block below) — never
+          duplicated up here as a small thumbnail. */}
+      {resolveServiceDescription(service, language) && (
+        <p className="wsp-result-service-description">{resolveServiceDescription(service, language)}</p>
       )}
 
       {isQuote ? (
@@ -269,6 +259,32 @@ export function WholesaleResultPanel({ selection, service, onConsultAnother }) {
         <RotateCcw size={16} aria-hidden="true" />
         {t("result.consultAnother")}
       </button>
+
+      {/* Large service photo — dynamically the SELECTED service's own
+          photo, never an equipment-type/Microsoldering-level image
+          (ServicePhoto only ever reads service.image, which is looked up
+          per-service on the server — see imageByService in
+          api/_lib/wholesaleDb.js's buildWholesaleCatalog — so a service
+          with its own photo can never fall back to Microsoldering's or any
+          other card's). Placed after the full quote (cost, tiers,
+          recommendation, this button) and before the sibling Torays Boost
+          Sales module that WholesaleWizard.jsx renders right after this
+          card. Renders nothing at all when the service has no photo — no
+          empty box. size is intentionally omitted (see ServicePhoto's own
+          header) so the image keeps its real, original aspect ratio;
+          wsp-result-photo-large's own CSS (width:100%, a controlled
+          max-width, height:auto) is what makes it wide-but-controlled on
+          desktop and edge-to-edge with zero horizontal overflow on
+          mobile. */}
+      {service.image && (
+        <div className="wsp-result-photo-block">
+          <ServicePhoto
+            image={service.image}
+            alt={service.image?.alt_text || translateServiceName(service, language)}
+            className="wsp-result-photo-large"
+          />
+        </div>
+      )}
     </div>
   );
 }

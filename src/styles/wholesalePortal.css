@@ -969,33 +969,47 @@
   text-align: center;
 }
 
-/* Optional service photo + description, shown right under the breadcrumb —
-   see WholesaleResultPanel.jsx's own comment. Centered like the breadcrumb
-   above it; the photo is a fixed square (never stretched/cropped oddly by a
-   tall or wide source image, thanks to ServicePhoto's explicit width/height
-   plus object-fit here), the description wraps normally under it. */
-.wsp-result-service-meta {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-  text-align: center;
-}
-
-.wsp-result-service-photo {
-  width: 72px;
-  height: 72px;
-  border-radius: 12px;
-  object-fit: cover;
-  background: var(--wsp-placeholder-bg-start);
-}
-
+/* Optional service description, shown right under the breadcrumb — see
+   WholesaleResultPanel.jsx's own comment. Centered like the breadcrumb
+   above it (align-self, since this panel is a flex column); the service's
+   own PHOTO renders separately, large, near the bottom of the card (see
+   .wsp-result-photo-block/-large further down) — never duplicated here as
+   a small thumbnail. */
 .wsp-result-service-description {
   font-size: clamp(12px, 3vw, 13.5px);
   line-height: 1.45;
   color: var(--wsp-card-text-soft);
   max-width: 46ch;
+  margin-top: 6px;
+  align-self: center;
+  text-align: center;
+}
+
+/* Large service photo — placed after the full quote block (cost, tiers,
+   recommendation, the "Consult another price" button) and before the
+   sibling Torays Boost Sales module (see WholesaleWizard.jsx/
+   WholesalePrices.jsx: this card and that module are adjacent siblings, so
+   the end of this card IS "right above Sales"). Centered, generous but
+   controlled on desktop, edge-to-edge with zero horizontal overflow on
+   mobile — a single width:100%/max-width pair does both without a
+   breakpoint: on a narrow phone the card itself is well under the
+   max-width, so 100% already fills it; on a wide desktop card the
+   max-width caps it instead of stretching edge to edge. height:auto (no
+   fixed aspect-ratio box, unlike the small list/card thumbnails elsewhere
+   in this file) is what preserves the photo's real original proportions —
+   never cropped or distorted to fit a fixed box. */
+.wsp-result-photo-block {
+  margin-top: 14px;
+  text-align: center;
+}
+
+.wsp-result-photo-large {
+  display: inline-block;
+  width: 100%;
+  max-width: 480px;
+  height: auto;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.12);
 }
 
 .wsp-result-diagnostic-note {
