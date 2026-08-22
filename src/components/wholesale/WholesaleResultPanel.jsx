@@ -3,6 +3,7 @@ import { useWholesaleLocale } from "../../i18n/WholesaleLocaleContext.jsx";
 import { computeFixedPricing, computeRangePricing, hasCompletePriceTiers } from "../../lib/wholesaleMargin.js";
 import { translateCatalogLabel, translateServiceName, resolveServiceDescription } from "../../lib/wholesaleCatalogI18n.js";
 import { wholesaleHoverProps } from "../../lib/wholesaleSound.js";
+import { computeAnimatedDisplayPrice, useCountUpProgress } from "../../lib/wholesalePriceAnimation.js";
 import { ServicePhoto } from "./ServicePhoto.jsx";
 
 /** Silver/Purple/Gold, in display order. Purely presentational metadata —
@@ -28,14 +29,6 @@ const PRICE_TIERS = [
     Icon: TrendingUp,
   },
 ];
-
-/** Which single number to show for "Tu precio Shop" — fixed/range/quote all
- *  need a different presentation, and `quote` genuinely has none yet. */
-function wholesaleDisplayPrice(service, formatPrice) {
-  if (service.pricing_type === "fixed") return formatPrice(service.fixed_price);
-  if (service.pricing_type === "range") return `${formatPrice(service.price_min)} – ${formatPrice(service.price_max)}`;
-  return null; // quote
-}
 
 /** Profit/margin for a single DESK-configured price (a Silver/Purple/Gold
  *  tier, or the plain recommended price on a service without tiers),
@@ -89,6 +82,14 @@ export function WholesaleResultPanel({ selection, service, onConsultAnother }) {
   const isQuote = service.pricing_type === "quote";
   const isRange = service.pricing_type === "range";
 
+  // 0 -> 1 exactly once per mount (this component remounts fresh for every
+  // new result — see WholesaleWizard.jsx's screen==="result" branch — so a
+  // plain mount-effect is already "once per result", no extra guard
+  // needed). Immediately 1 (no animation at all) under prefers-reduced-
+  // motion: reduce. Purely visual — see computeAnimatedDisplayPrice's own
+  // header for why this can never change the actual displayed price.
+  const shopCostProgress = useCountUpProgress(undefined, !isQuote);
+
   // Silver/Purple/Gold only ever apply to a service DESK has fully and
   // explicitly configured (never a formula, never a partial set — see
   // hasCompletePriceTiers) — every service without that stays on the
@@ -137,10 +138,24 @@ export function WholesaleResultPanel({ selection, service, onConsultAnother }) {
           <div className="wsp-result-money wsp-result-money-reveal">
             {/* "Your cost with Torays Boost" — read first, and the single
                 biggest number on this panel: this is what the shop actually
-                pays Torays Boost, so it anchors every other figure below. */}
-            <div className="wsp-result-shopcost-hero">
+                pays Torays Boost, so it anchors every other figure below.
+                Centered (wsp-result-shopcost-hero); counts up from $0.00 to
+                the real value once (shopCostProgress), then a single
+                fade/scale settle (wsp-result-shopcost-settle) and a
+                discreet blue glow sweep (the hero's own ::after, see
+                wholesalePortal.css) play once — never a loop, never a
+                flicker, and fully skipped under prefers-reduced-motion
+                (both the CSS animations AND the JS count-up itself). The
+                FINAL rendered text is always exactly
+                computeAnimatedDisplayPrice(service, formatPrice, 1) — byte-
+                identical to the non-animated price the pricing engine
+                returned; see that function's own header for the exact
+                guarantee. */}
+            <div className="wsp-result-shopcost-hero wsp-result-shopcost-settle">
               <span className="wsp-result-money-label">{t("result.shopPrice")}</span>
-              <span className="wsp-result-shopcost-value">{wholesaleDisplayPrice(service, formatPrice)}</span>
+              <span className="wsp-result-shopcost-value">
+                {computeAnimatedDisplayPrice(service, formatPrice, shopCostProgress)}
+              </span>
             </div>
 
             {hasTiers ? (

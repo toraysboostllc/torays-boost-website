@@ -1075,10 +1075,18 @@
 
 /* "Your Cost with Torays Boost" — the dominant hero figure, stacked
    (label above value) rather than a left/right row like the smaller
-   figures below, so its own size can carry the full width of the card. */
+   figures below, so its own size can carry the full width of the card.
+   Centered (align-items + text-align — the label and the value both read
+   as one centered block, not a left-anchored stack). position:relative +
+   overflow:hidden is the containing block for the ::after glow sweep
+   below — it must never escape this box's rounded corners. */
 .wsp-result-shopcost-hero {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  text-align: center;
   gap: 0;
   padding: clamp(0px, 0.1vh, 14px) 12px;
   border-radius: 14px;
@@ -1088,7 +1096,11 @@
 
 /* Flat sizes, not vh-scaled — Shop Cost is the one figure on this panel
    that must never shrink below a real, always-legible size regardless of
-   viewport height (36px mobile / 42px desktop, hard floors). */
+   viewport height (36px mobile / 42px desktop, hard floors).
+   font-variant-numeric: tabular-nums (already present) is what keeps
+   digit glyphs a fixed width while the count-up animation's text changes
+   every frame — the box grows/shrinks smoothly with digit COUNT, never
+   jitters within a fixed digit width. */
 .wsp-result-shopcost-value {
   font-size: 36px;
   line-height: 1;
@@ -1100,6 +1112,86 @@
 @media (min-width: 640px) {
   .wsp-result-shopcost-value {
     font-size: 42px;
+  }
+}
+
+/* Once-only polish after the JS count-up (see useCountUpProgress in
+   wholesalePriceAnimation.js) finishes: a subtle fade/scale settle, timed
+   via animation-delay to start right as the ~600ms count-up completes —
+   never simultaneous with it, never a loop, never left in a mid-animation
+   state (animation-fill-mode: forwards, and its 100% keyframe is
+   pixel-identical to the element's own static/base styles, so there is no
+   visible "snap" when the animation ends). The delay value below is
+   coupled 1:1 with SHOPCOST_COUNT_UP_DURATION_MS in
+   wholesalePriceAnimation.js — keep them in sync. */
+@keyframes wsp-result-shopcost-settle {
+  0% {
+    transform: scale(0.98);
+    opacity: 0.92;
+  }
+  60% {
+    transform: scale(1.012);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.wsp-result-shopcost-settle {
+  animation: wsp-result-shopcost-settle 260ms ease-out;
+  animation-delay: 600ms;
+  animation-fill-mode: forwards;
+}
+
+/* Discreet blue glow sweep, once — a soft diagonal highlight band that
+   travels across the hero and fades back out, drawing a brief, calm
+   moment of attention to the just-finished count-up without a border glow
+   that stays lit (which would read as "selected"/"active" state, not a
+   one-time reveal) or any repeating shimmer. Reuses the exact same blue
+   rgba() channels already used elsewhere in this file for a translucent
+   --wsp-blue effect (see .wsp-wizard-step-active .wsp-wizard-step-circle's
+   box-shadow) rather than inventing a new color. pointer-events:none so it
+   can never intercept a click even mid-sweep. animation-fill-mode:forwards
+   ends the sweep at 0% opacity and stays there — never a stuck-visible
+   band, never a flicker back to visible. Timed via the same 600ms delay as
+   the settle above, coupled to SHOPCOST_COUNT_UP_DURATION_MS the same way. */
+.wsp-result-shopcost-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 35%, rgba(37, 99, 235, 0.18) 50%, transparent 65%);
+  transform: translateX(-120%);
+  opacity: 0;
+  pointer-events: none;
+  animation: wsp-result-shopcost-glow 650ms ease-out;
+  animation-delay: 600ms;
+  animation-fill-mode: forwards;
+}
+
+@keyframes wsp-result-shopcost-glow {
+  0% {
+    transform: translateX(-120%);
+    opacity: 0;
+  }
+  35% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wsp-result-shopcost-settle {
+    animation: none;
+  }
+
+  .wsp-result-shopcost-hero::after {
+    animation: none;
+    opacity: 0;
   }
 }
 

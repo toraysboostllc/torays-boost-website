@@ -158,8 +158,8 @@ describe("WholesaleResultPanel.jsx: money hierarchy — Shop Cost is the dominan
     expect(shopPriceIdx).toBeLessThan(fallbackHeroIdx);
   });
 
-  it("renders the shop-cost figure in its own dedicated hero block", () => {
-    expect(panelSrc).toContain('<div className="wsp-result-shopcost-hero">');
+  it("renders the shop-cost figure in its own dedicated hero block (now also carrying the once-only settle animation class — see wholesalePriceAnimation.test.js)", () => {
+    expect(panelSrc).toContain('<div className="wsp-result-shopcost-hero wsp-result-shopcost-settle">');
     expect(panelSrc).toContain('<span className="wsp-result-shopcost-value">');
   });
 
