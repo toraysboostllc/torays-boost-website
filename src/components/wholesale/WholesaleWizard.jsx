@@ -4,11 +4,19 @@ import { useWholesaleLocale } from "../../i18n/WholesaleLocaleContext.jsx";
 import { buildWholesaleWizardCatalog } from "../../lib/wholesaleWizardCatalog.js";
 import { translateServiceName } from "../../lib/wholesaleCatalogI18n.js";
 import { wholesaleHoverProps } from "../../lib/wholesaleSound.js";
-import { pushScreen, popScreen, resetStack, currentScreen, TOP_SCREEN } from "../../lib/wizardScreenStack.js";
+import {
+  pushScreen,
+  popScreen,
+  resetStack,
+  currentScreen,
+  stackForSearchSelection,
+  TOP_SCREEN,
+} from "../../lib/wizardScreenStack.js";
 import { EquipmentTypeCard } from "./EquipmentTypeCard.jsx";
 import { ServicePhoto } from "./ServicePhoto.jsx";
 import { WholesaleProgressPanel } from "./WholesaleProgressPanel.jsx";
 import { WholesaleResultPanel } from "./WholesaleResultPanel.jsx";
+import { WholesaleSearch } from "./WholesaleSearch.jsx";
 
 /**
  * Equipo -> Modelo -> Falla progress indicator, shown above every selection
@@ -147,10 +155,45 @@ export function WholesaleWizard({ equipmentTypes, microsolderingEquipmentType, l
     goTo("progress");
   }
 
+  /** Live Search result selection — hydrates ALL THREE selections at once
+   *  (Equipment Type, model when one applies, service) using the exact
+   *  same real catalog objects handleSelectEquipo/handleSelectModel/
+   *  handleSelectFault above would have set one click at a time, and lands
+   *  on the SAME "progress" screen (the same ~3s reveal) those manual
+   *  clicks would have reached — never a shortcut into "result" directly,
+   *  so nothing about the progress reveal, the pricing engine, or
+   *  WholesaleResultPanel's own diagnostic/terms/animated-price logic is
+   *  ever bypassed or duplicated. The screen stack is rebuilt to match
+   *  what that click-through would have produced (including the "model"
+   *  entry for a multi-model Equipo, so Back still lands somewhere
+   *  sensible), NOT just jumped to directly — this is what makes a
+   *  direct_services card like Microsoldering (always exactly 1 internal
+   *  model) naturally skip the "model" screen here too, with zero special
+   *  case: equipo.models.length is the only thing this branches on, same
+   *  as handleSelectEquipo already does. */
+  function handleSelectSearchResult({ equipo, model, service }) {
+    setSelectedEquipo(equipo);
+    setSelectedModel(model);
+    setSelectedService(service);
+    setScreenStack(stackForSearchSelection(equipo));
+  }
+
   const showSteps = screen === TOP_SCREEN || screen === "model" || screen === "fault";
 
   return (
-    <div className="wsp-wizard">
+    <div className="wsp-wizard-outer">
+      {/* Global Live Search — deliberately rendered OUTSIDE .wsp-wizard
+          (which has its own overflow:hidden, needed to clip its rounded-
+          corner glass background — see that class's own CSS) instead of
+          inside it: an absolutely-positioned dropdown living inside an
+          overflow:hidden ancestor would get clipped at that ancestor's own
+          edge, breaking the "sin recortes" requirement. This wrapper adds
+          no overflow constraint of its own, so the dropdown (positioned
+          relative to the search bar itself) can extend down over the
+          Equipo/Modelo grid or Falla list below it without being cut off,
+          on any screen. */}
+      <WholesaleSearch equipoList={topEquipoList} onSelectResult={handleSelectSearchResult} />
+      <div className="wsp-wizard">
       {showSteps && (
         <WizardSteps
           // Screen-derived, not selection-derived — see WizardSteps' own
@@ -270,6 +313,7 @@ export function WholesaleWizard({ equipmentTypes, microsolderingEquipmentType, l
           onConsultAnother={resetToTop}
         />
       )}
+      </div>
     </div>
   );
 }

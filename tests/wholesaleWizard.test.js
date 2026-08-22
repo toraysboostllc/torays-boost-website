@@ -46,7 +46,8 @@ describe("WholesaleWizard.jsx: Modelo step is skipped only when an Equipo has ex
 
 describe("WholesaleWizard.jsx: back navigation is a real stack, not a hardcoded per-screen target", () => {
   it("goBack delegates to the pure popScreen reducer rather than switching on the current screen name — see wizardScreenStack.test.js for the underflow-proof behind it", () => {
-    expect(wizardSrc).toContain('import { pushScreen, popScreen, resetStack, currentScreen, TOP_SCREEN } from "../../lib/wizardScreenStack.js";');
+    expect(wizardSrc).toContain("popScreen,");
+    expect(wizardSrc).toContain('} from "../../lib/wizardScreenStack.js";');
     expect(wizardSrc).toMatch(/function goBack\(\) \{\s*\n\s*setScreenStack\(\(stack\) => popScreen\(stack\)\);/);
   });
 

@@ -45,6 +45,14 @@ export const wholesaleTranslations = {
       title: "Microsoldering",
       subtitle: "Advanced board-level repair",
     },
+    search: {
+      placeholder: "Search device, model, or issue…",
+      ariaLabel: "Search the wholesale catalog",
+      clearLabel: "Clear search",
+      resultsLabel: "Search results",
+      noResults: "No results found",
+      searching: "Searching…",
+    },
     wizard: {
       chooseEquipment: "Select a Device to View Pricing",
       chooseEquipmentSubtitle: "Choose the device, model, and issue for an instant estimate.",
@@ -177,6 +185,14 @@ export const wholesaleTranslations = {
     microsoldering: {
       title: "Microsoldadura",
       subtitle: "Reparación avanzada de placa",
+    },
+    search: {
+      placeholder: "Busca equipo, modelo o falla…",
+      ariaLabel: "Buscar en el catálogo mayorista",
+      clearLabel: "Limpiar búsqueda",
+      resultsLabel: "Resultados de búsqueda",
+      noResults: "No se encontraron resultados",
+      searching: "Buscando…",
     },
     wizard: {
       chooseEquipment: "Selecciona un equipo para ver el precio",

@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { pushScreen, popScreen, resetStack, currentScreen, TOP_SCREEN } from "../src/lib/wizardScreenStack.js";
+import {
+  pushScreen,
+  popScreen,
+  resetStack,
+  currentScreen,
+  stackForSearchSelection,
+  TOP_SCREEN,
+} from "../src/lib/wizardScreenStack.js";
 
 /**
  * Real, executable proof for the wizard's Back-navigation invariant ("never
@@ -86,5 +93,24 @@ describe("wizardScreenStack: pushScreen/popScreen round-trip preserves order and
     const originalCopy = [...original];
     pushScreen(original, "model");
     expect(original).toEqual(originalCopy);
+  });
+});
+
+describe("stackForSearchSelection: Live Search hydration rebuilds real history, never a bare jump to progress/result", () => {
+  it("a multi-model Equipo gets the full 4-entry history (top -> model -> fault -> progress), same as a manual click-through would have produced", () => {
+    const equipo = { models: [{ id: "m1" }, { id: "m2" }] };
+    expect(stackForSearchSelection(equipo)).toEqual(["top", "model", "fault", "progress"]);
+  });
+
+  it("a 1-model Equipo (including a direct_services card like Microsoldering, which always has exactly 1 internal model) skips straight to fault, same as handleSelectEquipo's own auto-skip branch", () => {
+    const equipo = { models: [{ id: "only" }] };
+    expect(stackForSearchSelection(equipo)).toEqual(["top", "fault", "progress"]);
+  });
+
+  it("Back from the resulting stack always lands somewhere real — popping once from either shape never produces an empty/invalid screen", () => {
+    const multiModel = stackForSearchSelection({ models: [{ id: "m1" }, { id: "m2" }] });
+    expect(currentScreen(popScreen(multiModel))).toBe("fault");
+    const singleModel = stackForSearchSelection({ models: [{ id: "only" }] });
+    expect(currentScreen(popScreen(singleModel))).toBe("fault");
   });
 });

@@ -30,3 +30,18 @@ export function resetStack() {
 export function currentScreen(stack) {
   return stack[stack.length - 1];
 }
+
+/** The screen stack Live Search hydration (WholesaleWizard.jsx's
+ *  handleSelectSearchResult) rebuilds to, given the real Equipo a search
+ *  result belongs to — matching exactly what a manual Equipo->Modelo->
+ *  Falla click-through would have produced for that same Equipo (see
+ *  handleSelectEquipo's own identical `models.length === 1` branch), never
+ *  a shortcut straight into "progress"/"result" with no history. This is
+ *  what makes Back still land somewhere sensible after a search selection,
+ *  and what makes a direct_services card (always exactly 1 internal model
+ *  — e.g. Microsoldering) naturally skip the "model" entry here too, with
+ *  no special case beyond the same models.length check every other path
+ *  already uses. */
+export function stackForSearchSelection(equipo) {
+  return equipo.models.length === 1 ? ["top", "fault", "progress"] : ["top", "model", "fault", "progress"];
+}
