@@ -177,25 +177,44 @@ function WholesaleLegalContent() {
                     />
                   );
                 })}
-                {/* Estimate Disclaimer — a separate, independently-published
-                    document (see wholesale-legal-document-types-migration.sql),
-                    not one of the 6 sections above. Its content_en/content_es
-                    are genuinely {body: "..."} objects (unlike the master
-                    bundle's plain-string sections above), so LegalDocSection's
-                    existing doc?.body read works correctly here without
-                    modification. Renders nothing at all when nothing has been
-                    published for this type yet — never an empty section. */}
-                {estimateDoc && (
-                  <LegalDocSection
-                    docKey="estimate_disclaimer"
-                    fallbackTitle={t("legal.estimateDisclaimerTitle")}
-                    contentEn={estimateDoc.content_en}
-                    contentEs={estimateDoc.content_es}
-                    onPrint={() => printOnly("estimate_disclaimer")}
-                  />
-                )}
               </div>
             </>
+          )}
+
+          {/* Estimate Disclaimer — a separate, independently-published
+              document (see wholesale-legal-document-types-migration.sql),
+              fetched from its own endpoint and rendered from its OWN state,
+              never nested inside the master bundle's status === "ready"
+              gate above. Bug fixed 2026-08-22: it previously WAS nested
+              there, so a Preview with an Estimate Disclaimer published but
+              no Master Agreement bundle yet showed the master's "No
+              published legal document bundle yet." page-wide error and hid
+              the Estimate Disclaimer section entirely, even though it had
+              already been fetched successfully — exactly the reported
+              WholesaleEstimateDisclaimerAcceptModal.jsx "Read the Estimate
+              Terms & Conditions" link failure. The two document types are
+              never mixed: this section reads only estimateDoc, never
+              state.doc's 6-key DOC_KEYS content, and DOC_KEYS never
+              includes "estimate_disclaimer". Renders nothing at all when
+              nothing has been published for this type yet (estimateDoc
+              stays null) — never an empty section, and never blocked by
+              the master bundle's own loading/error state. */}
+          {estimateDoc && (
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-torays-line pb-4 text-xs text-torays-text-muted print:hidden">
+                <span>
+                  {t("legal.version")}: {estimateDoc.version}
+                  {estimateDoc.published_at ? ` — ${t("legal.publishedAt")}: ${formatDate(estimateDoc.published_at)}` : ""}
+                </span>
+              </div>
+              <LegalDocSection
+                docKey="estimate_disclaimer"
+                fallbackTitle={t("legal.estimateDisclaimerTitle")}
+                contentEn={estimateDoc.content_en}
+                contentEs={estimateDoc.content_es}
+                onPrint={() => printOnly("estimate_disclaimer")}
+              />
+            </div>
           )}
         </div>
       </main>
