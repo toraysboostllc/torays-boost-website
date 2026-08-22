@@ -114,5 +114,7 @@ export default async function handler(req, res) {
     // LEGACY, TEMPORARY — see api/_lib/wholesaleDb.js's own comment.
     microsoldering: catalog.microsoldering,
     salesModule: catalog.salesModule,
+    // Global service warranty — see api/_lib/wholesaleDb.js's own comment.
+    warranty: catalog.warranty,
   });
 }

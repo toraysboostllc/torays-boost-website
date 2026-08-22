@@ -538,6 +538,25 @@ export async function buildWholesaleCatalog(env) {
       status: portalSettings?.sales_status ?? "maintenance",
       entryBlocked: portalSettings?.sales_entry_blocked ?? true,
     },
+    // Global service warranty (Wholesale Shops -> Catalog -> Pricing &
+    // Sales Settings in DESK) — ONE setting for the whole portal, applied
+    // to every quote alike. Never a per-service/per-equipment-type/
+    // per-model concept: this object is built exclusively from the same
+    // singleton portalSettings row salesModule above already reads, never
+    // from `service`/`equipmentTypes`/anything else. `?? false`/`?? null`
+    // throughout — see wholesale-global-warranty-migration.sql — is what
+    // keeps this endpoint working unchanged against a database where that
+    // migration hasn't run yet: portalSettings simply won't have these 4
+    // columns at all (a plain `select *`, not a column list that would
+    // error on a missing column), so every field here safely falls back to
+    // "warranty off", exactly like a freshly migrated, never-configured
+    // database would report.
+    warranty: {
+      enabled: portalSettings?.warranty_enabled ?? false,
+      durationDays: portalSettings?.warranty_duration_days ?? null,
+      termsEn: portalSettings?.warranty_terms_en ?? null,
+      termsEs: portalSettings?.warranty_terms_es ?? null,
+    },
   };
 }
 

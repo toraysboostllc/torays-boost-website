@@ -10,6 +10,8 @@ const read = (relPath) => readFileSync(join(root, relPath), "utf8").replace(/\r\
 
 const panelSrc = read("src/components/wholesale/WholesaleResultPanel.jsx");
 const cssSrc = read("src/styles/wholesalePortal.css");
+const wizardSrc = read("src/components/wholesale/WholesaleWizard.jsx");
+const pricesPageSrc = read("src/pages/WholesalePrices.jsx");
 
 /**
  * Correction pass: the shop can no longer edit, select, or change any
@@ -452,6 +454,89 @@ describe("wholesalePortal.css: read-only tier panels — soft hover only, no but
     const cardBlock = cssSrc.slice(cssSrc.indexOf(".wsp-result-tier-card {"), cssSrc.indexOf("}", cssSrc.indexOf(".wsp-result-tier-card {")));
     const radius = Number(cardBlock.match(/border-radius:\s*(\d+)px/)[1]);
     expect(radius).toBeGreaterThanOrEqual(10);
+  });
+});
+
+describe("WholesaleResultPanel.jsx: global service warranty — GLOBAL, never per-service (Adenda: user's explicit correction)", () => {
+  it("imports isWarrantyActive/resolveWarrantyTerms from the dedicated pure-function lib, never reimplemented inline", () => {
+    expect(panelSrc).toContain(
+      'import { isWarrantyActive, resolveWarrantyTerms } from "../../lib/wholesaleWarranty.js";'
+    );
+    expect(panelSrc).not.toMatch(/function isWarrantyActive|function resolveWarrantyTerms/);
+  });
+
+  it("WholesaleResultPanel receives warranty as a top-level prop, sibling to selection/service — never nested inside service or selection", () => {
+    expect(panelSrc).toMatch(/export function WholesaleResultPanel\(\{[^}]*\bwarranty\b[^}]*\}\)/);
+  });
+
+  it("the warranty box sits directly after the per-service recommendation block and directly before the keep-customer note — i.e. after Torays Boost Recommendation and before the button/photo", () => {
+    const recommendationIdx = panelSrc.indexOf('className="wsp-result-recommendation"');
+    const warrantyIdx = panelSrc.indexOf('isWarrantyActive(warranty) &&');
+    const keepCustomerIdx = panelSrc.indexOf('className="wsp-result-keep-customer-note"');
+    const photoBlockIdx = panelSrc.indexOf('className="wsp-result-photo-block"');
+    expect(recommendationIdx).toBeGreaterThan(-1);
+    expect(warrantyIdx).toBeGreaterThan(recommendationIdx);
+    expect(keepCustomerIdx).toBeGreaterThan(warrantyIdx);
+    expect(warrantyIdx).toBeLessThan(photoBlockIdx);
+  });
+
+  it("is gated exclusively on isWarrantyActive(warranty) — renders nothing (no empty box) when inactive", () => {
+    expect(panelSrc).toMatch(/\{isWarrantyActive\(warranty\) && \(\s*<div className="wsp-result-warranty">/);
+  });
+
+  it("the warranty block never reads service/selection/equipo/model fields — it is the same box for every service, grouped or direct_services alike", () => {
+    const blockStart = panelSrc.indexOf('{isWarrantyActive(warranty) && (');
+    const blockEnd = panelSrc.indexOf(")}", blockStart) + 2;
+    const block = panelSrc.slice(blockStart, blockEnd);
+    expect(block).not.toMatch(/\bservice\./);
+    expect(block).not.toMatch(/\bselection\./);
+  });
+
+  it("the title uses the existing t(key, vars) interpolation mechanism with the real durationDays, never a hand-rolled template string", () => {
+    expect(panelSrc).toContain('t("warranty.title", { days: warranty.durationDays })');
+  });
+
+  it("terms render only when resolveWarrantyTerms returns something — no empty <p> when neither language is set", () => {
+    expect(panelSrc).toMatch(/\{resolveWarrantyTerms\(warranty, language\) && \(/);
+  });
+
+  it("warranty threads through WholesaleWizard.jsx as a single prop, forwarded unchanged into WholesaleResultPanel — never derived per-selection/per-screen", () => {
+    expect(wizardSrc).toMatch(/export function WholesaleWizard\(\{[^}]*\bwarranty\b[^}]*\}\)/);
+    expect(wizardSrc).toContain("warranty={warranty}");
+    // Only ever forwarded, never reassigned/recomputed from selection/service.
+    expect(wizardSrc).not.toMatch(/const warranty\s*=/);
+  });
+
+  it("WholesalePrices.jsx holds warranty as wizard-level state, loaded once from the catalog fetch — not per result/selection", () => {
+    expect(pricesPageSrc).toContain("warranty: result.warranty");
+    expect(pricesPageSrc).toContain("warranty={state.warranty}");
+  });
+
+  it("this proves Live-Search-selected results and manually-clicked-through results render an identical warranty box: WholesaleResultPanel is always instantiated from the same single state.warranty value regardless of how selection/service got set, since warranty is never a parameter of the selection flow itself", () => {
+    // wholesaleWizardCatalog.js (Live Search's index) and the manual
+    // click-through screens both only ever produce `selection`/`service` —
+    // neither path touches `warranty` at all, so WholesaleWizard always
+    // passes through the one wizard-level prop untouched either way.
+    const catalogSrc = read("src/lib/wholesaleWizardCatalog.js");
+    expect(catalogSrc).not.toContain("warranty");
+  });
+});
+
+describe("wholesalePortal.css: warranty box — service-recommendation-adjacent styling, responsive by construction", () => {
+  it(".wsp-result-warranty has no fixed width/height (relies on the panel's own responsive flow, same as every other block here)", () => {
+    const idx = cssSrc.indexOf(".wsp-result-warranty {");
+    expect(idx).toBeGreaterThan(-1);
+    const block = cssSrc.slice(idx, cssSrc.indexOf("}", idx));
+    expect(block).not.toMatch(/\bwidth:\s*\d/);
+    expect(block).not.toMatch(/\bheight:\s*\d/);
+  });
+
+  it(".wsp-result-warranty-terms wraps normally (no forced nowrap/overflow hidden that could clip long admin-authored text)", () => {
+    const idx = cssSrc.indexOf(".wsp-result-warranty-terms {");
+    expect(idx).toBeGreaterThan(-1);
+    const block = cssSrc.slice(idx, cssSrc.indexOf("}", idx));
+    expect(block).not.toContain("white-space: nowrap");
+    expect(block).not.toContain("overflow: hidden");
   });
 });
 

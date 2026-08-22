@@ -98,6 +98,12 @@ export const wholesaleTranslations = {
       priceUpdatedLabel: "Prices last updated",
       priceUpdatedNone: "—",
     },
+    warranty: {
+      // {days} interpolated via formatTranslation — see
+      // WholesaleResultPanel.jsx's own t("warranty.title", { days: ... })
+      // call. Global setting, applies identically to every service.
+      title: "{days}-Day Service Warranty",
+    },
     audio: {
       label: "Sound",
       muteLabel: "Mute sound",
@@ -238,6 +244,9 @@ export const wholesaleTranslations = {
       rangeNote: "Rango estimado — el precio final depende del diagnóstico exacto.",
       priceUpdatedLabel: "Precios actualizados por última vez",
       priceUpdatedNone: "—",
+    },
+    warranty: {
+      title: "Garantía general de servicio de {days} días",
     },
     audio: {
       label: "Sonido",

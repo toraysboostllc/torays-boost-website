@@ -185,6 +185,81 @@ describe("GET /api/wholesale-prices: salesModule reflects wholesale_portal_setti
   });
 });
 
+describe("GET /api/wholesale-prices: warranty is a GLOBAL setting from wholesale_portal_settings, read-only, never per-service", () => {
+  it("defaults to disabled/null when the warranty_* columns don't exist yet on the settings row — a pre-migration database (the default fake fixture, matching a real row before wholesale-global-warranty-migration.sql has run) still returns a complete, non-crashing response", async () => {
+    const fake = createFakeSupabase();
+    seedApprovedShopAndDevice(fake);
+
+    const res = await callPrices(fake);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.warranty).toEqual({ enabled: false, durationDays: null, termsEn: null, termsEs: null });
+  });
+
+  it("returns the admin-configured warranty exactly as stored", async () => {
+    const fake = createFakeSupabase();
+    fake.db.wholesale_portal_settings[0].warranty_enabled = true;
+    fake.db.wholesale_portal_settings[0].warranty_duration_days = 60;
+    fake.db.wholesale_portal_settings[0].warranty_terms_en = "We stand behind every repair for 60 days.";
+    fake.db.wholesale_portal_settings[0].warranty_terms_es = "Respaldamos cada reparación por 60 días.";
+    seedApprovedShopAndDevice(fake);
+
+    const res = await callPrices(fake);
+    expect(res.body.warranty).toEqual({
+      enabled: true,
+      durationDays: 60,
+      termsEn: "We stand behind every repair for 60 days.",
+      termsEs: "Respaldamos cada reparación por 60 días.",
+    });
+  });
+
+  it("reflects warranty_enabled=false even when a stale duration/terms are still stored (an admin who disabled it without clearing the fields)", async () => {
+    const fake = createFakeSupabase();
+    fake.db.wholesale_portal_settings[0].warranty_enabled = false;
+    fake.db.wholesale_portal_settings[0].warranty_duration_days = 90;
+    fake.db.wholesale_portal_settings[0].warranty_terms_en = "stale text";
+    seedApprovedShopAndDevice(fake);
+
+    const res = await callPrices(fake);
+    expect(res.body.warranty.enabled).toBe(false);
+  });
+
+  it("falls back to safe defaults (disabled) if the settings row is missing entirely — a missing row must not break the whole response", async () => {
+    const fake = createFakeSupabase();
+    fake.db.wholesale_portal_settings = [];
+    seedApprovedShopAndDevice(fake);
+
+    const res = await callPrices(fake);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.warranty).toEqual({ enabled: false, durationDays: null, termsEn: null, termsEs: null });
+  });
+
+  it("is identical regardless of which equipment type/category/service the catalog contains — grouped AND direct_services alike, since it is read exclusively from the settings row, never from any service/category/equipmentType", async () => {
+    const fake = createFakeSupabase();
+    fake.db.wholesale_portal_settings[0].warranty_enabled = true;
+    fake.db.wholesale_portal_settings[0].warranty_duration_days = 30;
+    fake.db.wholesale_portal_settings[0].warranty_terms_en = "30-day warranty on all repairs.";
+    seedApprovedShopAndDevice(fake);
+    // A grouped card (PS5, seeded by seedEquipmentType's own default) AND a
+    // direct_services card (Microsoldering) both present in the same
+    // response — the warranty object must be the exact same value either
+    // way, proving it never varies by card type.
+    const grouped = seedEquipmentType(fake, { id: fake.nextId(), slug: "ps5-console-2" });
+    const groupedCat = seedCategory(fake, grouped.id, { id: fake.nextId(), slug: "ps5-2" });
+    seedService(fake, groupedCat.id, { id: fake.nextId() });
+    const direct = seedEquipmentType(fake, { id: fake.nextId(), slug: "microsoldering", name: "Microsoldering", catalog_mode: "direct_services" });
+    const directCat = seedCategory(fake, direct.id, { id: fake.nextId(), slug: "microsoldering-direct" });
+    seedService(fake, directCat.id, { id: fake.nextId(), name: "FPC Connector Soldering" });
+
+    const res = await callPrices(fake);
+    expect(res.body.warranty).toEqual({ enabled: true, durationDays: 30, termsEn: "30-day warranty on all repairs.", termsEs: null });
+    // Sanity: both card shapes really did make it into the response — the
+    // "identical warranty regardless of card type" claim only means
+    // something if both types are genuinely present here.
+    expect(res.body.equipmentTypes.some((et) => et.slug === "ps5-console-2")).toBe(true);
+    expect(res.body.microsolderingEquipmentType?.slug).toBe("microsoldering");
+  });
+});
+
 describe("GET /api/wholesale-prices: unauthorized/revoked access is unaffected by the pricing-intelligence extension", () => {
   it("still 401s with no session cookie", async () => {
     const fake = createFakeSupabase();

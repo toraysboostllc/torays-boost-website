@@ -4,6 +4,7 @@ import { computeFixedPricing, computeRangePricing, hasCompletePriceTiers } from 
 import { translateCatalogLabel, translateServiceName, resolveServiceDescription } from "../../lib/wholesaleCatalogI18n.js";
 import { wholesaleHoverProps } from "../../lib/wholesaleSound.js";
 import { computeAnimatedDisplayPrice, useCountUpProgress } from "../../lib/wholesalePriceAnimation.js";
+import { isWarrantyActive, resolveWarrantyTerms } from "../../lib/wholesaleWarranty.js";
 import { ServicePhoto } from "./ServicePhoto.jsx";
 
 /** Silver/Purple/Gold, in display order. Purely presentational metadata —
@@ -77,7 +78,7 @@ function formatTierMargin(pricing) {
  * numbers (wholesale price, customer estimate) and the arithmetic derived
  * from them.
  */
-export function WholesaleResultPanel({ selection, service, onConsultAnother }) {
+export function WholesaleResultPanel({ selection, service, warranty, onConsultAnother }) {
   const { t, formatPrice, formatDate, language } = useWholesaleLocale();
   const isQuote = service.pricing_type === "quote";
   const isRange = service.pricing_type === "range";
@@ -249,6 +250,31 @@ export function WholesaleResultPanel({ selection, service, onConsultAnother }) {
         <p className="wsp-result-recommendation">
           <strong>{t("result.recommendationHeading")}</strong> {service.notes}
         </p>
+      )}
+
+      {/* Global service warranty (Wholesale Shops -> Catalog -> Pricing &
+          Sales Settings in DESK, ONE setting for the whole portal) — comes
+          exclusively from the `warranty` prop, which is exactly
+          /api/wholesale-prices' top-level `warranty` field, threaded
+          through WholesalePrices.jsx -> WholesaleWizard.jsx unchanged.
+          Never reads service/selection/equipmentType — the exact same box
+          renders for every service, grouped or direct_services alike, with
+          no per-service/per-equipo override anywhere in this codebase.
+          Renders nothing at all (no empty box, no empty space) unless
+          isWarrantyActive(warranty) is true — off, or a malformed/
+          incomplete object (should never happen given the schema-level
+          CHECK constraint, but the client trusts nothing), both degrade to
+          "don't render". Terms follow resolveWarrantyTerms' EN/ES
+          fallback: the language-matched text first, then whichever
+          language IS set, matching resolveServiceDescription's own
+          established pattern. */}
+      {isWarrantyActive(warranty) && (
+        <div className="wsp-result-warranty">
+          <p className="wsp-result-warranty-title">{t("warranty.title", { days: warranty.durationDays })}</p>
+          {resolveWarrantyTerms(warranty, language) && (
+            <p className="wsp-result-warranty-terms">{resolveWarrantyTerms(warranty, language)}</p>
+          )}
+        </div>
       )}
 
       <p className="wsp-result-keep-customer-note">{t("result.keepCustomerNote")}</p>

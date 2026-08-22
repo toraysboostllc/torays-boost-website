@@ -47,6 +47,9 @@ function WholesalePricesContent() {
     // header. Not read here, only forwarded to WholesaleWizard.
     legacyMicrosoldering: null,
     salesModule: null,
+    // Global service warranty — see api/_lib/wholesaleDb.js's own comment.
+    // Not read here, only forwarded to WholesaleWizard.
+    warranty: null,
     errorMessage: "",
     legalDocumentId: null,
   });
@@ -92,6 +95,7 @@ function WholesalePricesContent() {
         microsolderingEquipmentType: result.microsolderingEquipmentType,
         legacyMicrosoldering: result.legacyMicrosoldering,
         salesModule: result.salesModule,
+        warranty: result.warranty,
         errorMessage: "",
         legalDocumentId: null,
       });
@@ -129,6 +133,7 @@ function WholesalePricesContent() {
       microsolderingEquipmentType: null,
       legacyMicrosoldering: null,
       salesModule: null,
+      warranty: null,
       errorMessage: "",
     });
     window.location.href = MAIN_WEBSITE_URL;
@@ -255,6 +260,7 @@ function WholesalePricesContent() {
             equipmentTypes={state.equipmentTypes}
             microsolderingEquipmentType={state.microsolderingEquipmentType}
             legacyMicrosoldering={state.legacyMicrosoldering}
+            warranty={state.warranty}
             onScreenChange={setWizardScreen}
           />
 

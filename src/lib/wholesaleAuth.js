@@ -79,6 +79,13 @@ export async function fetchWholesaleCatalog() {
     // it. Not read anywhere else in this file.
     legacyMicrosoldering: data.microsoldering || null,
     salesModule: data.salesModule || null,
+    // Global service warranty — see api/_lib/wholesaleDb.js's own comment.
+    // `|| null`, same fallback shape as every other field here, so an old
+    // cached client tab hitting a server response with no `warranty` key
+    // at all (impossible today, but the same defensive convention as the
+    // rest of this file) degrades to "no warranty configured" rather than
+    // throwing.
+    warranty: data.warranty || null,
   };
 }
 

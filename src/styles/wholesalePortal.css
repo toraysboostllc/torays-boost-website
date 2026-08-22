@@ -1595,6 +1595,38 @@
   font-weight: 700;
 }
 
+/* Global service warranty box — same soft-blue "informational" treatment
+   already established by .wsp-result-diagnostic-note (reused rgba(59,130,
+   246,...) tokens, no new color), directly below Torays Boost Recommendation
+   and above the "Consult another price" button / the large photo. Full
+   width within the panel's own padding (no negative-margin bleed, unlike
+   .wsp-result-recommendation above it) — a distinct box, not a plain text
+   line, so it reads as its own "here's what's included" callout. Responsive
+   by construction: no fixed width/height, wraps naturally, respects the
+   panel's own side padding at every breakpoint — the same way every other
+   block in this card already does, no separate mobile rule needed. */
+.wsp-result-warranty {
+  margin-top: 10px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.wsp-result-warranty-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--wsp-card-text);
+  line-height: 1.35;
+}
+
+.wsp-result-warranty-terms {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--wsp-card-text-soft);
+}
+
 .wsp-result-keep-customer-note {
   font-size: clamp(11.5px, 2.6vw, 13px);
   color: var(--wsp-card-text-soft);

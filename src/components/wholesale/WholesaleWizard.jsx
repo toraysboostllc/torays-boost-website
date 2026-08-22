@@ -99,7 +99,7 @@ function WizardSteps({ equipoDone, modeloDone, fallaDone, t }) {
  * delete it. Screen history is a simple stack (push forward, pop on Back)
  * instead of hardcoding a back-target per screen.
  */
-export function WholesaleWizard({ equipmentTypes, microsolderingEquipmentType, legacyMicrosoldering, onScreenChange }) {
+export function WholesaleWizard({ equipmentTypes, microsolderingEquipmentType, legacyMicrosoldering, warranty, onScreenChange }) {
   const { t, language } = useWholesaleLocale();
 
   const topEquipoList = useMemo(
@@ -310,6 +310,7 @@ export function WholesaleWizard({ equipmentTypes, microsolderingEquipmentType, l
             modelName: selectedModel?.name,
           }}
           service={selectedService}
+          warranty={warranty}
           onConsultAnother={resetToTop}
         />
       )}
