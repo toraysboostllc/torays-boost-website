@@ -196,7 +196,7 @@ export function WholesaleLegalAcceptModal({ legalDocumentId, onAccepted, onLogou
               <LogOut size={16} aria-hidden="true" />
               {t("legalAccept.logout")}
             </button>
-            <button type="submit" disabled={!canSubmit} className="wsp-btn wsp-btn-primary disabled:cursor-not-allowed disabled:opacity-50">
+            <button type="submit" disabled={!canSubmit} className="wsp-btn wsp-btn-primary">
               {submitting ? t("legalAccept.accepting") : t("legalAccept.accept")}
             </button>
           </div>

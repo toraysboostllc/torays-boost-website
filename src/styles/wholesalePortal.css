@@ -459,11 +459,34 @@
   font-size: 13px;
   cursor: pointer;
   border: 1px solid var(--wsp-border-strong);
-  transition: filter 0.12s ease, box-shadow 0.12s ease, transform 0.05s ease;
+  transition: filter 0.12s ease, box-shadow 0.12s ease, transform 0.05s ease, background 0.12s ease;
 }
 
-.wsp-btn:active {
+.wsp-btn:not(:disabled):active {
   transform: translateY(1px);
+}
+
+/* Focus-visible ring — keyboard/a11y only, never a plain mouse click. Same
+   accent blue as the primary button's own gradient highlight, so it reads
+   as an extension of the existing palette rather than a new color. Applies
+   to every .wsp-btn variant, including :disabled (a disabled button can
+   still receive focus and should still show where focus is). */
+.wsp-btn:focus-visible {
+  outline: 2px solid var(--wsp-blue-light);
+  outline-offset: 2px;
+}
+
+/* Disabled — deliberately NOT opacity-based. A translucent button over
+   this modal's light card fades its text along with the fill, which is
+   exactly what made a disabled/enabled CTA nearly unreadable before (see
+   the .wsp-btn-primary:disabled rule below). A flat, distinctly muted fill
+   with fully-opaque text reads as clearly inactive while staying legible. */
+.wsp-btn:disabled {
+  cursor: not-allowed;
+  opacity: 1;
+  filter: none;
+  transform: none;
+  box-shadow: none;
 }
 
 .wsp-btn-primary {
@@ -473,8 +496,25 @@
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 2px 5px rgba(15, 30, 70, 0.3);
 }
 
-.wsp-btn-primary:hover {
+.wsp-btn-primary:not(:disabled):hover {
   filter: brightness(1.08);
+}
+
+.wsp-btn-primary:not(:disabled):active {
+  filter: brightness(0.9);
+}
+
+/* Muted flat fill reusing the SAME surface3/btn-text pairing
+   .wsp-btn-ghost already uses for its own (enabled) background below —
+   no new colors, just applied to the disabled state of the primary
+   button. Solid, fully-opaque text stays legible; the flat fill (no
+   gradient, no glossy inset highlight) is what visually distinguishes
+   "disabled" from the vivid gradient of an active primary button. */
+.wsp-btn-primary:disabled {
+  background: var(--wsp-surface3);
+  color: var(--wsp-btn-text);
+  border-color: var(--wsp-border);
+  text-shadow: none;
 }
 
 .wsp-btn-ghost {
@@ -483,8 +523,12 @@
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset;
 }
 
-.wsp-btn-ghost:hover {
+.wsp-btn-ghost:not(:disabled):hover {
   background: linear-gradient(180deg, var(--wsp-blue-tint-strong) 0%, var(--wsp-blue-tint) 100%);
+}
+
+.wsp-btn-ghost:not(:disabled):active {
+  background: linear-gradient(180deg, var(--wsp-blue-tint) 0%, var(--wsp-navy) 100%);
 }
 
 /* ---------------------------------------------------------------------

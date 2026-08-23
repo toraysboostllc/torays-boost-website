@@ -181,18 +181,36 @@ function WholesalePricesContent() {
   // handleLogout as the rest of this page — always available, independent
   // of the form's validity, per each modal's own header comment.
   if (state.status === "legal_required") {
-    return state.documentType === "estimate_disclaimer" ? (
-      <WholesaleEstimateDisclaimerAcceptModal
-        legalDocumentId={state.legalDocumentId}
-        onAccepted={loadCatalog}
-        onLogout={handleLogout}
-      />
-    ) : (
-      <WholesaleLegalAcceptModal
-        legalDocumentId={state.legalDocumentId}
-        onAccepted={loadCatalog}
-        onLogout={handleLogout}
-      />
+    // wsp-scope wrapper — same pattern as the loading/error branches above
+    // and the main return below. Bug fixed 2026-08-22: this branch was the
+    // only one of the four missing it, so none of the --wsp-* custom
+    // properties (--wsp-blue, --wsp-blue-light, --wsp-navy, --wsp-btn-text,
+    // --wsp-border-strong, ...) were defined anywhere in this modal's
+    // render tree. .wsp-btn-primary's background is a gradient built
+    // entirely from those undefined variables, so the whole `background`
+    // declaration silently failed to resolve (an unresolvable var() makes
+    // the property invalid, not merely blank) — the "Accept and Enter" /
+    // "Accept and Continue" buttons rendered with no background and
+    // effectively invisible white text on the modal's light card, exactly
+    // the reported "casi no se ve" bug. Restoring the scope fixes both
+    // legal modals' buttons (primary and ghost/Logout alike) at the root
+    // cause, without touching wholesalePortal.css or either modal's markup.
+    return (
+      <div className="wsp-scope">
+        {state.documentType === "estimate_disclaimer" ? (
+          <WholesaleEstimateDisclaimerAcceptModal
+            legalDocumentId={state.legalDocumentId}
+            onAccepted={loadCatalog}
+            onLogout={handleLogout}
+          />
+        ) : (
+          <WholesaleLegalAcceptModal
+            legalDocumentId={state.legalDocumentId}
+            onAccepted={loadCatalog}
+            onLogout={handleLogout}
+          />
+        )}
+      </div>
     );
   }
 

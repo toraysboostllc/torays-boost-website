@@ -107,7 +107,7 @@ export function WholesaleEstimateDisclaimerAcceptModal({ legalDocumentId, onAcce
               <LogOut size={16} aria-hidden="true" />
               {t("estimateDisclaimerAccept.logout")}
             </button>
-            <button type="submit" disabled={!canSubmit} className="wsp-btn wsp-btn-primary disabled:cursor-not-allowed disabled:opacity-50">
+            <button type="submit" disabled={!canSubmit} className="wsp-btn wsp-btn-primary">
               {submitting ? t("estimateDisclaimerAccept.accepting") : t("estimateDisclaimerAccept.accept")}
             </button>
           </div>
