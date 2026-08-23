@@ -504,16 +504,25 @@
   filter: brightness(0.9);
 }
 
-/* Muted flat fill reusing the SAME surface3/btn-text pairing
-   .wsp-btn-ghost already uses for its own (enabled) background below —
-   no new colors, just applied to the disabled state of the primary
-   button. Solid, fully-opaque text stays legible; the flat fill (no
-   gradient, no glossy inset highlight) is what visually distinguishes
-   "disabled" from the vivid gradient of an active primary button. */
+/* Disabled fill — deliberately NOT the dark --wsp-surface3/--wsp-btn-text
+   pairing used elsewhere in this file. .wsp-btn-primary:disabled is ONLY
+   ever reachable on the two legal clickwrap modals' Accept buttons
+   (WholesaleLegalAcceptModal.jsx / WholesaleEstimateDisclaimerAcceptModal.jsx
+   — confirmed by grep, no other .wsp-btn-primary button is ever given a
+   `disabled` prop) — both sit on a LIGHT bg-torays-surface card, not the
+   dark .wsp-scope portal page this component's other tokens were designed
+   for. These exact hex values are the SAME torays-bg/torays-line/
+   torays-navy tokens that modal's own name/title text inputs already use
+   (see the `bg-torays-bg` inputs a few lines below this button in either
+   modal) — reused literally here (this file hardcodes every color as a
+   literal, same convention as the --wsp-* tokens above; not run through
+   Tailwind's theme()) rather than introducing a new palette. Solid,
+   fully-opaque, clearly-visible blue-gray fill with dark, legible navy
+   text and a real (not hairline) border — contrast ~12:1. */
 .wsp-btn-primary:disabled {
-  background: var(--wsp-surface3);
-  color: var(--wsp-btn-text);
-  border-color: var(--wsp-border);
+  background: #edf1f9;
+  color: #20266f;
+  border-color: rgba(15, 20, 36, 0.22);
   text-shadow: none;
 }
 
