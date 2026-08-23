@@ -3,9 +3,15 @@
  * approved for production — never mid-round. Keep in sync with the
  * "version" field in package.json.
  */
-export const APP_VERSION = "1.1.0";
+export const APP_VERSION = "1.1.1";
 
 export const VERSION_HISTORY = [
+  {
+    version: "1.1.1",
+    date: "2026-08-22",
+    summary:
+      "Wholesale Portal completion: dynamic equipment types and catalog architecture, predictive Live Search, global service warranty, microsoldering tag-based filtering, animated price reveal and the redesigned pricing wizard/result panel, a second lightweight Estimate Disclaimer legal document (accepted in parallel with the existing Master Agreement, never replacing it) with its own admin publishing flow, persistent trusted-device silent session refresh, a schema-qualification fix for the pgcrypto digest() publish error, a fix so the Estimate Disclaimer renders on /wholesale/legal even without a published Master Agreement bundle, corrected visibility/contrast/keyboard-accessibility states for both legal clickwrap Accept buttons, and a continuously scrolling pricing notice above the Torays Boost Sales card.",
+  },
   {
     version: "1.1.0",
     date: "2026-08-20",
