@@ -10,9 +10,17 @@ import acceptHandler from "../api/wholesale-accept-estimate-disclaimer.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
-const modalSrc = readFileSync(join(root, "src/components/wholesale/WholesaleEstimateDisclaimerAcceptModal.jsx"), "utf8");
-const pricesSrc = readFileSync(join(root, "src/pages/WholesalePrices.jsx"), "utf8");
-const authSrc = readFileSync(join(root, "src/lib/wholesaleAuth.js"), "utf8");
+// Normalized to LF before any regex/equality check — the checked-out
+// working tree can carry CRLF line endings (Windows, core.autocrlf), and
+// a couple of assertions below compare an exact captured line via strict
+// string equality; without this, that comparison is flaky depending on
+// how git last wrote this file to disk, even though the actual source
+// content never changed. Same defensive read this repo already uses in
+// wholesaleSalesModule.test.js.
+const read = (relPath) => readFileSync(join(root, relPath), "utf8").replace(/\r\n?/g, "\n");
+const modalSrc = read("src/components/wholesale/WholesaleEstimateDisclaimerAcceptModal.jsx");
+const pricesSrc = read("src/pages/WholesalePrices.jsx");
+const authSrc = read("src/lib/wholesaleAuth.js");
 const modalCodeOnly = modalSrc.replace(/\/\*[\s\S]*?\*\//g, "");
 
 /**
