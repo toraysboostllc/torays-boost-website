@@ -1833,6 +1833,74 @@
 }
 
 /* ---------------------------------------------------------------------
+   Pricing notice — sits directly above the Torays Boost Sales card (see
+   .wsp-wizard-sales-group; spacing between the two comes entirely from
+   that flex parent's own `gap`, nothing added here). Same .wsp-card
+   bevel/border/shadow language as every other card in this file, just a
+   flat icon+text row rather than a clickable/photo card.
+--------------------------------------------------------------------- */
+.wsp-pricing-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  /* This notice and the Sales card right below it share ONE plain wrapper
+     div (see WholesalePrices.jsx) with no flex/gap of its own — unlike
+     .wsp-wizard-sales-group one level up, which only spaces THIS wrapper
+     from the Wizard above it. Same clamp() no-scroll-spec scale as that
+     gap, just the smaller of the two internal spacings. */
+  margin-bottom: clamp(2px, 0.5vh, 12px);
+}
+
+.wsp-pricing-notice-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--wsp-red);
+}
+
+.wsp-pricing-notice-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--wsp-card-text);
+}
+
+/* Only "may change"/"pueden cambiar" pulses — never the icon or the rest
+   of the sentence. Slow (2.6s) and subtle (opacity 1 -> 0.72 -> 1, no
+   scale/position change) on purpose: a caution accent, not a distraction
+   next to a card a shop is trying to read. */
+.wsp-pricing-notice-highlight {
+  color: var(--wsp-red);
+  font-weight: 700;
+  animation: wsp-pricing-notice-pulse 2.6s ease-in-out infinite;
+}
+
+/* Pausing on hover/focus-within (never just the highlighted span, the
+   WHOLE notice — a shop's cursor is rarely exactly on the two-word
+   phrase) means the color holds still the moment attention is actually
+   on this text, keyboard or mouse alike. */
+.wsp-pricing-notice:hover .wsp-pricing-notice-highlight,
+.wsp-pricing-notice:focus-within .wsp-pricing-notice-highlight {
+  animation-play-state: paused;
+}
+
+@keyframes wsp-pricing-notice-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.72;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wsp-pricing-notice-highlight {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* ---------------------------------------------------------------------
    Wizard — Equipo / Modelo / Falla screens. `.wsp-grid-compact` is a
    variant of the existing `.wsp-grid` (never edited in place — other
    views may still rely on its 1-col-mobile default): 2 columns from

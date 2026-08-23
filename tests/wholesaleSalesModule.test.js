@@ -27,9 +27,20 @@ describe("Adenda 8 — Sales module hidden ONLY on the narrowest phones while th
   });
 
   it("the Sales module is wrapped in a conditional class applied ONLY when wizardScreen === 'result' — every other screen renders it with no wrapper class at all", () => {
-    const idx = pageSrc.indexOf("<WholesaleSalesModule");
-    const surrounding = pageSrc.slice(idx - 200, idx);
-    expect(surrounding).toContain('wizardScreen === "result" ? "wsp-sales-hide-on-narrow-result" : undefined');
+    // Finds the wrapper div by its own distinctive text rather than a
+    // fixed-length slice before <WholesaleSalesModule — the two can have
+    // other JSX (e.g. WholesalePricingNotice) between them without
+    // breaking this check, as long as the wrapper div still opens before
+    // and the module still renders inside it.
+    const wrapperIdx = pageSrc.indexOf('wizardScreen === "result" ? "wsp-sales-hide-on-narrow-result" : undefined');
+    const moduleIdx = pageSrc.indexOf("<WholesaleSalesModule");
+    expect(wrapperIdx, "conditional wrapper div not found").toBeGreaterThan(-1);
+    expect(moduleIdx, "<WholesaleSalesModule not found").toBeGreaterThan(-1);
+    expect(moduleIdx).toBeGreaterThan(wrapperIdx);
+    // And nothing OTHER than this exact wrapper closes before the module
+    // renders — no second, unrelated </div> sitting between them.
+    const between = pageSrc.slice(wrapperIdx, moduleIdx);
+    expect(between).not.toContain("</div>");
   });
 
   it("the CSS hide rule is scoped to <=379px (covers 320x568 and 375x667; 390x844 and up are untouched) and targets ONLY the conditional wrapper class, never .wsp-sales-module directly (which would hide it on every screen, not just the result screen)", () => {

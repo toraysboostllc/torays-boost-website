@@ -10,6 +10,7 @@ import { WholesaleLocaleSelector } from "../components/wholesale/WholesaleLocale
 import { WholesaleSoundToggle } from "../components/wholesale/WholesaleSoundToggle.jsx";
 import { WholesaleWizard } from "../components/wholesale/WholesaleWizard.jsx";
 import { WholesaleSalesModule } from "../components/wholesale/WholesaleSalesModule.jsx";
+import { WholesalePricingNotice } from "../components/wholesale/WholesalePricingNotice.jsx";
 import { WholesaleLegalAcceptModal } from "../components/wholesale/WholesaleLegalAcceptModal.jsx";
 import { WholesaleEstimateDisclaimerAcceptModal } from "../components/wholesale/WholesaleEstimateDisclaimerAcceptModal.jsx";
 
@@ -311,6 +312,10 @@ function WholesalePricesContent() {
               instead. Every other screen and every wider breakpoint keeps
               it visible exactly as before. */}
           <div className={wizardScreen === "result" ? "wsp-sales-hide-on-narrow-result" : undefined}>
+            {/* Directly above the Sales card, and gated by the exact same
+                salesModule.visible flag — never a notice left floating
+                with no card below it if DESK ever hides the module. */}
+            {state.salesModule?.visible && <WholesalePricingNotice />}
             <WholesaleSalesModule salesModule={state.salesModule} />
           </div>
         </div>

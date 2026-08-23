@@ -117,6 +117,15 @@ export const wholesaleTranslations = {
       maintenanceMessage:
         "Torays Boost Sales is under maintenance. Soon you'll be able to buy parts, equipment, and accessories at special shop prices.",
     },
+    // Split into 3 parts (never one string with a placeholder) so only
+    // "may change" renders inside the red <span> — plain text composition
+    // in JSX, same discipline as the rest of this file (never
+    // dangerouslySetInnerHTML).
+    pricingNotice: {
+      before: "Prices are based on market conditions and ",
+      highlight: "may change",
+      after: ". Always verify the current price before quoting.",
+    },
     legal: {
       pageTitle: "Torays Boost Pro — Legal Documents",
       pageSubtitle: "Read, print, or save any of these documents at any time — before or after you accept them.",
@@ -277,6 +286,11 @@ export const wholesaleTranslations = {
       statusActive: "Activo",
       maintenanceMessage:
         "Torays Boost Sales está en mantenimiento. Próximamente podrás comprar piezas, equipos y accesorios con precios especiales para shops.",
+    },
+    pricingNotice: {
+      before: "Los precios se basan en las condiciones del mercado y ",
+      highlight: "pueden cambiar",
+      after: ". Verifique siempre el precio actual antes de cotizar.",
     },
     legal: {
       pageTitle: "Torays Boost Pro — Documentos Legales",
