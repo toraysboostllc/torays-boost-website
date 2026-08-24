@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { computeFixedPricing } from "../src/lib/wholesaleMargin.js";
+import { wholesaleTranslations } from "../src/i18n/wholesaleTranslations.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
@@ -142,9 +143,24 @@ describe("WholesaleResultPanel.jsx: breadcrumb summary and required disclaimers"
     expect(panelSrc).toContain('t("result.disclaimer")');
   });
 
-  it("the Check another price button calls onConsultAnother (wrapped for the hover/tap sound) — no inline navigation/reset logic duplicated here", () => {
+  it("the Back to Price Menu button calls onConsultAnother (wrapped for the hover/tap sound) — no inline navigation/reset logic duplicated here, exact same action as before this button's redesign", () => {
     expect(panelSrc).toMatch(/wholesaleHoverProps\(onConsultAnother\)/);
     expect(panelSrc).toContain('t("result.consultAnother")');
+  });
+
+  it("the button's accessible name (aria-label) is localized through the same t() key as its visible label, never a hardcoded string", () => {
+    const btnIdx = panelSrc.indexOf('className="wsp-btn wsp-result-consult-another"');
+    expect(btnIdx).toBeGreaterThan(-1);
+    const ariaIdx = panelSrc.indexOf('aria-label={t("result.consultAnother")}', btnIdx);
+    expect(ariaIdx).toBeGreaterThan(btnIdx);
+    expect(ariaIdx).toBeLessThan(panelSrc.indexOf("</button>", btnIdx));
+  });
+
+  it("result.consultAnother reads exactly 'Back to Price Menu' in English and 'Volver al menú de precios' in Spanish, through the existing i18n dictionary — never hardcoded in the component", () => {
+    expect(wholesaleTranslations.en.result.consultAnother).toBe("Back to Price Menu");
+    expect(wholesaleTranslations.es.result.consultAnother).toBe("Volver al menú de precios");
+    expect(panelSrc).not.toMatch(/>Back to Price Menu</);
+    expect(panelSrc).not.toMatch(/>Volver al menú de precios</);
   });
 });
 
@@ -266,13 +282,13 @@ describe("WholesaleResultPanel.jsx: money hierarchy — Shop Cost is the dominan
     expect(block).not.toContain("clamp(");
   });
 
-  it("the Check Another Price button never drops below the 44px minimum touch target at any width", () => {
+  it("the Back to Price Menu button never drops below the 48px minimum height required by the redesign spec, at any width", () => {
     const baseIdx = cssSrc.indexOf(".wsp-result-consult-another {");
     const baseBlock = cssSrc.slice(baseIdx, cssSrc.indexOf("}", baseIdx));
     expect(baseBlock).toMatch(/min-height:\s*56px;/);
     const narrowIdx = cssSrc.indexOf("@media (max-width: 359px) {\n  .wsp-result-consult-another {");
     const narrowBlock = cssSrc.slice(narrowIdx, cssSrc.indexOf("}", narrowIdx));
-    expect(narrowBlock).toMatch(/min-height:\s*44px;/);
+    expect(narrowBlock).toMatch(/min-height:\s*48px;/);
   });
 
   it("desktop (>=640px) tier price value is exactly within the 30-34px spec range — the mobile floor above never applies past that breakpoint", () => {
@@ -540,7 +556,7 @@ describe("wholesalePortal.css: warranty box — service-recommendation-adjacent 
   });
 });
 
-describe("wholesalePortal.css: 'Check another price' is a fixed-width rectangular button, never a full-width bar", () => {
+describe("wholesalePortal.css: 'Back to Price Menu' is a fixed-width rectangular button, never a full-width bar", () => {
   const block = cssSrc.slice(cssSrc.indexOf(".wsp-result-consult-another {"), cssSrc.indexOf("}", cssSrc.indexOf(".wsp-result-consult-another {")));
 
   it("is centered (align-self: center), never stretched to the panel's full width", () => {
@@ -556,23 +572,76 @@ describe("wholesalePortal.css: 'Check another price' is a fixed-width rectangula
     expect(capPx).toBeLessThanOrEqual(320);
   });
 
-  it("height is within the approved 54-58px range", () => {
+  it("height stays at its existing 56px — comfortably above the 48px minimum required by the redesign spec, and keeps the button's approximate current size", () => {
     const minHeight = Number(block.match(/min-height:\s*(\d+)px/)[1]);
-    expect(minHeight).toBeGreaterThanOrEqual(54);
+    expect(minHeight).toBeGreaterThanOrEqual(48);
     expect(minHeight).toBeLessThanOrEqual(58);
   });
 
-  it("border-radius is close to the approved ~12px", () => {
+  it("border-radius is exactly the spec's 12px", () => {
     const radius = Number(block.match(/border-radius:\s*(\d+)px/)[1]);
-    expect(radius).toBeGreaterThanOrEqual(10);
-    expect(radius).toBeLessThanOrEqual(14);
+    expect(radius).toBe(12);
   });
 
-  it("the reset icon (RotateCcw) is still the first child, before the label text — icon-left, matching the approved spec", () => {
-    const btnIdx = panelSrc.indexOf('className="wsp-btn wsp-btn-primary wsp-result-consult-another"');
-    const iconIdx = panelSrc.indexOf("<RotateCcw", btnIdx);
-    const labelIdx = panelSrc.indexOf('t("result.consultAnother")', btnIdx);
+  it("the ArrowLeft icon is the first child, before the label text — icon-left, matching the approved spec (the aria-label attribute also carries the same t() call, so the label TEXT NODE is deliberately located by searching after the icon, not the attribute)", () => {
+    const btnIdx = panelSrc.indexOf('className="wsp-btn wsp-result-consult-another"');
+    expect(btnIdx).toBeGreaterThan(-1);
+    const iconIdx = panelSrc.indexOf("<ArrowLeft", btnIdx);
     expect(iconIdx).toBeGreaterThan(btnIdx);
-    expect(iconIdx).toBeLessThan(labelIdx);
+    const labelIdx = panelSrc.indexOf('t("result.consultAnother")', iconIdx);
+    expect(labelIdx).toBeGreaterThan(iconIdx);
+  });
+
+  it("the old circular reset icon (RotateCcw) is gone from this component entirely, not just from this one button", () => {
+    expect(panelSrc).not.toMatch(/RotateCcw/);
+  });
+
+  it("no longer carries wsp-btn-primary — the shared blue gradient class stays untouched and unused by this button, which now supplies its own solid color entirely via wsp-result-consult-another", () => {
+    expect(panelSrc).not.toContain('className="wsp-btn wsp-btn-primary wsp-result-consult-another"');
+    expect(panelSrc).toContain('className="wsp-btn wsp-result-consult-another"');
+  });
+
+  it("solid green fill, exactly the requested hex — never a gradient", () => {
+    expect(block).toContain("background: #16a34a;");
+    expect(block).toContain("color: #ffffff;");
+    expect(block).not.toMatch(/linear-gradient/i);
+  });
+
+  it("hover and active states use the exact requested darker greens", () => {
+    const hoverIdx = cssSrc.indexOf(".wsp-result-consult-another:not(:disabled):hover {");
+    const hoverBlock = cssSrc.slice(hoverIdx, cssSrc.indexOf("}", hoverIdx));
+    expect(hoverBlock).toContain("background: #15803d;");
+
+    const activeIdx = cssSrc.indexOf(".wsp-result-consult-another:not(:disabled):active {");
+    const activeBlock = cssSrc.slice(activeIdx, cssSrc.indexOf("}", activeIdx));
+    expect(activeBlock).toContain("background: #166534;");
+  });
+
+  it("has a light, professional shadow — present, but not the old heavy blue-tinted glow", () => {
+    expect(block).toMatch(/box-shadow:\s*0 2px 6px/);
+    expect(block).not.toMatch(/rgba\(15, 30, 70, 0\.35\)/); // the old heavy shadow value
+  });
+
+  it("has its own distinct green focus-visible ring, separate from the portal's default blue .wsp-btn ring", () => {
+    const focusIdx = cssSrc.indexOf(".wsp-result-consult-another:focus-visible {");
+    expect(focusIdx).toBeGreaterThan(-1);
+    const focusBlock = cssSrc.slice(focusIdx, cssSrc.indexOf("}", focusIdx));
+    expect(focusBlock).toContain("outline: 2px solid #86efac;");
+    expect(focusBlock).not.toContain("var(--wsp-blue-light)");
+  });
+
+  it("never clips or forces the label onto one line — no overflow:hidden/white-space:nowrap that could cut off 'Back to Price Menu' on a narrow phone", () => {
+    expect(block).not.toContain("overflow: hidden");
+    expect(block).not.toContain("white-space: nowrap");
+  });
+
+  it("keeps its icon-text gap and centering from the shared .wsp-btn base (display:inline-flex, align-items:center, justify-content:center, gap:6px) — this button overrides colors/shape only, never the shared layout mechanics", () => {
+    expect(panelSrc).toContain('className="wsp-btn wsp-result-consult-another"');
+    const wspBtnIdx = cssSrc.indexOf(".wsp-btn {");
+    const wspBtnBlock = cssSrc.slice(wspBtnIdx, cssSrc.indexOf("}", wspBtnIdx));
+    expect(wspBtnBlock).toContain("display: inline-flex;");
+    expect(wspBtnBlock).toContain("align-items: center;");
+    expect(wspBtnBlock).toContain("gap: 6px;");
+    expect(block).toContain("justify-content: center;");
   });
 });

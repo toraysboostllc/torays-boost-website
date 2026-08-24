@@ -1702,22 +1702,48 @@
    below that on a screen too narrow to fit it (accounting for the panel's
    own side padding, that's only the very narrowest phones), so it never
    becomes an unnecessarily long bar. */
+/* Solid green "Back to Price Menu" treatment — deliberately its own flat
+   color, not the shared blue .wsp-btn-primary gradient (that class is used
+   by other buttons across the portal and stays completely untouched; this
+   button no longer carries it at all — see WholesaleResultPanel.jsx). No
+   border either: --wsp-border-strong is a blue tone that would clash with
+   a solid green fill, and the spec calls for a clean flat button, never a
+   gradient/border treatment. */
 .wsp-result-consult-another {
   align-self: center;
   justify-content: center;
   width: min(300px, 100%);
-  min-height: 56px;
+  min-height: 56px; /* comfortably above the 48px minimum, keeps the button's existing size */
   border-radius: 12px;
   margin-top: 14px;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 6px 16px rgba(15, 30, 70, 0.35);
+  background: #16a34a;
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 2px 6px rgba(15, 30, 70, 0.18);
+}
+
+.wsp-result-consult-another:not(:disabled):hover {
+  background: #15803d;
+}
+
+.wsp-result-consult-another:not(:disabled):active {
+  background: #166534;
+}
+
+/* Green focus ring, distinct from the blue ring every other .wsp-btn uses
+   (.wsp-btn:focus-visible) — matches this button's own green identity
+   instead of the portal's default blue accent. */
+.wsp-result-consult-another:focus-visible {
+  outline: 2px solid #86efac;
+  outline-offset: 2px;
 }
 
 /* No-scroll pass: only the narrowest phones (320px-class) need the button
    itself to shrink — 375/390 already pass at the full 56px touch target.
-   46px stays above the 44px minimum touch-target guideline. */
+   48px is the redesign spec's own minimum (never lower, even here). */
 @media (max-width: 359px) {
   .wsp-result-consult-another {
-    min-height: 44px;
+    min-height: 48px;
     margin-top: 0;
   }
 }

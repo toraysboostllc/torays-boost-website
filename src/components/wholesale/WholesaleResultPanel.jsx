@@ -1,4 +1,4 @@
-import { RotateCcw, ShieldCheck, Tag, Star, TrendingUp } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Tag, Star, TrendingUp } from "lucide-react";
 import { useWholesaleLocale } from "../../i18n/WholesaleLocaleContext.jsx";
 import { computeFixedPricing, computeRangePricing, hasCompletePriceTiers } from "../../lib/wholesaleMargin.js";
 import { translateCatalogLabel, translateServiceName, resolveServiceDescription } from "../../lib/wholesaleCatalogI18n.js";
@@ -309,12 +309,21 @@ export function WholesaleResultPanel({ selection, service, warranty, onConsultAn
         {t("result.priceUpdatedLabel")}: {formatDate(service.price_updated_at) || t("result.priceUpdatedNone")}
       </p>
 
+      {/* Same onConsultAnother action/logic as before (wired through
+          wholesaleHoverProps for the existing hover/tap sound) — only the
+          icon/label/color changed, to read immediately as "go back to the
+          price menu" rather than a generic reset. Deliberately NOT
+          wsp-btn-primary (that class is shared with other buttons across
+          the portal, e.g. the legal modals' Accept button, and stays
+          untouched) — wsp-result-consult-another alone now supplies this
+          button's solid green look, so nothing else is affected. */}
       <button
         type="button"
         {...wholesaleHoverProps(onConsultAnother)}
-        className="wsp-btn wsp-btn-primary wsp-result-consult-another"
+        className="wsp-btn wsp-result-consult-another"
+        aria-label={t("result.consultAnother")}
       >
-        <RotateCcw size={16} aria-hidden="true" />
+        <ArrowLeft size={16} aria-hidden="true" />
         {t("result.consultAnother")}
       </button>
 

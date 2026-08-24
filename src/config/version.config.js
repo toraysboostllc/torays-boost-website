@@ -3,9 +3,15 @@
  * approved for production — never mid-round. Keep in sync with the
  * "version" field in package.json.
  */
-export const APP_VERSION = "1.2.0";
+export const APP_VERSION = "1.2.1";
 
 export const VERSION_HISTORY = [
+  {
+    version: "1.2.1",
+    date: "2026-08-24",
+    summary:
+      "Redesigned the Wholesale Portal's price-result \"Check another price\" button so it reads immediately as a way back: renamed to \"Back to Price Menu\" / \"Volver al menú de precios\", the circular reset icon replaced with a plain ArrowLeft, and the button restyled as a solid green action (#16A34A, hover #15803D, active #166534, white text/icon, no gradient, 12px radius, its own green focus ring) instead of the shared blue gradient every other primary button uses. The button's action is completely unchanged — it still calls the exact same onConsultAnother/resetToTop handler that resets the wizard back to its top screen.",
+  },
   {
     version: "1.2.0",
     date: "2026-08-24",
