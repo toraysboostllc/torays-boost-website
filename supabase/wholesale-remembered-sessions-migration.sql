@@ -1,0 +1,78 @@
+-- ============================================================================
+-- "Keep me signed in on this device" — persistent-vs-session-only login
+-- ============================================================================
+-- Additive follow-up to wholesale-migration.sql (which created
+-- wholesale_sessions) and the persistent-trusted-device silent refresh
+-- already built on top of it (see attemptSilentDeviceSessionRefresh in
+-- api/_lib/wholesaleDb.js). Run in the same Supabase project's SQL Editor.
+--
+-- Scope of this file, exactly: ONE new column on the EXISTING
+-- wholesale_sessions table. No new table, no new RPC, no change to
+-- wholesale_shops, wholesale_devices, wholesale_access_log, or any other
+-- wholesale_* table.
+--
+-- ----------------------------------------------------------------------------
+-- WHY a column on wholesale_sessions, not a new mechanism:
+--
+-- The shop's own choice at login time — "Keep me signed in on this device"
+-- checked or not — has to be remembered somewhere so that a LATER silent
+-- refresh (which runs with no user present to ask again) can honor it. The
+-- most recent session row for a device is already exactly what
+-- attemptSilentDeviceSessionRefresh() reads to decide "was this explicitly
+-- revoked" (via revoked_at); this migration adds one more thing for that
+-- same row to answer: "did the shop ask to be remembered".
+--
+-- Application-side contract (api/_lib/wholesaleDb.js, api/wholesale-login.js
+-- — code, not this file):
+--   - Checked at login -> remembered = true, AND the ws_session cookie is
+--     set with the existing 30-day Max-Age (persists across browser
+--     restarts, exactly like every session did before this migration).
+--   - Unchecked at login -> remembered = false, AND the ws_session cookie is
+--     set with NO Max-Age at all (a true session cookie — the browser
+--     discards it when it closes; standard, well-understood cookie
+--     semantics, the only mechanism a web app has for this).
+--   - attemptSilentDeviceSessionRefresh() declines (falls through to an
+--     ordinary 401, exactly like a revoked session) when the device's most
+--     recent session has remembered = false — so a shop that didn't check
+--     the box never gets silently logged back in after their session-only
+--     cookie is gone. It still proceeds, unaffected, when the most recent
+--     session is remembered = true, or (unchanged, pre-existing behavior)
+--     when the device has no session row yet at all.
+--   - Every EXISTING revocation path — logout, admin "Close sessions", a
+--     regenerated Access Code, an individually revoked device, a blocked
+--     shop — is untouched by this migration and keeps working exactly as
+--     it already did; remembered is an ADDITIONAL condition for a silent
+--     refresh to proceed, never a replacement for any of those checks.
+--
+-- DEFAULT true, not false: every session ever minted before this migration
+-- behaved as fully persistent (30-day cookie, silently refreshed
+-- indefinitely until explicitly revoked) — that is what `true` means here.
+-- Backfilling every existing row to `true` preserves that exact behavior for
+-- every shop already using the portal; nothing about their access changes
+-- the moment this migration runs.
+--
+-- Idempotent — `add column if not exists`, wrapped in one explicit
+-- transaction: if anything fails, Postgres rolls back everything, never a
+-- half-applied schema.
+--
+-- No DELETE, no DROP, no data loss anywhere in this file. Every existing
+-- column and row on wholesale_sessions keeps its current value untouched.
+-- ============================================================================
+
+begin;
+
+alter table wholesale_sessions add column if not exists remembered boolean not null default true;
+
+commit;
+
+-- ============================================================================
+-- Not part of the transaction above, on purpose — read this, do not run it
+-- as part of this file:
+--
+--   Run supabase/wholesale-remembered-sessions-preflight.sql BEFORE this
+--   file, and supabase/wholesale-remembered-sessions-verify.sql AFTER.
+--
+--   supabase/wholesale-remembered-sessions-rollback.sql documents how to
+--   undo the one column this file adds, for reference only — it is never
+--   run automatically and is not part of this migration.
+-- ============================================================================

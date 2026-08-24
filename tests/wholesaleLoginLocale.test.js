@@ -31,8 +31,8 @@ describe("WholesaleLogin.jsx: locale selector added, auth logic untouched", () =
     expect(loginSrc).toContain('t("login.pendingDefault")');
   });
 
-  it("handleSubmit still calls wholesaleLogin(shopName, code) with exactly 2 arguments — code now normalized, not just trimmed", () => {
-    expect(loginSrc).toContain("const result = await wholesaleLogin(shopName.trim(), normalizeShopCode(code));");
+  it("handleSubmit still calls wholesaleLogin(shopName, code, rememberDevice) — code normalized, not just trimmed, plus the 'Keep me signed in' choice", () => {
+    expect(loginSrc).toContain("const result = await wholesaleLogin(shopName.trim(), normalizeShopCode(code), rememberDevice);");
   });
 
   it("navigation on success is unchanged: still navigate('/wholesale/prices')", () => {
@@ -43,10 +43,13 @@ describe("WholesaleLogin.jsx: locale selector added, auth logic untouched", () =
     expect(loginSrc).toMatch(/\{message \|\| t\("login\.pendingDefault"\)\}/);
   });
 
-  it("no new network call, cookie, or storage access was added to this file", () => {
+  it("no raw fetch(), cookie, or storage access was added directly to this file — every real network call stays wrapped in wholesaleAuth.js's own functions", () => {
     expect(loginSrc).not.toMatch(/localStorage\.setItem|localStorage\.getItem/);
     expect(loginSrc).not.toMatch(/document\.cookie/);
     const fetchCalls = (loginSrc.match(/fetch\(/g) || []).length;
-    expect(fetchCalls).toBe(0); // all real network calls stay inside wholesaleLogin() itself, unchanged
+    // wholesaleLogin() and the silent-session-check's fetchWholesaleCatalog()
+    // both live in wholesaleAuth.js, not here — this file only ever calls
+    // those wrapped functions, never fetch() directly.
+    expect(fetchCalls).toBe(0);
   });
 });

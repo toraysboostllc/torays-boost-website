@@ -3,9 +3,15 @@
  * approved for production — never mid-round. Keep in sync with the
  * "version" field in package.json.
  */
-export const APP_VERSION = "1.1.3";
+export const APP_VERSION = "1.2.0";
 
 export const VERSION_HISTORY = [
+  {
+    version: "1.2.0",
+    date: "2026-08-24",
+    summary:
+      "New feature: \"Keep me signed in on this device\" on the Wholesale Shop Login screen. A shop can now check a box so their session survives a browser restart (the existing 30-day trusted-device session, reused as-is — no new mechanism); left unchecked, the session ends the moment the browser closes (a true session cookie, no Max-Age) and is never silently restored later. Returning to /wholesale with an already-valid session now skips the login form entirely and goes straight to the catalog. The Access Code itself is still never stored anywhere in the browser — only HttpOnly cookies holding opaque, unrelated session/device tokens. Device approval and every existing protection (logout, admin block/revoke, Access Code regeneration) are untouched and still immediately end a remembered session.",
+  },
   {
     version: "1.1.3",
     date: "2026-08-24",

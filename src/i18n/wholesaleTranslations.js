@@ -24,8 +24,11 @@ export const wholesaleTranslations = {
       title: "Shop Login",
       shopName: "Shop Name",
       accessCode: "Access Code",
+      rememberMe: "Keep me signed in on this device",
+      rememberMeWarning: "Do not use on a public or shared device.",
       submit: "Log In",
       submitting: "Checking…",
+      checkingSession: "Checking your session…",
       pendingDefault: "This device needs approval. We'll let you know once it's approved.",
     },
     portal: {
@@ -197,8 +200,11 @@ export const wholesaleTranslations = {
       title: "Acceso de Taller",
       shopName: "Nombre del Taller",
       accessCode: "Código de Acceso",
+      rememberMe: "Mantener mi sesión iniciada en este dispositivo",
+      rememberMeWarning: "No uses esta opción en un dispositivo público o compartido.",
       submit: "Iniciar Sesión",
       submitting: "Verificando…",
+      checkingSession: "Verificando tu sesión…",
       pendingDefault: "Este dispositivo necesita aprobación. Te avisaremos cuando esté aprobado.",
     },
     portal: {

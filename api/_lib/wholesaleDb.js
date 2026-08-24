@@ -143,7 +143,7 @@ export async function updateDevice(env, id, patch) {
   });
 }
 
-export async function createSession(env, { shopId, deviceId, tokenHash, expiresAt }) {
+export async function createSession(env, { shopId, deviceId, tokenHash, expiresAt, remembered }) {
   await rest(env, `wholesale_sessions`, {
     method: "POST",
     headers: { Prefer: "return=minimal" },
@@ -152,6 +152,12 @@ export async function createSession(env, { shopId, deviceId, tokenHash, expiresA
       device_id: deviceId,
       session_token_hash: tokenHash,
       expires_at: expiresAt,
+      // "Keep me signed in on this device" — see wholesale-remembered-
+      // sessions-migration.sql's own header for the full contract. Always
+      // an explicit boolean here (mintSession always passes one); the
+      // column's own DEFAULT true only matters for rows inserted before
+      // this field existed in application code.
+      remembered: Boolean(remembered),
     }),
   });
 }
@@ -253,11 +259,16 @@ export async function findMostRecentSessionForDevice(env, deviceId) {
  *  SAME code, never two independent reimplementations of "create a session
  *  token, hash it, store it, hand back the plaintext token to set as a
  *  cookie." Returns the plaintext token (never stored anywhere itself —
- *  only its hash is) so the caller can set the ws_session cookie. */
-export async function mintSession(env, { shopId, deviceId, sessionDays }) {
+ *  only its hash is) so the caller can set the ws_session cookie.
+ *
+ *  `remembered` records whether THIS session came from a "Keep me signed in
+ *  on this device" login — see wholesale-remembered-sessions-migration.sql.
+ *  Always pass it explicitly; there is no default here on purpose, so a
+ *  caller can never silently forget to decide. */
+export async function mintSession(env, { shopId, deviceId, sessionDays, remembered }) {
   const sessionToken = randomToken();
   const expiresAt = new Date(Date.now() + sessionDays * 24 * 60 * 60 * 1000).toISOString();
-  await createSession(env, { shopId, deviceId, tokenHash: sha256Hex(sessionToken), expiresAt });
+  await createSession(env, { shopId, deviceId, tokenHash: sha256Hex(sessionToken), expiresAt, remembered });
   return { sessionToken, expiresAt };
 }
 
@@ -281,15 +292,28 @@ export async function mintSession(env, { shopId, deviceId, sessionDays }) {
  *   - Shop blocked: same shop.status check already used everywhere else.
  *   - A device with a cookie that doesn't match any row (new browser, or a
  *     tampered/bogus token): findDeviceByTokenHashAnyShop returns null.
+ *   - "Keep me signed in on this device" was left UNCHECKED at the most
+ *     recent login: that session's `remembered` column is `false` (see
+ *     wholesale-remembered-sessions-migration.sql) — declined below, exactly
+ *     like an explicit revocation. This is what makes "don't remember me"
+ *     actually mean something: without this check, the ws_device cookie
+ *     alone (400-day, unaffected by the checkbox — see wholesale-login.js)
+ *     would silently re-authenticate the shop on its very next visit even
+ *     though they asked not to be remembered.
  *
  *  A device that simply has NO session yet (approved by an admin, but the
  *  shop never actually completed a login on this browser) is treated the
- *  same as "nothing to have been revoked" — proceed. This function never
- *  creates a wholesale_devices row under any circumstance; an unrecognized
- *  device cookie always falls through to the ordinary "please log in"
- *  path, exactly like having no cookie at all — the "every new device
- *  starts pending" rule in wholesale-login.js is completely untouched by
- *  this code path. */
+ *  same as "nothing to have been revoked" — proceed. Likewise, a session
+ *  minted before the `remembered` column existed reads as `true` (the
+ *  column's own DEFAULT — see the migration) and proceeds exactly as every
+ *  session already did before this feature existed. Either way, `!==
+ *  false` (never a strict `=== true`) is the check — only an EXPLICIT
+ *  false, from a real "Keep me signed in" left unchecked, declines. This
+ *  function never creates a wholesale_devices row under any circumstance;
+ *  an unrecognized device cookie always falls through to the ordinary
+ *  "please log in" path, exactly like having no cookie at all — the "every
+ *  new device starts pending" rule in wholesale-login.js is completely
+ *  untouched by this code path. */
 export async function attemptSilentDeviceSessionRefresh(env, { deviceTokenHash, ip, userAgent }) {
   const device = await findDeviceByTokenHashAnyShop(env, deviceTokenHash).catch(() => null);
   if (!device || device.status !== "approved") return null;
@@ -304,11 +328,22 @@ export async function attemptSilentDeviceSessionRefresh(env, { deviceTokenHash, 
   // exactly this everywhere else in the codebase.
   const mostRecent = await findMostRecentSessionForDevice(env, device.id).catch(() => null);
   if (mostRecent && mostRecent.revoked_at) return null;
+  // See this function's own header — only an explicit `false` (a real
+  // "Keep me signed in" left unchecked) declines; missing/legacy/true all
+  // proceed.
+  if (mostRecent && mostRecent.remembered === false) return null;
 
+  // A silent refresh always mints a `remembered: true` session — reaching
+  // this line already means the most recent session was either explicitly
+  // remembered, or predates the checkbox entirely (both cases behave the
+  // same: fully persistent, chained forward indefinitely until something
+  // explicitly revokes it, exactly as every session already did before
+  // this feature existed).
   const { sessionToken } = await mintSession(env, {
     shopId: shop.id,
     deviceId: device.id,
     sessionDays: WHOLESALE_SESSION_DAYS,
+    remembered: true,
   });
   await logEvent(env, {
     shopId: shop.id,

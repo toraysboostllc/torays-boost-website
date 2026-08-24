@@ -95,7 +95,7 @@ describe("WholesaleLogin.jsx: existing behavior is untouched by this hardening p
 
   it("shopName still trims only at submit time (handleSubmit), not on every keystroke", () => {
     expect(loginSrc).toContain("onChange={(e) => setShopName(e.target.value)}");
-    expect(loginSrc).toContain("wholesaleLogin(shopName.trim(), normalizeShopCode(code));");
+    expect(loginSrc).toContain("wholesaleLogin(shopName.trim(), normalizeShopCode(code), rememberDevice);");
   });
 
   it("submit button disabled state and loading copy are unchanged", () => {

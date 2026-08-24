@@ -48,7 +48,7 @@ describe("WholesaleLogin.jsx: access code field normalizes live and again before
   });
 
   it("normalizes again immediately before calling wholesaleLogin (defense in depth)", () => {
-    expect(loginSrc).toContain("wholesaleLogin(shopName.trim(), normalizeShopCode(code))");
+    expect(loginSrc).toContain("wholesaleLogin(shopName.trim(), normalizeShopCode(code), rememberDevice)");
     expect(loginSrc).not.toContain("wholesaleLogin(shopName.trim(), code.trim())");
   });
 

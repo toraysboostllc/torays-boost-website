@@ -12,6 +12,22 @@
  * set here via Set-Cookie — never in the JSON body, never read/written by
  * client-side JS, never in localStorage.
  *
+ * "Keep me signed in on this device" (rememberDevice in the request body):
+ * checked -> the ws_session cookie gets its usual persistent 30-day Max-Age,
+ * and the session row is stored with remembered=true, so a later silent
+ * refresh (see attemptSilentDeviceSessionRefresh in _lib/wholesaleDb.js) is
+ * allowed to keep the shop signed in past a browser restart. Unchecked ->
+ * the ws_session cookie is set with NO Max-Age at all (a true session
+ * cookie — gone when the browser closes; standard cookie semantics, the
+ * only mechanism available for this), and the session row is stored with
+ * remembered=false, so a later silent refresh explicitly declines rather
+ * than silently re-authenticating the shop against their own choice. Either
+ * way, the ws_device cookie (400-day, tracks device APPROVAL, a completely
+ * separate concept — see wholesale-remembered-sessions-migration.sql) is
+ * unaffected: not checking the box never forces a device back into
+ * "pending" or strips its approval, it only changes whether that approved
+ * device is allowed to silently sign back in later.
+ *
  * Every response is deliberately vague about *why* a login failed (shop
  * not found vs. wrong code look identical) so this endpoint can't be used
  * to enumerate shop names.
@@ -77,6 +93,11 @@ export default async function handler(req, res) {
   }
   const shopName = typeof body.shopName === "string" ? body.shopName.trim() : "";
   const code = normalizeShopCode(body.code);
+  // Strict boolean check — anything other than the literal `true` (missing,
+  // "true" the string, 1, etc.) is treated as unchecked. Never trust a truthy
+  // coercion here: this value ends up deciding whether a session cookie
+  // outlives the browser.
+  const rememberDevice = body.rememberDevice === true;
   const ip = clientIp(req);
   const userAgent = req.headers["user-agent"] || null;
   const incomingCookies = parse(req.headers.cookie || "");
@@ -181,11 +202,25 @@ export default async function handler(req, res) {
   // device.status === "approved" — issue a session via the same
   // mintSession() helper the silent trusted-device refresh in
   // wholesale-prices.js also calls, so both paths mint sessions identically.
-  const { sessionToken } = await mintSession(env, { shopId: shop.id, deviceId: device.id, sessionDays: WHOLESALE_SESSION_DAYS });
+  // `remembered` records the shop's own "Keep me signed in" choice for this
+  // login — see this file's own header and mintSession's own doc comment.
+  const { sessionToken } = await mintSession(env, {
+    shopId: shop.id,
+    deviceId: device.id,
+    sessionDays: WHOLESALE_SESSION_DAYS,
+    remembered: rememberDevice,
+  });
   await updateDevice(env, device.id, { last_seen_at: new Date().toISOString() });
   await logEvent(env, { shopId: shop.id, deviceId: device.id, event: "login_success", ip, userAgent }).catch(() => {});
 
-  setCookies.push(serialize("ws_session", sessionToken, cookieOpts(WHOLESALE_SESSION_DAYS * 24 * 60 * 60)));
+  // Checked -> the existing persistent 30-day Max-Age. Unchecked -> no
+  // Max-Age at all, so the browser treats it as a session cookie and drops
+  // it when it closes (cookieOpts()/wholesaleSessionCookieOptions() already
+  // omits the Max-Age attribute entirely when passed `undefined` — verified
+  // against the installed `cookie` package, not assumed).
+  setCookies.push(
+    serialize("ws_session", sessionToken, cookieOpts(rememberDevice ? WHOLESALE_SESSION_DAYS * 24 * 60 * 60 : undefined))
+  );
   res.setHeader("Set-Cookie", setCookies);
   res.status(200).json({ status: "ok", shopName: shop.name });
 }

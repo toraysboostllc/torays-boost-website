@@ -5,12 +5,19 @@
  * same-origin requests; this file just calls the endpoints and reads
  * their responses.
  */
-export async function wholesaleLogin(shopName, code) {
+/**
+ * `rememberDevice` mirrors the "Keep me signed in on this device" checkbox
+ * verbatim — never coerced/defaulted here, so a caller can't accidentally
+ * send a truthy-but-wrong value; api/wholesale-login.js itself does the
+ * strict `=== true` check that decides whether the session cookie survives
+ * a browser restart. See that file's own header for the full contract.
+ */
+export async function wholesaleLogin(shopName, code, rememberDevice) {
   const res = await fetch("/api/wholesale-login", {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ shopName, code }),
+    body: JSON.stringify({ shopName, code, rememberDevice: rememberDevice === true }),
   });
   const data = await res.json().catch(() => ({}));
 
