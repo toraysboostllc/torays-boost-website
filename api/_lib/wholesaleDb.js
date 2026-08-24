@@ -396,18 +396,34 @@ export async function listActiveImagesForOwners(env, equipmentTypeIds, categoryI
  *  full signed URL; a path that errors or is simply absent from the
  *  response is left out of the map (callers treat a missing entry as
  *  `image: null`, never a broken/partial URL). Skips the Storage request
- *  completely when there are zero paths to sign. */
+ *  completely when there are zero paths to sign.
+ *
+ *  Retries the WHOLE batch call exactly once on a transient failure (a
+ *  non-2xx response, or the fetch itself throwing — network blip, a cold
+ *  serverless instance's first outbound connection to Supabase, etc.)
+ *  before giving up. This is the fix for a reported bug: every image on
+ *  the portal would occasionally degrade to its icon fallback right after
+ *  a shop's first request of a session, self-correcting only on a manual
+ *  reload — because a one-off hiccup on this SINGLE batch call used to
+ *  silently fail EVERY image in the response with no retry at all. One
+ *  immediate retry absorbs exactly that class of transient failure before
+ *  it ever reaches the client. */
 export async function signImagePaths(env, storagePaths) {
   if (!storagePaths.length) return new Map();
 
-  const res = await fetch(`${env.SUPABASE_URL}/storage/v1/object/sign/${WHOLESALE_IMAGES_BUCKET}`, {
-    method: "POST",
-    headers: headers(env),
-    body: JSON.stringify({ expiresIn: IMAGE_SIGN_TTL_SECONDS, paths: storagePaths }),
-  }).catch(() => null);
+  async function attemptSign() {
+    return fetch(`${env.SUPABASE_URL}/storage/v1/object/sign/${WHOLESALE_IMAGES_BUCKET}`, {
+      method: "POST",
+      headers: headers(env),
+      body: JSON.stringify({ expiresIn: IMAGE_SIGN_TTL_SECONDS, paths: storagePaths }),
+    }).catch(() => null);
+  }
+
+  let res = await attemptSign();
+  if (!res || !res.ok) res = await attemptSign();
 
   const byPath = new Map();
-  if (!res || !res.ok) return byPath; // batch call itself failed — every image degrades to null, catalog still returns
+  if (!res || !res.ok) return byPath; // both attempts failed — every image degrades to null, catalog still returns
 
   const entries = await res.json().catch(() => null);
   if (!Array.isArray(entries)) return byPath;

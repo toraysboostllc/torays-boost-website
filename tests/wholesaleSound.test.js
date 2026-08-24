@@ -268,10 +268,30 @@ describe("No manual addEventListener anywhere in the sound-wired wizard files â€
     "src/components/wholesale/WholesaleWizard.jsx",
     "src/components/wholesale/WholesaleResultPanel.jsx",
     "src/components/wholesale/WholesaleLocaleSelector.jsx",
-    "src/pages/WholesalePrices.jsx",
   ];
 
   it.each(files)("%s never calls addEventListener directly", (relPath) => {
     expect(read(relPath)).not.toContain("addEventListener");
+  });
+});
+
+/**
+ * src/pages/WholesalePrices.jsx is exempt from the blanket check above: it
+ * legitimately calls document/window.addEventListener for "visibilitychange"
+ * and "pageshow" â€” page-lifecycle events with no JSX prop equivalent (unlike
+ * the hover/click sound wiring the check above protects). Its own
+ * listener-hygiene (registered once, removed on unmount, no duplicates) is
+ * covered separately by tests/wholesalePricesImageSelfHeal.test.jsx's
+ * "No duplicate timers/listeners" suite.
+ */
+describe("WholesalePrices.jsx's addEventListener usage is scoped to page-lifecycle events only, never hover/click", () => {
+  it("only registers visibilitychange/pageshow listeners, nothing sound- or pointer-related", () => {
+    const src = read("src/pages/WholesalePrices.jsx");
+    const calls = src.match(/\.addEventListener\(\s*["'`](\w+)["'`]/g) || [];
+    const eventNames = calls.map((c) => c.match(/["'`](\w+)["'`]/)[1]);
+    expect(eventNames.length).toBeGreaterThan(0);
+    for (const name of eventNames) {
+      expect(["visibilitychange", "pageshow"]).toContain(name);
+    }
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LogOut, Lock, Home } from "lucide-react";
 import { Logo } from "../components/ui/Logo.jsx";
@@ -25,6 +25,15 @@ import { WholesaleEstimateDisclaimerAcceptModal } from "../components/wholesale/
 // shop, same tab, full navigation — a single constant so both call sites
 // and every test that pins the exact URL stay in sync automatically.
 const MAIN_WEBSITE_URL = "https://www.toraysboost.com/";
+// Self-healing image refresh (see refreshCatalogSilently below for the full
+// "why"). SETTLE_REFRESH_DELAY_MS: one quiet follow-up fetch shortly after
+// the catalog first becomes ready, absorbing a transient signing hiccup on
+// the very first load of a session automatically. PERIODIC_REFRESH_INTERVAL_MS:
+// comfortably under half of IMAGE_SIGN_TTL_SECONDS (5 minutes, see
+// api/_lib/wholesaleDb.js) so a signed image URL is never actually left to
+// expire while this screen is open.
+const SETTLE_REFRESH_DELAY_MS = 4000;
+const PERIODIC_REFRESH_INTERVAL_MS = 4 * 60 * 1000;
 export function WholesalePrices() {
   return (
     <WholesaleLocaleProvider>
@@ -120,6 +129,104 @@ function WholesalePricesContent() {
     // stable in intent (only reads navigate, which react-router guarantees
     // stable); re-running this on every render would refetch in a loop.
   }, []);
+
+  // Self-healing refresh: fixes a reported bug where the portal's cards
+  // occasionally all showed their icon fallback right after a shop's first
+  // load of a session, self-correcting only on a manual reload (the
+  // signed-image-URL batch call this depends on — see signImagePaths in
+  // api/_lib/wholesaleDb.js, now hardened with its own one-time retry —
+  // could still fail both attempts on a genuinely bad network moment).
+  // Unlike loadCatalog(), this NEVER flips status back to "loading" (which
+  // would blank the whole screen mid-session) — it fetches quietly and, on
+  // success, merges fresh catalog data (including newly re-signed image
+  // URLs) into state in place, leaving the wizard's own screen/selection
+  // state completely untouched so a shop mid-flow never loses their place.
+  // A failed background attempt is silently swallowed except for a genuine
+  // "auth" result (session actually revoked) — that's the one case
+  // real enough to still redirect to the login screen; "transient" and
+  // "legal_required" simply wait for the next scheduled attempt rather
+  // than disrupt whatever the shop is already looking at.
+  //
+  // refreshInFlightRef guards against overlapping calls: the settle
+  // timeout, the periodic interval, a visibilitychange, and a pageshow can
+  // all plausibly fire close together (e.g. the shop returns to the tab
+  // right as the periodic tick was already due) — this makes a second
+  // trigger while one fetch is still in flight a no-op instead of a
+  // redundant network call, so there is never more than one
+  // fetchWholesaleCatalog() request racing at a time from this mechanism.
+  const refreshInFlightRef = useRef(false);
+  function refreshCatalogSilently() {
+    if (refreshInFlightRef.current) return;
+    refreshInFlightRef.current = true;
+    fetchWholesaleCatalog()
+      .then((result) => {
+        if (!result.ok) {
+          if (result.kind === "auth") navigate("/wholesale");
+          return;
+        }
+        setState((prev) => ({
+          ...prev,
+          equipmentTypes: result.equipmentTypes,
+          microsolderingEquipmentType: result.microsolderingEquipmentType,
+          legacyMicrosoldering: result.legacyMicrosoldering,
+          salesModule: result.salesModule,
+          warranty: result.warranty,
+        }));
+      })
+      .finally(() => {
+        refreshInFlightRef.current = false;
+      });
+  }
+
+  useEffect(() => {
+    if (state.status !== "ready") return undefined;
+    // One quiet follow-up shortly after the catalog first becomes ready —
+    // this is the actual fix for "shows icons right after logging in, F5
+    // fixes it": whatever caused the FIRST load's images to come back
+    // empty (a transient Storage-signing hiccup — see signImagePaths'
+    // own header) almost never repeats a few seconds later, so this
+    // corrects it automatically, in place, with no visible reload of any
+    // kind.
+    const settleTimeout = setTimeout(refreshCatalogSilently, SETTLE_REFRESH_DELAY_MS);
+    // Signed image URLs expire after IMAGE_SIGN_TTL_SECONDS (5 minutes —
+    // see api/_lib/wholesaleDb.js). A shop who leaves this screen open
+    // longer than that would otherwise start seeing icons again one by
+    // one as each photo's <img> individually 404s. Refreshing comfortably
+    // inside that window (well under half of it) keeps every signed URL
+    // perpetually fresh, so that expiry is never actually visible.
+    const interval = setInterval(refreshCatalogSilently, PERIODIC_REFRESH_INTERVAL_MS);
+    // Browsers throttle or fully suspend setInterval/setTimeout in a
+    // background tab (most aggressively on mobile) — a shop who backgrounds
+    // this tab for longer than the periodic interval's own margin can come
+    // back to signed URLs that quietly expired while the interval never
+    // got to fire. visibilitychange (desktop and most mobile browsers) and
+    // pageshow (Safari/iOS bfcache restores, which can skip
+    // visibilitychange entirely) both catch "the shop is looking at this
+    // tab again" from a different angle — refreshCatalogSilently() is the
+    // exact same in-place, non-blocking refresh used everywhere else in
+    // this effect, so returning to the tab never reloads the page or
+    // resets the wizard's current screen/selection.
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") refreshCatalogSilently();
+    }
+    function handlePageShow() {
+      if (document.visibilityState === "visible") refreshCatalogSilently();
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pageshow", handlePageShow);
+    return () => {
+      clearTimeout(settleTimeout);
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pageshow", handlePageShow);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refreshCatalogSilently
+    // is stable in intent (same reasoning as loadCatalog above); only
+    // state.status should restart these timers/listeners. Guarded against
+    // ever registering twice for the same "ready" session by this effect's
+    // own cleanup, which always runs before a re-run — never leaves a
+    // stale pair of listeners behind.
+  }, [state.status]);
 
   // "Main website" — a plain external link, same tab, never touches the
   // session in any way (Pro stays logged in behind it).

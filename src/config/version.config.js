@@ -3,9 +3,15 @@
  * approved for production — never mid-round. Keep in sync with the
  * "version" field in package.json.
  */
-export const APP_VERSION = "1.1.2";
+export const APP_VERSION = "1.1.3";
 
 export const VERSION_HISTORY = [
+  {
+    version: "1.1.3",
+    date: "2026-08-24",
+    summary:
+      "Fixed a reported bug: Wholesale Portal card images loaded intermittently — on some visits every card showed its fallback icon until the shop pressed F5, caused by an unretried single Storage batch-signing call silently degrading every image to null on a transient hiccup (most likely a cold serverless instance right after login), with no client-side recovery. The server now retries that batch sign call once on failure, and the client now self-heals: a one-time settle refresh shortly after the catalog first loads, a periodic background refresh, and a silent refresh whenever the tab returns to focus (visibilitychange/pageshow) — covering both a signed URL expiring while the tab was backgrounded and the browser suspending the periodic timer. Never a full page reload, never resets the wizard's current screen, and an in-flight guard prevents overlapping/duplicate refreshes.",
+  },
   {
     version: "1.1.2",
     date: "2026-08-24",
