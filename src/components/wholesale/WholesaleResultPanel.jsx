@@ -83,6 +83,23 @@ export function WholesaleResultPanel({ selection, service, warranty, onConsultAn
   const isQuote = service.pricing_type === "quote";
   const isRange = service.pricing_type === "range";
 
+  // The real, reported bug this fixes: this panel used to read ONLY
+  // service.image, so a photo DESK uploaded at the Category or Equipment
+  // Type level (a very natural place to put "a photo of the device itself",
+  // as opposed to a photo per individual repair line item) never appeared
+  // here at all -- it only ever showed as that card's cover photo on the
+  // earlier selection screens. Microsoldering
+  // "just worked" because its content is organized AS services directly
+  // (catalog_mode='direct_services'), so a photo uploaded for it naturally
+  // landed at the service level already. Priority, most to least specific:
+  // the SELECTED SERVICE's own photo first (still wins whenever it exists,
+  // zero change to today's working behavior), then its category's cover
+  // photo, then its equipment type's cover photo. Every one of the three is
+  // already the exact same { url, alt_text } | null shape the server signs
+  // (see api/_lib/wholesaleDb.js) -- this is a display-priority choice, not
+  // new data, no new fetch, no hardcoded owner/slug.
+  const photo = service.image || selection.modelImage || selection.equipoImage || null;
+
   // 0 -> 1 exactly once per mount (this component remounts fresh for every
   // new result — see WholesaleWizard.jsx's screen==="result" branch — so a
   // plain mount-effect is already "once per result", no extra guard
@@ -301,17 +318,15 @@ export function WholesaleResultPanel({ selection, service, warranty, onConsultAn
         {t("result.consultAnother")}
       </button>
 
-      {/* Large service photo — dynamically the SELECTED service's own
-          photo, never an equipment-type/Microsoldering-level image
-          (ServicePhoto only ever reads service.image, which is looked up
-          per-service on the server — see imageByService in
-          api/_lib/wholesaleDb.js's buildWholesaleCatalog — so a service
-          with its own photo can never fall back to Microsoldering's or any
-          other card's). Placed after the full quote (cost, tiers,
-          recommendation, this button) and before the sibling Torays Boost
-          Sales module that WholesaleWizard.jsx renders right after this
-          card. Renders nothing at all when the service has no photo — no
-          empty box, no empty frame.
+      {/* Large photo — the SELECTED service's own photo first, falling back
+          to its category's then its equipment type's cover photo (see
+          `photo` above for the full "why" — this is the real fix for a
+          reported bug: a photo uploaded at the Category/Equipment Type
+          level used to never appear here at all). Placed after the full
+          quote (cost, tiers, recommendation, this button) and before the
+          sibling Torays Boost Sales module that WholesaleWizard.jsx renders
+          right after this card. Renders nothing at all when none of the
+          three levels has a photo — no empty box, no empty frame.
           wsp-result-photo-block reserves >=24px of space AFTER the frame,
           before this panel ends — the frame no longer sits flush against
           the card's own bottom edge or (by extension) the Torays Boost
@@ -326,12 +341,12 @@ export function WholesaleResultPanel({ selection, service, warranty, onConsultAn
           frame's own padding box at 100% width, edge-to-edge with zero
           horizontal overflow on mobile the same way the frame itself
           already is. */}
-      {service.image && (
+      {photo && (
         <div className="wsp-result-photo-block">
           <div className="wsp-result-photo-frame">
             <ServicePhoto
-              image={service.image}
-              alt={service.image?.alt_text || translateServiceName(service, language)}
+              image={photo}
+              alt={photo?.alt_text || translateServiceName(service, language)}
               className="wsp-result-photo-large"
             />
           </div>

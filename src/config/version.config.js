@@ -3,9 +3,15 @@
  * approved for production — never mid-round. Keep in sync with the
  * "version" field in package.json.
  */
-export const APP_VERSION = "1.1.1";
+export const APP_VERSION = "1.1.2";
 
 export const VERSION_HISTORY = [
+  {
+    version: "1.1.2",
+    date: "2026-08-24",
+    summary:
+      "Fixed a reported bug: a photo uploaded from TORAYS BOOST DESK at the Category or Equipment Type level (rather than per individual service) never appeared on the Wholesale Portal's \"Pricing Ready\" result screen, even though it correctly showed as that card's cover photo on the earlier selection screens — only Microsoldering (whose content is organized as services directly) reliably showed its photo there. The result screen now falls back from the selected service's own photo to its category's, then its equipment type's, cover photo — the same signed, access-gated data the server already resolved, no new fetch, no hardcoded device name.",
+  },
   {
     version: "1.1.1",
     date: "2026-08-22",

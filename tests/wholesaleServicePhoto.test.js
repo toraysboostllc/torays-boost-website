@@ -144,12 +144,19 @@ describe("WholesaleResultPanel.jsx: service description near the top, LARGE phot
     expect(photoBlockTagIdx).toBeLessThan(closingDivIdx);
   });
 
-  it("the large photo is gated on service.image alone — renders nothing at all (no empty box) when the selected service has no photo", () => {
-    const gateIdx = panelSrc.lastIndexOf("{service.image && (", photoBlockTagIdx);
+  // Bug fix (see tests/wholesaleResultPhotoFallback.test.js for the full,
+  // dedicated coverage): the gate is now the resolved `photo` fallback
+  // (service.image -> selection.modelImage -> selection.equipoImage), not
+  // service.image alone — a Category/Equipment-Type-level photo now shows
+  // here too when the selected service itself has none. Still renders
+  // nothing at all (no empty box) when none of the 3 levels has a photo.
+  it("the large photo is gated on the resolved `photo` fallback (service -> category -> equipment type) — renders nothing at all (no empty box) when none of the 3 levels has a photo", () => {
+    expect(panelSrc).toContain("const photo = service.image || selection.modelImage || selection.equipoImage || null;");
+    const gateIdx = panelSrc.lastIndexOf("{photo && (", photoBlockTagIdx);
     expect(gateIdx).toBeGreaterThan(-1);
     // The gate immediately guards this exact block — only whitespace
     // between the opening `(` of the gate and the block's own tag.
-    const between = panelSrc.slice(gateIdx + "{service.image && (".length, photoBlockTagIdx);
+    const between = panelSrc.slice(gateIdx + "{photo && (".length, photoBlockTagIdx);
     expect(between.trim()).toBe("");
   });
 
@@ -158,11 +165,14 @@ describe("WholesaleResultPanel.jsx: service description near the top, LARGE phot
     expect(block).toContain('<div className="wsp-result-photo-frame">');
   });
 
-  it("passes image={service.image} — never selectedEquipo/equipo/Microsoldering-level image — with a real alt fallback, and size is intentionally omitted so ServicePhoto renders it at its real aspect ratio, not forced into a square", () => {
+  it("passes image={photo} (the resolved fallback, not a bare service.image) with a real alt fallback, and size is intentionally omitted so ServicePhoto renders it at its real aspect ratio, not forced into a square", () => {
     const block = panelSrc.slice(photoBlockTagIdx, panelSrc.indexOf("</div>", photoBlockTagIdx) + 6);
-    expect(block).toContain("image={service.image}");
-    expect(block).toMatch(/alt=\{service\.image\?\.alt_text \|\| translateServiceName\(service, language\)\}/);
+    expect(block).toContain("image={photo}");
+    expect(block).toMatch(/alt=\{photo\?\.alt_text \|\| translateServiceName\(service, language\)\}/);
     expect(block).not.toMatch(/size=\{/);
+    // Still never a raw selectedEquipo/equipo reference inside the JSX
+    // itself — the fallback is resolved once, above, into the single
+    // `photo` value; the render block only ever reads that.
     expect(block).not.toContain("selectedEquipo");
     expect(block).not.toContain("equipo.image");
   });

@@ -308,6 +308,14 @@ export function WholesaleWizard({ equipmentTypes, microsolderingEquipmentType, l
             microsoldering: Boolean(selectedEquipo?.isDirectServices),
             equipoName: selectedEquipo?.name,
             modelName: selectedModel?.name,
+            // Fallback photo chain (see WholesaleResultPanel's own header for
+            // the full "why" and priority order) -- both already carry the
+            // exact same { url, alt_text } | null shape service.image does
+            // (toWizardModel/the equipo-list builder in wholesaleWizardCatalog.js
+            // resolve them from the SAME per-owner image map buildWholesaleCatalog
+            // already built server-side; nothing new fetched or computed here).
+            modelImage: selectedModel?.image ?? null,
+            equipoImage: selectedEquipo?.image ?? null,
           }}
           service={selectedService}
           warranty={warranty}
