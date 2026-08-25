@@ -34,6 +34,11 @@ export function createFakeSupabase() {
     // wholesale-migration.sql/wholesale-navigation-migration.sql already
     // ran). A test that specifically wants to exercise "settings row
     // missing" can still `fake.db.wholesale_portal_settings = []`.
+    // Easy Search (supabase/wholesale-easy-search-migration.sql) — empty by
+    // default, same "assume the migration already ran, an individual test
+    // seeds what it needs" convention as every other table here.
+    wholesale_device_models: [],
+    wholesale_device_model_codes: [],
     wholesale_portal_settings: [
       {
         id: 1,
@@ -121,6 +126,19 @@ export function createFakeSupabase() {
         .split(",")
         .filter(Boolean);
       return rowVal != null && list.includes(String(rowVal));
+    }
+    // Added for Easy Search's model-code lookup (searchWholesaleDeviceModels
+    // in api/_lib/wholesaleDb.js), which is the first caller in this repo to
+    // issue an ilike filter. Only supports the one pattern shape that
+    // function ever builds — `*value*` ("contains"), PostgREST's own `*`
+    // wildcard (not `%`) — as a plain case-insensitive substring test.
+    // escapePostgrestPattern's backslash-escaping is undone first so the
+    // comparison is against the real intended value, not its escaped form.
+    if (op === "ilike") {
+      if (rowVal == null) return false;
+      const pattern = val.replace(/^\*/, "").replace(/\*$/, "");
+      const unescaped = pattern.replace(/\\(.)/g, "$1");
+      return String(rowVal).toLowerCase().includes(unescaped.toLowerCase());
     }
     return true;
   }

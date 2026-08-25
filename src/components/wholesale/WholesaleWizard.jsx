@@ -10,6 +10,7 @@ import {
   resetStack,
   currentScreen,
   stackForSearchSelection,
+  stackForEasySearchSelection,
   TOP_SCREEN,
 } from "../../lib/wizardScreenStack.js";
 import { EquipmentTypeCard } from "./EquipmentTypeCard.jsx";
@@ -17,6 +18,7 @@ import { ServicePhoto } from "./ServicePhoto.jsx";
 import { WholesaleProgressPanel } from "./WholesaleProgressPanel.jsx";
 import { WholesaleResultPanel } from "./WholesaleResultPanel.jsx";
 import { WholesaleSearch } from "./WholesaleSearch.jsx";
+import { EasySearchPanel } from "./EasySearchPanel.jsx";
 
 /**
  * Equipo -> Modelo -> Falla progress indicator, shown above every selection
@@ -178,6 +180,39 @@ export function WholesaleWizard({ equipmentTypes, microsolderingEquipmentType, l
     setScreenStack(stackForSearchSelection(equipo));
   }
 
+  /** Easy Search result -> catalog navigation. Only ever called when the
+   *  shop clicked "View Services & Wholesale Prices" on a result that had
+   *  hasWholesaleCatalog === true (see EasySearchPanel.jsx) — catalogCategoryId
+   *  is wholesale_categories.id (== the Easy Search device's catalog_model_id),
+   *  which is exactly what toWizardModel() sets as a model's own `id` (see
+   *  wholesaleWizardCatalog.js). Scans EVERY equipo's `.models` for that id
+   *  rather than looking the equipo up by equipmentTypeId first — a
+   *  "promoted" category (e.g. a bridge card like PS5) appears in
+   *  topEquipoList with `equipo.id === category.id`, NOT
+   *  `category.equipment_type_id`, so matching by equipmentTypeId first
+   *  would miss that case. Never sets selectedService (Easy Search never
+   *  resolves a specific Failure/Service, only Equipo+Model — see
+   *  api/wholesale-easy-search.js's own header), landing on "fault" via
+   *  stackForEasySearchSelection() so the shop picks the actual issue from
+   *  there, same as a manual Equipo->Modelo click-through would. */
+  function handleSelectEasySearchResult({ catalogCategoryId }) {
+    let foundEquipo = null;
+    let foundModel = null;
+    for (const equipo of topEquipoList) {
+      const model = (equipo.models || []).find((m) => m.id === catalogCategoryId);
+      if (model) {
+        foundEquipo = equipo;
+        foundModel = model;
+        break;
+      }
+    }
+    if (!foundEquipo || !foundModel) return;
+    setSelectedEquipo(foundEquipo);
+    setSelectedModel(foundModel);
+    setSelectedService(null);
+    setScreenStack(stackForEasySearchSelection());
+  }
+
   const showSteps = screen === TOP_SCREEN || screen === "model" || screen === "fault";
 
   return (
@@ -193,6 +228,14 @@ export function WholesaleWizard({ equipmentTypes, microsolderingEquipmentType, l
           Equipo/Modelo grid or Falla list below it without being cut off,
           on any screen. */}
       <WholesaleSearch equipoList={topEquipoList} onSelectResult={handleSelectSearchResult} />
+      {/* Easy Search — a separate, closed-by-default entry point (see
+          EasySearchPanel.jsx's own header for why this is NOT the same
+          feature as WholesaleSearch above). `position: fixed` internally,
+          so mounting it here (rather than in WholesalePrices.jsx's header
+          row) costs nothing visually while giving direct access to
+          topEquipoList for handleSelectEasySearchResult — no prop-drilling
+          through an extra layer. */}
+      <EasySearchPanel onSelectCatalogModel={handleSelectEasySearchResult} />
       <div className="wsp-wizard">
       {showSteps && (
         <WizardSteps

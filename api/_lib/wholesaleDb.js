@@ -850,3 +850,147 @@ export async function callWholesaleRpc(env, fnName, args) {
   }
   return { ok: res.ok, status: res.status, data };
 }
+
+/* ===========================================================================
+ * Easy Search — model-code lookup (wholesale_device_models /
+ * wholesale_device_model_codes, see supabase/wholesale-easy-search-*.sql).
+ * Additive: nothing above this point is modified or called differently by
+ * either function below.
+ * ===========================================================================
+ */
+
+/**
+ * Resolves shop/device identity from already-extracted session/device
+ * tokens, re-checking shop.status==='active' and device.status==='approved'
+ * on every call — the exact same rule api/wholesale-prices.js enforces
+ * inline (silent trusted-device refresh first, then a hard shop/device
+ * status check). Factored out here as a NEW, additive function so
+ * api/wholesale-easy-search.js can reuse the identical enforcement without
+ * copy-pasting it — wholesale-prices.js itself is untouched and keeps its
+ * own inline logic exactly as it was.
+ *
+ * Cookie parsing/serialization stays the caller's job (matching
+ * wholesale-prices.js's own use of the `cookie` package) — this function
+ * only ever deals in already-extracted token strings, so this file gains no
+ * new import. On a successful silent refresh, returns the raw new session
+ * token (not a serialized cookie) for the caller to set itself.
+ *
+ * Returns exactly one of:
+ *   { ok: true, shop, device, refreshedSessionToken: string|null }
+ *   { ok: false, status: 401, error: "unauthorized", message }
+ *   { ok: false, status: 403, error: "access_revoked", message }
+ */
+export async function resolveWholesaleSession(env, { sessionToken, deviceToken, ip, userAgent }) {
+  let session =
+    sessionToken && sessionToken.length <= 128
+      ? await findActiveSessionByTokenHash(env, sha256Hex(sessionToken)).catch(() => null)
+      : null;
+
+  let refreshedSessionToken = null;
+  if (!session && deviceToken && deviceToken.length <= 128) {
+    const refreshed = await attemptSilentDeviceSessionRefresh(env, {
+      deviceTokenHash: sha256Hex(deviceToken),
+      ip,
+      userAgent,
+    }).catch(() => null);
+    if (refreshed) {
+      session = { shop_id: refreshed.shop.id, device_id: refreshed.device.id };
+      refreshedSessionToken = refreshed.sessionToken;
+    }
+  }
+
+  if (!session) {
+    return { ok: false, status: 401, error: "unauthorized", message: "Session expired or invalid. Please log in again." };
+  }
+
+  const [shop, device] = await Promise.all([
+    getShopById(env, session.shop_id),
+    getDeviceById(env, session.device_id),
+  ]);
+
+  if (!shop || shop.status !== "active" || !device || device.status !== "approved") {
+    if (sessionToken) await revokeSessionByTokenHash(env, sha256Hex(sessionToken)).catch(() => {});
+    return { ok: false, status: 403, error: "access_revoked", message: "Access to wholesale pricing has been revoked." };
+  }
+
+  return { ok: true, shop, device, refreshedSessionToken };
+}
+
+/** Backslash-escapes the characters PostgREST treats specially inside a
+ *  filter value (`%`, `,`, `(`, `)`, `*`, and a literal backslash itself) so
+ *  a query typed by a shop can never be misread as PostgREST syntax — this
+ *  is a correctness/robustness measure (a malformed filter would just error
+ *  the request), not a security boundary; the service-role key already has
+ *  full table access regardless of what any filter says. */
+function escapePostgrestPattern(value) {
+  return value.replace(/[%,()*\\]/g, (c) => "\\" + c);
+}
+
+/**
+ * Easy Search's model-code lookup. Two-step REST fetch + in-JS merge
+ * (matching this file's existing style — see attemptSilentDeviceSessionRefresh
+ * above — rather than a single PostgREST embedded-resource query), so the
+ * result stays easy to reason about and to test against fakeSupabase.js's
+ * eq/ilike/in-filter simulation.
+ *
+ * `normalizedQuery` (uppercase, alphanumeric-only — see
+ * normalizeEasySearchCode in src/lib/wholesaleEasySearch.js, applied
+ * identically here) drives the CODE match, ranked exact > prefix > partial.
+ * `rawQuery` (trimmed, case/spacing preserved) separately drives a
+ * commercial_name/brand match, since stripping spaces would break a search
+ * like "iphone 11" — both are merged into one result set, deduplicated by
+ * model id, exact/prefix code matches always ranked above any name/brand
+ * match. Only active=true codes AND active=true models are ever considered
+ * — a hidden model or a deactivated code is structurally invisible here,
+ * not merely filtered in the UI.
+ */
+export async function searchWholesaleDeviceModels(env, { normalizedQuery, rawQuery, limit }) {
+  if (!normalizedQuery && !rawQuery) return [];
+
+  const results = [];
+  const seen = new Set();
+  function addResult(model, tier) {
+    if (seen.has(model.id)) return;
+    seen.add(model.id);
+    results.push({ model, tier });
+  }
+
+  if (normalizedQuery) {
+    const escapedCode = escapePostgrestPattern(normalizedQuery);
+    const codeRows = await rest(
+      env,
+      `wholesale_device_model_codes?active=eq.true&normalized_code=ilike.*${encodeURIComponent(escapedCode)}*`
+        + `&select=id,device_model_id,code,normalized_code&limit=200`
+    );
+    if (codeRows.length) {
+      const modelIds = [...new Set(codeRows.map((c) => c.device_model_id))];
+      const models = await rest(
+        env,
+        `wholesale_device_models?active=eq.true&id=in.(${modelIds.join(",")})&select=*`
+      );
+      const modelById = new Map(models.map((m) => [m.id, m]));
+      for (const codeRow of codeRows) {
+        const model = modelById.get(codeRow.device_model_id);
+        if (!model) continue; // model hidden/deleted — a live code alone never surfaces it
+        const tier =
+          codeRow.normalized_code === normalizedQuery ? 0
+          : codeRow.normalized_code.startsWith(normalizedQuery) ? 1
+          : 2;
+        addResult(model, tier);
+      }
+    }
+  }
+
+  const nameTerm = typeof rawQuery === "string" ? rawQuery.trim() : "";
+  if (nameTerm.length >= 2) {
+    const escapedName = escapePostgrestPattern(nameTerm);
+    const [nameMatches, brandMatches] = await Promise.all([
+      rest(env, `wholesale_device_models?active=eq.true&commercial_name=ilike.*${encodeURIComponent(escapedName)}*&select=*&limit=50`),
+      rest(env, `wholesale_device_models?active=eq.true&brand=ilike.*${encodeURIComponent(escapedName)}*&select=*&limit=50`),
+    ]);
+    for (const model of [...nameMatches, ...brandMatches]) addResult(model, 2);
+  }
+
+  results.sort((a, b) => a.tier - b.tier);
+  return results.slice(0, limit).map((r) => r.model);
+}

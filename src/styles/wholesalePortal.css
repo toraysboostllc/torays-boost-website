@@ -73,6 +73,17 @@
   --wsp-wizard-glass-rgb: 230, 241, 253;
   --wsp-red: #f0525e;
 
+  /* Easy Search — its own dedicated accent, per spec: the trigger button
+     and the panel/sheet chrome are purple; result CONTENT (the spec list)
+     stays on the ordinary --wsp-text-strong/--wsp-card-* tokens above, on
+     purpose, so the panel never reads as "all purple". Exactly the 5 hex
+     values from the approved design — never re-derived or approximated. */
+  --wsp-purple: #7c3aed;
+  --wsp-purple-hover: #6d28d9;
+  --wsp-purple-focus: #a78bfa;
+  --wsp-purple-bg-light: #f5f3ff;
+  --wsp-purple-on: #ffffff;
+
   /* Money-hierarchy colors (result panel) — each figure gets its own
      distinct hue so a shop can tell "what I pay" from "what I can charge"
      from "what I keep" at a glance, never by size/position alone. */
@@ -2636,4 +2647,311 @@
   .ws-legal-print-hide {
     display: none !important;
   }
+}
+
+/* ---------------------------------------------------------------------
+   Easy Search — trigger button + backdrop/panel. Purple per spec
+   (see the --wsp-purple tokens in the .wsp-scope block above); result
+   CONTENT inside the panel deliberately stays on the ordinary card text
+   tokens, never purple, so the panel doesn't read as entirely purple. One
+   trigger element, mobile-first: a circular floating button
+   bottom-right by default, becoming a top-right capsule with a visible
+   label at >=768px — same breakpoint this file already uses everywhere
+   else for the mobile/desktop split. Safe-area aware on the bottom edge,
+   same convention as .whatsapp-float-button in src/styles/index.css.
+--------------------------------------------------------------------- */
+.wsp-easy-search-trigger {
+  position: fixed;
+  right: 1rem;
+  bottom: max(1rem, calc(env(safe-area-inset-bottom) + 0.5rem));
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--wsp-purple);
+  color: var(--wsp-purple-on);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.45);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.wsp-easy-search-trigger-label {
+  display: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .wsp-easy-search-trigger:hover {
+    background: var(--wsp-purple-hover);
+  }
+}
+.wsp-easy-search-trigger:active {
+  transform: scale(0.96);
+}
+.wsp-easy-search-trigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--wsp-purple-focus);
+}
+
+@media (min-width: 768px) {
+  .wsp-easy-search-trigger {
+    right: 1.5rem;
+    bottom: auto;
+    top: 1rem;
+    width: auto;
+    height: 40px;
+    padding: 0 18px 0 16px;
+  }
+  .wsp-easy-search-trigger-label {
+    display: inline;
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 13.5px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+}
+
+/* Backdrop + panel. Mobile: a true bottom sheet (anchored to the viewport
+   bottom, rounded top corners only, safe-area padding). Desktop: a
+   centered dialog card — this project has no existing bottom-sheet
+   component to reuse (confirmed before writing this), so this is new,
+   built to the same visual language (radius/shadow/border tokens) as
+   every other .wsp-* surface rather than introducing a new style. */
+.wsp-easy-search-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(10, 14, 30, 0.55);
+  animation: wsp-easy-search-fade-in 0.15s ease;
+}
+@media (min-width: 768px) {
+  .wsp-easy-search-backdrop {
+    align-items: center;
+    padding: 1rem;
+  }
+}
+@keyframes wsp-easy-search-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.wsp-easy-search-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: 85dvh;
+  max-height: 85vh;
+  border-radius: 16px 16px 0 0;
+  background: var(--wsp-card-bg);
+  color: var(--wsp-card-text);
+  box-shadow: 0 -8px 32px rgba(8, 14, 30, 0.5);
+  padding: 1rem 1rem calc(env(safe-area-inset-bottom) + 1rem);
+  overflow-y: auto;
+  animation: wsp-easy-search-slide-up 0.2s ease;
+}
+@keyframes wsp-easy-search-slide-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@media (min-width: 768px) {
+  .wsp-easy-search-panel {
+    width: 420px;
+    max-height: min(560px, 85vh);
+    border-radius: 16px;
+    padding: 1.25rem;
+    animation: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wsp-easy-search-panel,
+  .wsp-easy-search-backdrop {
+    animation: none;
+  }
+}
+
+.wsp-easy-search-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.wsp-easy-search-panel-title {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--wsp-purple);
+}
+.wsp-easy-search-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--wsp-card-text-soft);
+}
+.wsp-easy-search-close:hover {
+  background: var(--wsp-purple-bg-light);
+  color: var(--wsp-purple);
+}
+.wsp-easy-search-close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--wsp-purple-focus);
+}
+
+.wsp-easy-search-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  min-height: 44px;
+  border-radius: 12px;
+  background: var(--wsp-purple-bg-light);
+  border: 1px solid var(--wsp-purple-focus);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.wsp-easy-search-field:focus-within {
+  border-color: var(--wsp-purple);
+  box-shadow: 0 0 0 3px var(--wsp-purple-focus);
+}
+.wsp-easy-search-field-icon {
+  flex-shrink: 0;
+  color: var(--wsp-purple);
+}
+.wsp-easy-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  /* 16px floor — below that, iOS Safari auto-zooms the viewport on focus. */
+  font-size: 16px;
+  line-height: 1.2;
+  color: var(--wsp-card-text);
+}
+.wsp-easy-search-input::placeholder {
+  color: var(--wsp-card-text-soft);
+}
+.wsp-easy-search-spinner {
+  flex-shrink: 0;
+  color: var(--wsp-purple);
+  animation: wsp-search-spin 0.8s linear infinite;
+}
+
+.wsp-easy-search-status {
+  margin: 10px 2px 0;
+  font-size: 13px;
+  color: var(--wsp-card-text-soft);
+}
+
+.wsp-easy-search-listbox {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.wsp-easy-search-option {
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.wsp-easy-search-option-active {
+  background: var(--wsp-purple-bg-light);
+}
+.wsp-easy-search-option-primary {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--wsp-card-text);
+}
+.wsp-easy-search-option-secondary {
+  display: block;
+  font-size: 11.5px;
+  color: var(--wsp-card-text-soft);
+}
+
+.wsp-easy-search-detail {
+  margin-top: 6px;
+}
+.wsp-easy-search-back {
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin-bottom: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--wsp-purple);
+  cursor: pointer;
+}
+.wsp-easy-search-detail-title {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--wsp-card-text);
+  margin: 0 0 2px;
+}
+.wsp-easy-search-detail-subtitle {
+  font-size: 12.5px;
+  color: var(--wsp-card-text-soft);
+  margin: 0 0 12px;
+}
+.wsp-easy-search-spec-list {
+  margin: 0 0 14px;
+}
+.wsp-easy-search-spec-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--wsp-card-border);
+  font-size: 13px;
+}
+.wsp-easy-search-spec-row dt {
+  color: var(--wsp-card-text-soft);
+}
+.wsp-easy-search-spec-row dd {
+  margin: 0;
+  color: var(--wsp-card-text);
+  font-weight: 500;
+  text-align: right;
+}
+
+.wsp-easy-search-view-catalog {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border: none;
+  border-radius: 999px;
+  background: var(--wsp-purple);
+  color: var(--wsp-purple-on);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.wsp-easy-search-view-catalog:hover {
+  background: var(--wsp-purple-hover);
+}
+.wsp-easy-search-view-catalog:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--wsp-purple-focus);
 }

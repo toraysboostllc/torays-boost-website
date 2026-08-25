@@ -56,6 +56,31 @@ export const wholesaleTranslations = {
       noResults: "No results found",
       searching: "Searching…",
     },
+    // "Easy Search" (buttonLabel) is deliberately identical in en/es — per
+    // spec, the feature's NAME stays the same in both languages; everything
+    // else here still translates normally, same as every other key in this
+    // file. Not the same feature as `search` above (Live Search /
+    // Buscador Predictivo, the always-visible catalog combobox) — this is
+    // the closed-by-default model-code lookup, see EasySearchPanel.jsx.
+    easySearch: {
+      buttonLabel: "Easy Search",
+      panelLabel: "Easy Search — find a device by model code",
+      closeLabel: "Close",
+      inputAriaLabel: "Search by model code, commercial name, or brand",
+      placeholder: "Enter model number — A2218 or SM-S918U",
+      resultsLabel: "Easy Search results",
+      noResults: "No matches found",
+      sessionExpired: "Your session expired. Please log in again.",
+      transientError: "Could not search right now. Try again.",
+      backToResults: "Back to results",
+      viewCatalogButton: "View Services & Wholesale Prices",
+      specScreen: "Screen",
+      specProcessor: "Processor",
+      specRam: "RAM",
+      specStorage: "Storage",
+      specCamera: "Main Camera",
+      specBattery: "Battery",
+    },
     wizard: {
       chooseEquipment: "Select a Device to View Pricing",
       chooseEquipmentSubtitle: "Choose the device, model, and issue for an instant estimate.",
@@ -231,6 +256,27 @@ export const wholesaleTranslations = {
       resultsLabel: "Resultados de búsqueda",
       noResults: "No se encontraron resultados",
       searching: "Buscando…",
+    },
+    // "Easy Search" (buttonLabel) se mantiene igual en inglés y español a
+    // propósito — ver el mismo comentario en el bloque `en` arriba.
+    easySearch: {
+      buttonLabel: "Easy Search",
+      panelLabel: "Easy Search — busca un equipo por código de modelo",
+      closeLabel: "Cerrar",
+      inputAriaLabel: "Buscar por código de modelo, nombre comercial o marca",
+      placeholder: "Escribe el número de modelo — A2218 o SM-S918U",
+      resultsLabel: "Resultados de Easy Search",
+      noResults: "No se encontraron coincidencias",
+      sessionExpired: "Tu sesión expiró. Inicia sesión de nuevo.",
+      transientError: "No se pudo buscar en este momento. Intenta de nuevo.",
+      backToResults: "Volver a los resultados",
+      viewCatalogButton: "Ver Servicios y Precios Mayoristas",
+      specScreen: "Pantalla",
+      specProcessor: "Procesador",
+      specRam: "RAM",
+      specStorage: "Almacenamiento",
+      specCamera: "Cámara Principal",
+      specBattery: "Batería",
     },
     wizard: {
       chooseEquipment: "Selecciona un equipo para ver el precio",

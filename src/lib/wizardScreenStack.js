@@ -45,3 +45,17 @@ export function currentScreen(stack) {
 export function stackForSearchSelection(equipo) {
   return equipo.models.length === 1 ? ["top", "fault", "progress"] : ["top", "model", "fault", "progress"];
 }
+
+/** Easy Search's hydration target — used by
+ *  WholesaleWizard.jsx's handleSelectEasySearchResult. Unlike Live Search
+ *  (stackForSearchSelection above), Easy Search only ever resolves an
+ *  Equipo + Model (never a specific Failure/Service — see
+ *  api/wholesale-easy-search.js's own header on why it never returns
+ *  pricing), so it always lands on "fault" (the Model -> Failure/Service
+ *  step) with the model screen skipped — exactly what handleSelectModel
+ *  already produces once an Equipo is set, just reached directly instead
+ *  of via a manual click. Never "progress"/"result": those require a
+ *  selectedService, which Easy Search deliberately never sets. */
+export function stackForEasySearchSelection() {
+  return ["top", "fault"];
+}

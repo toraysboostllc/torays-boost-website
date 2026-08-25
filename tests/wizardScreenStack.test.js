@@ -5,6 +5,7 @@ import {
   resetStack,
   currentScreen,
   stackForSearchSelection,
+  stackForEasySearchSelection,
   TOP_SCREEN,
 } from "../src/lib/wizardScreenStack.js";
 
@@ -112,5 +113,19 @@ describe("stackForSearchSelection: Live Search hydration rebuilds real history, 
     expect(currentScreen(popScreen(multiModel))).toBe("fault");
     const singleModel = stackForSearchSelection({ models: [{ id: "only" }] });
     expect(currentScreen(popScreen(singleModel))).toBe("fault");
+  });
+});
+
+describe("stackForEasySearchSelection: always lands on fault, never progress/result", () => {
+  it("returns exactly [top, fault] — Easy Search only ever resolves Equipo+Model, never a specific Failure/Service", () => {
+    expect(stackForEasySearchSelection()).toEqual(["top", "fault"]);
+  });
+
+  it("Back from the resulting stack returns to top", () => {
+    expect(currentScreen(popScreen(stackForEasySearchSelection()))).toBe("top");
+  });
+
+  it("takes no arguments — unlike stackForSearchSelection, it never branches on equipo.models.length (Easy Search always skips the model screen, since the model is already resolved)", () => {
+    expect(stackForEasySearchSelection.length).toBe(0);
   });
 });
