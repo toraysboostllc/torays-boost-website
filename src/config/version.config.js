@@ -3,9 +3,15 @@
  * approved for production — never mid-round. Keep in sync with the
  * "version" field in package.json.
  */
-export const APP_VERSION = "1.2.1";
+export const APP_VERSION = "1.3.0";
 
 export const VERSION_HISTORY = [
+  {
+    version: "1.3.0",
+    date: "2026-08-25",
+    summary:
+      "New feature: Easy Search, a closed-by-default entry point in the authenticated Wholesale portal. A shop types a printed model code (or a commercial name/brand) and gets back real-world device specs — never a price. When the device is linked to the existing pricing catalog, a \"View Services & Wholesale Prices\" button funnels into the unmodified Equipment → Model → Failure/Service → Price flow. Purple capsule trigger on desktop, purple floating button + bottom sheet on mobile. Backed by two new tables (wholesale_device_models, wholesale_device_model_codes, RLS enabled, zero policies — same posture as every other wholesale_* table), seeded with 55 verified Apple/Samsung devices and 126 model codes/aliases. The existing Live Search, login, \"Keep me signed in\", and every other Wholesale flow are unaffected. The public site never exposes this endpoint — it requires the same authenticated shop session as the price catalog.",
+  },
   {
     version: "1.2.1",
     date: "2026-08-24",
