@@ -3,9 +3,15 @@
  * approved for production — never mid-round. Keep in sync with the
  * "version" field in package.json.
  */
-export const APP_VERSION = "1.3.0";
+export const APP_VERSION = "1.3.1";
 
 export const VERSION_HISTORY = [
+  {
+    version: "1.3.1",
+    date: "2026-08-25",
+    summary:
+      "Wholesale Portal usability fixes, no behaviour changes outside it. Easy Search now closes only through a deliberate control: the quiet ghost X became a 40x40 red square with a white X, and the document-level listener that closed the panel on any press outside it was removed — on a phone the backdrop is most of the screen, touch synthesizes a mousedown, and closing wipes the query, so a thumb brushing the backdrop while scrolling the sheet threw away whatever the shop had just typed. Escape still closes it, deliberately: that is a keyboard affordance, not an accidental-dismissal risk. The wizard's Back, the portal's Log out and the result panel's button now share one green through a single token family and one .wsp-btn-green class, instead of two ghost buttons plus a third green hardcoded in four places; their label and icons are the portal's existing navy ink rather than white, because white on this green measures 2.28:1 and fails WCAG AA — navy clears 4.5:1 in all three states, and a test recomputes those ratios from the tokens on every run. \"Back to Price Menu\" is now simply \"Back\" and steps back one screen keeping the shop's equipo and modelo, rather than resetting the wizard and discarding every selection. Finally, a bug found in preview review: that Back appeared to load and then returned the identical quote, because it landed on the internal progress screen, which advances by itself. Back now skips screens that ask nothing and forgets only the choice made on the screen it lands on, so the falla list comes back genuinely re-choosable.",
+  },
   {
     version: "1.3.0",
     date: "2026-08-25",
