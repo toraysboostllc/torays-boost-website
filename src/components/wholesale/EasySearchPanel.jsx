@@ -48,7 +48,7 @@ export function EasySearchPanel({ onSelectCatalogModel }) {
   const [errorKind, setErrorKind] = useState(null); // null | "transient" | "auth"
   const [activeIndex, setActiveIndex] = useState(-1);
   const [selectedResult, setSelectedResult] = useState(null); // detail view, or null = list view
-  const panelRef = useRef(null);
+
   const inputRef = useRef(null);
   const requestIdRef = useRef(0);
 
@@ -89,21 +89,31 @@ export function EasySearchPanel({ onSelectCatalogModel }) {
     setActiveIndex(-1);
   }, [results]);
 
+  /**
+   * NO outside-click listener, on purpose. There used to be a document-level
+   * "mousedown" handler here that closed the panel on any press landing
+   * outside panelRef, and it was actively harmful on a phone: the backdrop
+   * is most of the screen, a browser synthesizes mousedown from touch, and
+   * closePanel() wipes the query and the results — so a stray thumb while
+   * scrolling the sheet threw away whatever the shop had typed. The red
+   * close button is now the only pointer path out, which is why it is
+   * styled to be impossible to miss.
+   *
+   * Escape is deliberately KEPT. It is a keyboard affordance, not an
+   * accidental-dismissal risk (nobody brushes Escape with a thumb), and
+   * dropping it from a role="dialog" aria-modal="true" element would break
+   * the ARIA dialog pattern for keyboard and screen-reader users.
+   */
   useEffect(() => {
     if (!isOpen) return undefined;
-    function handlePointerDown(e) {
-      if (panelRef.current && !panelRef.current.contains(e.target)) closePanel();
-    }
     function handleKeyDown(e) {
       if (e.key === "Escape") closePanel();
     }
-    document.addEventListener("mousedown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
     // Autofocus the search input the moment the panel opens, so keyboard
     // users land ready to type without an extra Tab.
     inputRef.current?.focus();
     return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -179,7 +189,6 @@ export function EasySearchPanel({ onSelectCatalogModel }) {
         <div className="wsp-easy-search-backdrop">
           <div
             id="wsp-easy-search-panel"
-            ref={panelRef}
             role="dialog"
             aria-modal="true"
             aria-label={t("easySearch.panelLabel")}
@@ -193,7 +202,10 @@ export function EasySearchPanel({ onSelectCatalogModel }) {
                 aria-label={t("easySearch.closeLabel")}
                 className="wsp-easy-search-close"
               >
-                <X size={18} aria-hidden="true" />
+                {/* Thicker than lucide's default 2: at 40px the glyph has to
+                    carry the whole button, and a hairline X on a saturated
+                    red fill reads as washed out. */}
+                <X size={22} strokeWidth={3} aria-hidden="true" />
               </button>
             </div>
 

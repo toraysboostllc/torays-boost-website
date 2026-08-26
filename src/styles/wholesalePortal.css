@@ -2796,24 +2796,57 @@
   font-weight: 600;
   color: var(--wsp-purple);
 }
+/* Close button — the ONLY way out of the panel. A press on the backdrop
+   deliberately does nothing (see EasySearchPanel.jsx's own note on why the
+   outside-click listener was removed), so this control is no longer a quiet
+   ghost icon: it is a solid red square that reads as "exit" at a glance.
+
+   40x40 on every viewport, not only on touch — that is the smallest
+   comfortable tap target, and giving desktop the same size costs nothing.
+
+   Every colour comes from tokens that already exist: --wsp-red for the fill
+   and --wsp-card-bg (the panel's own background) for the focus ring's gap.
+   The hover and pressed steps are filter-based, the same technique .wsp-btn
+   already uses, precisely so no new red hex values enter the palette. */
 .wsp-easy-search-close {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  padding: 0;
   border: none;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--wsp-card-text-soft);
+  border-radius: 8px;
+  background: var(--wsp-red);
+  color: #ffffff;
+  cursor: pointer;
+  /* Suppresses the grey flash Android paints over the button on tap; the
+     :active state below is the real press feedback. */
+  -webkit-tap-highlight-color: transparent;
+  transition: filter 0.12s ease, box-shadow 0.12s ease, transform 0.05s ease;
 }
 .wsp-easy-search-close:hover {
-  background: var(--wsp-purple-bg-light);
-  color: var(--wsp-purple);
+  filter: brightness(0.92);
 }
+.wsp-easy-search-close:active {
+  filter: brightness(0.85);
+  transform: translateY(1px);
+}
+/* Two-layer ring: a panel-coloured gap first, so the red ring never sits
+   directly against the red fill and vanish into it. Keyboard only, like
+   every other :focus-visible in this file. */
 .wsp-easy-search-close:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--wsp-purple-focus);
+  box-shadow: 0 0 0 2px var(--wsp-card-bg), 0 0 0 4px var(--wsp-red);
+}
+@media (prefers-reduced-motion: reduce) {
+  .wsp-easy-search-close {
+    transition: none;
+  }
+  .wsp-easy-search-close:active {
+    transform: none;
+  }
 }
 
 .wsp-easy-search-field {

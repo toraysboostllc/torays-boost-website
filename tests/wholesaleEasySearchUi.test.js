@@ -74,13 +74,25 @@ describe("EasySearchPanel.jsx: trigger button and dialog semantics", () => {
     expect(panelSrc).toContain('aria-label={t("easySearch.closeLabel")}');
   });
 
-  it("Escape closes the panel, and clicking outside it closes the panel too — both real document-level listeners, both cleaned up", () => {
+  /* Superseded on purpose. This used to assert that a press outside the
+     panel closed it. That listener was REMOVED: on a phone the backdrop is
+     most of the screen, touch synthesizes mousedown, and closePanel() wipes
+     the query — so a thumb brushing the backdrop mid-scroll threw away what
+     the shop had typed. The red close button is now the only pointer way
+     out. Behavioural proof (backdrop press keeps the modal AND the query)
+     lives in tests/wholesaleEasySearchCloseButton.test.jsx; what stays here
+     is the keyboard half, which was never the problem. */
+  it("Escape still closes the panel — a real document-level listener, cleaned up on unmount", () => {
     expect(panelSrc).toMatch(/if \(e\.key === "Escape"\) closePanel\(\);/);
     expect(panelSrc).toContain('document.addEventListener("keydown", handleKeyDown);');
-    expect(panelSrc).toMatch(/if \(panelRef\.current && !panelRef\.current\.contains\(e\.target\)\) closePanel\(\);/);
-    expect(panelSrc).toContain('document.addEventListener("mousedown", handlePointerDown);');
-    expect(panelSrc).toContain('document.removeEventListener("mousedown", handlePointerDown);');
     expect(panelSrc).toContain('document.removeEventListener("keydown", handleKeyDown);');
+  });
+
+  it("no pointer listener closes the panel from outside it any more", () => {
+    expect(panelSrc).not.toContain('addEventListener("mousedown"');
+    expect(panelSrc).not.toContain('addEventListener("pointerdown"');
+    expect(panelSrc).not.toContain("const panelRef");
+    expect(panelSrc).not.toContain("ref={panelRef}");
   });
 });
 
@@ -230,12 +242,24 @@ describe("wholesalePortal.css: purple tokens, responsive trigger, mobile bottom 
     expect(cssSrc).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\n\s*\.wsp-easy-search-panel,\s*\n\s*\.wsp-easy-search-backdrop \{\s*\n\s*animation:\s*none;/);
   });
 
-  it("interactive controls have a visible focus ring using the purple focus token", () => {
-    for (const selector of [".wsp-easy-search-trigger:focus-visible", ".wsp-easy-search-close:focus-visible", ".wsp-easy-search-view-catalog:focus-visible"]) {
+  it("the purple controls have a visible focus ring using the purple focus token", () => {
+    for (const selector of [".wsp-easy-search-trigger:focus-visible", ".wsp-easy-search-view-catalog:focus-visible"]) {
       const idx = cssSrc.indexOf(`${selector} {`);
       expect(idx, `expected ${selector} to exist`).toBeGreaterThan(-1);
       const block = cssSrc.slice(idx, cssSrc.indexOf("}", idx));
       expect(block).toContain("var(--wsp-purple-focus)");
     }
+  });
+
+  /* The close button is the one control that is NOT purple — it is the red
+     square, so a purple ring on it would read as a stray colour. It still
+     has a focus-visible ring, built from --wsp-red over a --wsp-card-bg gap
+     so the ring never disappears into the red fill it surrounds. */
+  it("the red close button has its own focus ring, from the red and card tokens", () => {
+    const idx = cssSrc.indexOf(".wsp-easy-search-close:focus-visible {");
+    expect(idx, "expected .wsp-easy-search-close:focus-visible to exist").toBeGreaterThan(-1);
+    const block = cssSrc.slice(idx, cssSrc.indexOf("}", idx));
+    expect(block).toContain("var(--wsp-red)");
+    expect(block).toContain("var(--wsp-card-bg)");
   });
 });
