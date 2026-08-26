@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   pushScreen,
   popScreen,
+  popToSelectableScreen,
+  selectionsToClearFor,
+  isTransientScreen,
   resetStack,
   currentScreen,
   stackForSearchSelection,
@@ -127,5 +130,61 @@ describe("stackForEasySearchSelection: always lands on fault, never progress/res
 
   it("takes no arguments — unlike stackForSearchSelection, it never branches on equipo.models.length (Easy Search always skips the model screen, since the model is already resolved)", () => {
     expect(stackForEasySearchSelection.length).toBe(0);
+  });
+});
+
+describe("popToSelectableScreen: Back never rests on an auto-advancing screen", () => {
+  it("skips 'progress' when popping out of 'result' — the reported bug", () => {
+    // Back from the result used to land here on ["top","model","fault","progress"],
+    // and "progress" immediately pushed "result" again.
+    expect(popToSelectableScreen(["top", "model", "fault", "progress", "result"])).toEqual(["top", "model", "fault"]);
+  });
+
+  it("skips 'progress' for a single-model equipo too (no 'model' entry in the stack)", () => {
+    expect(popToSelectableScreen(["top", "fault", "progress", "result"])).toEqual(["top", "fault"]);
+  });
+
+  it("behaves like a plain pop when the screen below is already selectable", () => {
+    expect(popToSelectableScreen(["top", "model", "fault"])).toEqual(["top", "model"]);
+    expect(popToSelectableScreen(["top", "model"])).toEqual(["top"]);
+  });
+
+  it("never underflows, and never strands the shop on a transient screen", () => {
+    expect(popToSelectableScreen(["top"])).toEqual(["top"]);
+    expect(popToSelectableScreen(["top", "progress"])).toEqual(["top"]);
+    expect(popToSelectableScreen(["top", "progress", "progress"])).toEqual(["top"]);
+  });
+
+  it("is idempotent under repeat-tap at the floor", () => {
+    let stack = ["top", "model", "fault", "progress", "result"];
+    for (let i = 0; i < 10; i++) stack = popToSelectableScreen(stack);
+    expect(stack).toEqual(["top"]);
+    expect(isTransientScreen(currentScreen(stack))).toBe(false);
+  });
+});
+
+describe("selectionsToClearFor: the destination's own pick dies, everything before it lives", () => {
+  it("landing on the falla list forgets only the falla", () => {
+    expect(selectionsToClearFor("fault")).toEqual(["service"]);
+  });
+
+  it("landing on the model list forgets the model and the falla, never the equipo", () => {
+    expect(selectionsToClearFor("model")).toEqual(["model", "service"]);
+  });
+
+  it("landing on the main menu forgets everything", () => {
+    expect(selectionsToClearFor("top")).toEqual(["equipo", "model", "service"]);
+  });
+
+  it("a screen that asks nothing clears nothing", () => {
+    expect(selectionsToClearFor("progress")).toEqual([]);
+    expect(selectionsToClearFor("result")).toEqual([]);
+  });
+
+  it("every selectable destination clears its own step forward, never a step before it", () => {
+    const order = ["equipo", "model", "service"];
+    for (const [screen, firstCleared] of [["top", "equipo"], ["model", "model"], ["fault", "service"]]) {
+      expect(selectionsToClearFor(screen)).toEqual(order.slice(order.indexOf(firstCleared)));
+    }
   });
 });

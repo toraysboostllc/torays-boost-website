@@ -45,10 +45,14 @@ describe("WholesaleWizard.jsx: Modelo step is skipped only when an Equipo has ex
 });
 
 describe("WholesaleWizard.jsx: back navigation is a real stack, not a hardcoded per-screen target", () => {
-  it("goBack delegates to the pure popScreen reducer rather than switching on the current screen name — see wizardScreenStack.test.js for the underflow-proof behind it", () => {
-    expect(wizardSrc).toContain("popScreen,");
+  it("goBack delegates to the pure reducers rather than switching on the current screen name — see wizardScreenStack.test.js for the proofs behind them", () => {
+    expect(wizardSrc).toContain("popToSelectableScreen,");
+    expect(wizardSrc).toContain("selectionsToClearFor,");
     expect(wizardSrc).toContain('} from "../../lib/wizardScreenStack.js";');
-    expect(wizardSrc).toMatch(/function goBack\(\) \{\s*\n\s*setScreenStack\(\(stack\) => popScreen\(stack\)\);/);
+    expect(wizardSrc).toContain("const nextStack = popToSelectableScreen(screenStack);");
+    // No per-screen if/else ladder in the component: which selections die is
+    // the reducer's answer, not a branch duplicated here.
+    expect(wizardSrc).not.toMatch(/goBack[\s\S]{0,400}screen === "fault"/);
   });
 
   it("every non-top screen renders exactly one Back button wired to goBack (wrapped for the hover/tap sound)", () => {
@@ -100,13 +104,25 @@ describe("WholesaleWizard.jsx: result panel receives exactly the selection it ne
     expect(wizardSrc).not.toContain("onConsultAnother");
   });
 
-  it("goBack pops exactly one screen and clears no selection state whatsoever", () => {
-    /* The regex pins goBack's ENTIRE body: one statement, popScreen, closing
-       brace. That is the proof it cannot touch a selection — stronger than
-       grepping the whole file for setSelected*(null), which would wrongly
-       flag handleSelectEasySearchResult's legitimate clear of a stale
-       service when the shop jumps straight to a different model. */
-    expect(wizardSrc).toMatch(/function goBack\(\) \{\s*\n\s*setScreenStack\(\(stack\) => popScreen\(stack\)\);\s*\n\s*\}/);
+  /* SUPERSEDED, and it was wrong in a way worth recording. This used to
+     assert that goBack "clears no selection state whatsoever", pinning
+     goBack's body to a single popScreen call. That was an accurate
+     description of the code — and the code had a real bug: Back from the
+     result screen popped onto "progress", which auto-advances, so the shop
+     was returned to the identical result they had just left, with every
+     selection still live. Preserving EVERY selection is not the invariant;
+     preserving the ones BEFORE the destination is. */
+  it("goBack lands on a selectable screen and clears the destination's own selection forward", () => {
+    expect(wizardSrc).toContain("const nextStack = popToSelectableScreen(screenStack);");
+    expect(wizardSrc).toContain("const clear = selectionsToClearFor(currentScreen(nextStack));");
+    expect(wizardSrc).toContain('if (clear.includes("equipo")) setSelectedEquipo(null);');
+    expect(wizardSrc).toContain('if (clear.includes("model")) setSelectedModel(null);');
+    expect(wizardSrc).toContain('if (clear.includes("service")) setSelectedService(null);');
+  });
+
+  it("goBack never rests on the auto-advancing progress screen — the reducer skips it", () => {
+    expect(wizardSrc).not.toMatch(/function goBack\(\)[\s\S]{0,300}popScreen\(/);
+    expect(wizardSrc).toContain("popToSelectableScreen");
   });
 });
 

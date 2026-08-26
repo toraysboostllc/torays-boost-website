@@ -6,7 +6,8 @@ import { translateServiceName } from "../../lib/wholesaleCatalogI18n.js";
 import { wholesaleHoverProps } from "../../lib/wholesaleSound.js";
 import {
   pushScreen,
-  popScreen,
+  popToSelectableScreen,
+  selectionsToClearFor,
   resetStack,
   currentScreen,
   stackForSearchSelection,
@@ -130,8 +131,31 @@ export function WholesaleWizard({ equipmentTypes, microsolderingEquipmentType, l
   function goTo(next) {
     setScreenStack((stack) => pushScreen(stack, next));
   }
+  /**
+   * Back, semantically: land on the previous screen that actually ASKS the
+   * shop something, and forget the choice made there (and anything chosen
+   * after it) so that screen is genuinely re-choosable.
+   *
+   * Both halves are needed, and skipping either one reproduces a real bug:
+   *  - Without popToSelectableScreen, Back from "result" lands on
+   *    "progress", which auto-advances and drops the shop straight back
+   *    into the same result.
+   *  - Without clearing, the falla screen would come back with the previous
+   *    falla still selected, and the wizard would be sitting on the exact
+   *    residual state that produced the result it just left.
+   *
+   * Computed from the CURRENT stack rather than inside a setState updater:
+   * the destination decides which selections to clear, so stack and
+   * selections have to be derived from one single reading of the state, and
+   * a state updater must stay pure (it is invoked twice under StrictMode).
+   */
   function goBack() {
-    setScreenStack((stack) => popScreen(stack));
+    const nextStack = popToSelectableScreen(screenStack);
+    setScreenStack(nextStack);
+    const clear = selectionsToClearFor(currentScreen(nextStack));
+    if (clear.includes("equipo")) setSelectedEquipo(null);
+    if (clear.includes("model")) setSelectedModel(null);
+    if (clear.includes("service")) setSelectedService(null);
   }
   /* There is deliberately NO resetToTop() any more. It existed for exactly
      one caller — the result panel's old "Back to Price Menu" button — and
