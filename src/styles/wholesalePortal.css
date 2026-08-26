@@ -73,6 +73,31 @@
   --wsp-wizard-glass-rgb: 230, 241, 253;
   --wsp-red: #f0525e;
 
+  /* ONE green for every "step back / sign out" control in the portal:
+     the wizard's Back, the portal header's Log out, and the result panel's
+     Back. Defined here as tokens, and consumed through a single
+     .wsp-btn-green class, precisely so those three can never drift into
+     three slightly different greens — which is exactly what had started to
+     happen (only the result button was green, hardcoded inline).
+     One step lighter than the green those buttons used to carry, per the
+     approved design.
+
+     The label is --wsp-navy, not white, and that is what drives the state
+     ramp. White on this green is 2.28:1 — it fails WCAG AA outright. Navy
+     on it is 7.81:1. But dark ink inverts which direction the states may
+     move: the old white-text ramp darkened on hover and pressed, and
+     darkening under NAVY text destroys contrast (navy on the old pressed
+     green is 3.55:1, below the 4.5 floor). So hover lightens and pressed
+     darkens by only ONE step of the same Tailwind green scale every green
+     here already comes from. Measured, all four states clear AA for normal
+     text — and tests/wholesaleGreenBackButtons.test.jsx recomputes those
+     ratios from these very tokens on every run, so a future tweak that
+     breaks the floor fails the suite instead of shipping. */
+  --wsp-green: #22c55e;
+  --wsp-green-hover: #4ade80;
+  --wsp-green-active: #16a34a;
+  --wsp-green-focus: #86efac;
+
   /* Easy Search — its own dedicated accent, per spec: the trigger button
      and the panel/sheet chrome are purple; result CONTENT (the spec list)
      stays on the ordinary --wsp-text-strong/--wsp-card-* tokens above, on
@@ -549,6 +574,40 @@
 
 .wsp-btn-ghost:not(:disabled):active {
   background: linear-gradient(180deg, var(--wsp-blue-tint) 0%, var(--wsp-navy) 100%);
+}
+
+/* Shared green fill — the single source of truth for the three "go back /
+   sign out" buttons. Colour and interaction states ONLY: every dimension
+   (min-height, width, padding, radius, alignment) keeps coming from
+   .wsp-btn plus each button's own class, so adding this never resizes
+   anything. The border stays 1px like .wsp-btn's, just transparent, so the
+   box model is identical to the ghost variant it replaces.
+   :active needs no transform here — .wsp-btn:not(:disabled):active already
+   supplies the 1px press for every button variant. */
+.wsp-btn-green {
+  /* The portal's existing navy ink token — not a new near-black. Icons are
+     lucide SVGs stroked with currentColor, so they inherit this exact value
+     and can never drift from the label. */
+  color: var(--wsp-navy);
+  background: var(--wsp-green);
+  border-color: transparent;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset;
+}
+
+.wsp-btn-green:not(:disabled):hover {
+  background: var(--wsp-green-hover);
+}
+
+.wsp-btn-green:not(:disabled):active {
+  background: var(--wsp-green-active);
+}
+
+/* Green ring rather than the portal's default blue .wsp-btn ring — matches
+   these buttons' own identity, the same reasoning the result button's ring
+   already used. */
+.wsp-btn-green:focus-visible {
+  outline: 2px solid var(--wsp-green-focus);
+  outline-offset: 2px;
 }
 
 /* ---------------------------------------------------------------------
@@ -1727,26 +1786,13 @@
   min-height: 56px; /* comfortably above the 48px minimum, keeps the button's existing size */
   border-radius: 12px;
   margin-top: 14px;
-  background: #16a34a;
-  color: #ffffff;
-  border: none;
+  /* Colour, hover, pressed and the focus ring all come from .wsp-btn-green
+     now — this class is dimensions only. The four greens that used to be
+     hardcoded here were the reason a second green could exist alongside the
+     wizard's Back and the portal's Log out; they are deleted rather than
+     re-pointed at the tokens, so there is exactly one place left in the
+     stylesheet where a green can be changed. */
   box-shadow: 0 2px 6px rgba(15, 30, 70, 0.18);
-}
-
-.wsp-result-consult-another:not(:disabled):hover {
-  background: #15803d;
-}
-
-.wsp-result-consult-another:not(:disabled):active {
-  background: #166534;
-}
-
-/* Green focus ring, distinct from the blue ring every other .wsp-btn uses
-   (.wsp-btn:focus-visible) — matches this button's own green identity
-   instead of the portal's default blue accent. */
-.wsp-result-consult-another:focus-visible {
-  outline: 2px solid #86efac;
-  outline-offset: 2px;
 }
 
 /* No-scroll pass: only the narrowest phones (320px-class) need the button

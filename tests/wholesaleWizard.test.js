@@ -90,9 +90,23 @@ describe("WholesaleWizard.jsx: result panel receives exactly the selection it ne
     expect(wizardSrc).toContain("service={selectedService}");
   });
 
-  it("onConsultAnother resets the full stack (via the pure resetStack reducer) and every selection back to the top screen", () => {
-    expect(wizardSrc).toMatch(/function resetToTop\(\) \{\s*\n\s*setScreenStack\(resetStack\(\)\);/);
-    expect(wizardSrc).toContain("onConsultAnother={resetToTop}");
+  /* Superseded deliberately. The result panel's button used to reset the
+     whole wizard and wipe every selection; it now steps back exactly one
+     screen and keeps them, like every other Back in the flow. resetToTop()
+     was removed along with its only caller. */
+  it("the result panel steps BACK one screen — it never resets the wizard, and resetToTop is gone", () => {
+    expect(wizardSrc).toContain("onBack={goBack}");
+    expect(wizardSrc).not.toContain("function resetToTop");
+    expect(wizardSrc).not.toContain("onConsultAnother");
+  });
+
+  it("goBack pops exactly one screen and clears no selection state whatsoever", () => {
+    /* The regex pins goBack's ENTIRE body: one statement, popScreen, closing
+       brace. That is the proof it cannot touch a selection — stronger than
+       grepping the whole file for setSelected*(null), which would wrongly
+       flag handleSelectEasySearchResult's legitimate clear of a stale
+       service when the shop jumps straight to a different model. */
+    expect(wizardSrc).toMatch(/function goBack\(\) \{\s*\n\s*setScreenStack\(\(stack\) => popScreen\(stack\)\);\s*\n\s*\}/);
   });
 });
 
@@ -175,7 +189,7 @@ describe("WholesaleWizard.jsx: keyboard accessibility — every selectable contr
 
 describe("WholesaleWizard.jsx: mobile — Back button and step indicator are never hidden at any breakpoint", () => {
   it("the Back button's own class carries no hidden/md:hidden responsive-visibility modifier", () => {
-    expect(wizardSrc).toMatch(/className="wsp-btn wsp-btn-ghost wsp-wizard-back"/);
+    expect(wizardSrc).toMatch(/className="wsp-btn wsp-btn-green wsp-wizard-back"/);
     expect(wizardSrc).not.toMatch(/wsp-wizard-back[^"]*\bhidden\b/);
   });
 

@@ -143,24 +143,37 @@ describe("WholesaleResultPanel.jsx: breadcrumb summary and required disclaimers"
     expect(panelSrc).toContain('t("result.disclaimer")');
   });
 
-  it("the Back to Price Menu button calls onConsultAnother (wrapped for the hover/tap sound) — no inline navigation/reset logic duplicated here, exact same action as before this button's redesign", () => {
-    expect(panelSrc).toMatch(/wholesaleHoverProps\(onConsultAnother\)/);
-    expect(panelSrc).toContain('t("result.consultAnother")');
+  it("the Back to Price Menu button calls onBack (wrapped for the hover/tap sound) — no inline navigation/reset logic duplicated here, exact same action as before this button's redesign", () => {
+    expect(panelSrc).toMatch(/wholesaleHoverProps\(onBack\)/);
+    expect(panelSrc).toContain('t("wizard.back")');
   });
 
   it("the button's accessible name (aria-label) is localized through the same t() key as its visible label, never a hardcoded string", () => {
-    const btnIdx = panelSrc.indexOf('className="wsp-btn wsp-result-consult-another"');
+    const btnIdx = panelSrc.indexOf('className="wsp-btn wsp-btn-green wsp-result-consult-another"');
     expect(btnIdx).toBeGreaterThan(-1);
-    const ariaIdx = panelSrc.indexOf('aria-label={t("result.consultAnother")}', btnIdx);
+    const ariaIdx = panelSrc.indexOf('aria-label={t("wizard.back")}', btnIdx);
     expect(ariaIdx).toBeGreaterThan(btnIdx);
     expect(ariaIdx).toBeLessThan(panelSrc.indexOf("</button>", btnIdx));
   });
 
-  it("result.consultAnother reads exactly 'Back to Price Menu' in English and 'Volver al menú de precios' in Spanish, through the existing i18n dictionary — never hardcoded in the component", () => {
-    expect(wholesaleTranslations.en.result.consultAnother).toBe("Back to Price Menu");
-    expect(wholesaleTranslations.es.result.consultAnother).toBe("Volver al menú de precios");
-    expect(panelSrc).not.toMatch(/>Back to Price Menu</);
-    expect(panelSrc).not.toMatch(/>Volver al menú de precios</);
+  /* The label is now just "Back". It reuses the wizard's OWN existing key
+     rather than keeping a second key holding the same word: result
+     .consultAnother is deleted from both dictionaries, so the three Back
+     controls in this portal can never drift into three different wordings,
+     the same single-source-of-truth reasoning applied to their colour. */
+  it("the button reads 'Back' in English and 'Atrás' in Spanish, through the shared wizard.back key", () => {
+    expect(wholesaleTranslations.en.wizard.back).toBe("Back");
+    expect(wholesaleTranslations.es.wizard.back).toBe("Atrás");
+    expect(panelSrc).not.toMatch(/>Back</);
+    expect(panelSrc).not.toMatch(/>Atrás</);
+  });
+
+  it("the retired 'Back to Price Menu' wording is gone from both dictionaries and from the component", () => {
+    expect(wholesaleTranslations.en.result.consultAnother).toBeUndefined();
+    expect(wholesaleTranslations.es.result.consultAnother).toBeUndefined();
+    expect(panelSrc).not.toContain("consultAnother");
+    expect(panelSrc).not.toContain("Back to Price Menu");
+    expect(panelSrc).not.toContain("Volver al menú de precios");
   });
 });
 
@@ -584,11 +597,11 @@ describe("wholesalePortal.css: 'Back to Price Menu' is a fixed-width rectangular
   });
 
   it("the ArrowLeft icon is the first child, before the label text — icon-left, matching the approved spec (the aria-label attribute also carries the same t() call, so the label TEXT NODE is deliberately located by searching after the icon, not the attribute)", () => {
-    const btnIdx = panelSrc.indexOf('className="wsp-btn wsp-result-consult-another"');
+    const btnIdx = panelSrc.indexOf('className="wsp-btn wsp-btn-green wsp-result-consult-another"');
     expect(btnIdx).toBeGreaterThan(-1);
     const iconIdx = panelSrc.indexOf("<ArrowLeft", btnIdx);
     expect(iconIdx).toBeGreaterThan(btnIdx);
-    const labelIdx = panelSrc.indexOf('t("result.consultAnother")', iconIdx);
+    const labelIdx = panelSrc.indexOf('t("wizard.back")', iconIdx);
     expect(labelIdx).toBeGreaterThan(iconIdx);
   });
 
@@ -598,23 +611,25 @@ describe("wholesalePortal.css: 'Back to Price Menu' is a fixed-width rectangular
 
   it("no longer carries wsp-btn-primary — the shared blue gradient class stays untouched and unused by this button, which now supplies its own solid color entirely via wsp-result-consult-another", () => {
     expect(panelSrc).not.toContain('className="wsp-btn wsp-btn-primary wsp-result-consult-another"');
-    expect(panelSrc).toContain('className="wsp-btn wsp-result-consult-another"');
+    expect(panelSrc).toContain('className="wsp-btn wsp-btn-green wsp-result-consult-another"');
   });
 
-  it("solid green fill, exactly the requested hex — never a gradient", () => {
-    expect(block).toContain("background: #16a34a;");
-    expect(block).toContain("color: #ffffff;");
+  /* The colour moved OUT of this class. It used to hardcode #16a34a here
+     with its own hover/active/focus greens, which is precisely how a second
+     green could exist alongside the wizard's Back and the portal's Log out.
+     Fill and states now come from the shared .wsp-btn-green, so this class
+     is dimensions only and there is exactly one place left to change a
+     green. */
+  it("carries no colour of its own any more — no background, no fill hex, no gradient", () => {
+    expect(block).not.toMatch(/background:/);
+    expect(block).not.toMatch(/#[0-9a-fA-F]{6}/);
     expect(block).not.toMatch(/linear-gradient/i);
   });
 
-  it("hover and active states use the exact requested darker greens", () => {
-    const hoverIdx = cssSrc.indexOf(".wsp-result-consult-another:not(:disabled):hover {");
-    const hoverBlock = cssSrc.slice(hoverIdx, cssSrc.indexOf("}", hoverIdx));
-    expect(hoverBlock).toContain("background: #15803d;");
-
-    const activeIdx = cssSrc.indexOf(".wsp-result-consult-another:not(:disabled):active {");
-    const activeBlock = cssSrc.slice(activeIdx, cssSrc.indexOf("}", activeIdx));
-    expect(activeBlock).toContain("background: #166534;");
+  it("the retired per-button hover/active/focus green rules are gone from the stylesheet", () => {
+    expect(cssSrc).not.toContain(".wsp-result-consult-another:not(:disabled):hover");
+    expect(cssSrc).not.toContain(".wsp-result-consult-another:not(:disabled):active");
+    expect(cssSrc).not.toContain(".wsp-result-consult-another:focus-visible");
   });
 
   it("has a light, professional shadow — present, but not the old heavy blue-tinted glow", () => {
@@ -622,11 +637,11 @@ describe("wholesalePortal.css: 'Back to Price Menu' is a fixed-width rectangular
     expect(block).not.toMatch(/rgba\(15, 30, 70, 0\.35\)/); // the old heavy shadow value
   });
 
-  it("has its own distinct green focus-visible ring, separate from the portal's default blue .wsp-btn ring", () => {
-    const focusIdx = cssSrc.indexOf(".wsp-result-consult-another:focus-visible {");
+  it("gets its green focus-visible ring from the shared class, still distinct from the portal's default blue .wsp-btn ring", () => {
+    const focusIdx = cssSrc.indexOf(".wsp-btn-green:focus-visible {");
     expect(focusIdx).toBeGreaterThan(-1);
     const focusBlock = cssSrc.slice(focusIdx, cssSrc.indexOf("}", focusIdx));
-    expect(focusBlock).toContain("outline: 2px solid #86efac;");
+    expect(focusBlock).toContain("outline: 2px solid var(--wsp-green-focus);");
     expect(focusBlock).not.toContain("var(--wsp-blue-light)");
   });
 
@@ -636,7 +651,7 @@ describe("wholesalePortal.css: 'Back to Price Menu' is a fixed-width rectangular
   });
 
   it("keeps its icon-text gap and centering from the shared .wsp-btn base (display:inline-flex, align-items:center, justify-content:center, gap:6px) — this button overrides colors/shape only, never the shared layout mechanics", () => {
-    expect(panelSrc).toContain('className="wsp-btn wsp-result-consult-another"');
+    expect(panelSrc).toContain('className="wsp-btn wsp-btn-green wsp-result-consult-another"');
     const wspBtnIdx = cssSrc.indexOf(".wsp-btn {");
     const wspBtnBlock = cssSrc.slice(wspBtnIdx, cssSrc.indexOf("}", wspBtnIdx));
     expect(wspBtnBlock).toContain("display: inline-flex;");

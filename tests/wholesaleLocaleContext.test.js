@@ -63,7 +63,6 @@ describe("wholesaleTranslations.js: EN and ES have exactly the same keys", () =>
       "Tú conservas a tu cliente. Nosotros hacemos la reparación a nivel de placa."
     );
     expect(wholesaleTranslations.es.result.disclaimer).toBe("Estimación antes de otros gastos.");
-    expect(wholesaleTranslations.es.result.consultAnother).toBe("Volver al menú de precios");
     expect(wholesaleTranslations.es.microsoldering.title).toBe("Microsoldadura");
     expect(wholesaleTranslations.es.microsoldering.subtitle).toBe("Reparación avanzada de placa");
     expect(wholesaleTranslations.es.portal.badge).toBe("Portal Mayorista");

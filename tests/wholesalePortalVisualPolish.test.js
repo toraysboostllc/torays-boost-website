@@ -72,7 +72,10 @@ describe("Cambio 1 — identity glass block (logo + WHOLESALE PORTAL/PRIVATE ARE
     expect(pageSrc).toContain("<WholesaleSoundToggle />");
     expect(pageSrc).toContain("<WholesaleLocaleSelector />");
     expect(pageSrc).toContain('className="wsp-main-site-link"');
-    expect(pageSrc).toContain("wsp-btn wsp-btn-ghost");
+    // Log out moved from the ghost variant to the shared green one; what
+    // this test guards is that its SIZE classes were not touched, and
+    // .wsp-btn-green is colour-only.
+    expect(pageSrc).toContain("wsp-btn wsp-btn-green");
     // Main website's 44px floor and Sound/Logout's own heights are untouched
     // — this test just confirms this pass didn't touch those class names.
     const mainSiteBlock = ruleBlock(".wsp-main-site-link");

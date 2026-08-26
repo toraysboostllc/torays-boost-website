@@ -380,7 +380,7 @@ function WholesalePricesContent() {
                 <Home size={14} aria-hidden="true" />
                 <span className="wsp-main-site-link-text">{t("portal.mainWebsite")}</span>
               </button>
-              <button type="button" {...wholesaleHoverProps(handleLogout)} className="wsp-btn wsp-btn-ghost">
+              <button type="button" {...wholesaleHoverProps(handleLogout)} className="wsp-btn wsp-btn-green">
                 <LogOut size={16} />
                 {t("portal.logout")}
               </button>

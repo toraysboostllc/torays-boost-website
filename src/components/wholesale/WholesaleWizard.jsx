@@ -29,15 +29,18 @@ import { EasySearchPanel } from "./EasySearchPanel.jsx";
  * passes in (see equipoDone/modeloDone/fallaDone at the WizardSteps call
  * site below) — never from whether a selection object merely still exists
  * in state. This matters for a real, reported bug: selectedEquipo/
- * selectedModel/selectedService are only ever CLEARED by resetToTop(), not
- * by goBack() (goBack only pops the screen stack — see
- * lib/wizardScreenStack.js), so a shop that picks Equipo -> Modelo -> Falla
- * and then presses Back twice, landing back on the Equipo grid, would keep
- * seeing steps 1 and 2 marked "done" and step 3 "active" — the stepper
- * claiming a position the shop isn't actually looking at — if done-ness
- * were derived from the stale selection objects instead of from `screen`.
- * Screen-based done-ness self-corrects the instant Back changes `screen`,
- * with zero extra state to keep in sync.
+ * selectedModel/selectedService are now NEVER cleared by a navigation
+ * handler at all — goBack() only pops the screen stack (see
+ * lib/wizardScreenStack.js), and it is the only way back since the result
+ * panel's button stopped resetting the wizard. So a shop that picks
+ * Equipo -> Modelo -> Falla and then presses Back twice, landing back on
+ * the Equipo grid, would keep seeing steps 1 and 2 marked "done" and step
+ * 3 "active" — the stepper claiming a position the shop isn't actually
+ * looking at — if done-ness were derived from the stale selection objects
+ * instead of from `screen`. Screen-based done-ness self-corrects the
+ * instant Back changes `screen`, with zero extra state to keep in sync.
+ * Keeping the selections is the whole point: stepping back must never cost
+ * the shop the equipo/modelo/falla it already chose.
  *
  * Markup: each `<li>` (`.wsp-wizard-step`) is a flex column with its own
  * `.wsp-wizard-step-row` wrapping ONLY the circle, centered inside it — the
@@ -130,12 +133,11 @@ export function WholesaleWizard({ equipmentTypes, microsolderingEquipmentType, l
   function goBack() {
     setScreenStack((stack) => popScreen(stack));
   }
-  function resetToTop() {
-    setScreenStack(resetStack());
-    setSelectedEquipo(null);
-    setSelectedModel(null);
-    setSelectedService(null);
-  }
+  /* There is deliberately NO resetToTop() any more. It existed for exactly
+     one caller — the result panel's old "Back to Price Menu" button — and
+     that button now steps back one screen like every other Back in the
+     wizard, keeping the shop's selections. Reintroducing a reset would
+     bring back the behaviour this change removed. */
 
   function handleSelectEquipo(equipo) {
     setSelectedEquipo(equipo);
@@ -275,7 +277,7 @@ export function WholesaleWizard({ equipmentTypes, microsolderingEquipmentType, l
 
       {screen === "model" && selectedEquipo && (
         <>
-          <button type="button" {...wholesaleHoverProps(goBack)} className="wsp-btn wsp-btn-ghost wsp-wizard-back">
+          <button type="button" {...wholesaleHoverProps(goBack)} className="wsp-btn wsp-btn-green wsp-wizard-back">
             <ArrowLeft size={16} />
             {t("wizard.back")}
           </button>
@@ -303,7 +305,7 @@ export function WholesaleWizard({ equipmentTypes, microsolderingEquipmentType, l
 
       {screen === "fault" && selectedModel && (
         <>
-          <button type="button" {...wholesaleHoverProps(goBack)} className="wsp-btn wsp-btn-ghost wsp-wizard-back">
+          <button type="button" {...wholesaleHoverProps(goBack)} className="wsp-btn wsp-btn-green wsp-wizard-back">
             <ArrowLeft size={16} />
             {t("wizard.back")}
           </button>
@@ -362,7 +364,7 @@ export function WholesaleWizard({ equipmentTypes, microsolderingEquipmentType, l
           }}
           service={selectedService}
           warranty={warranty}
-          onConsultAnother={resetToTop}
+          onBack={goBack}
         />
       )}
       </div>

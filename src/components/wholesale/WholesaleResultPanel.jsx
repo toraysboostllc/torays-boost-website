@@ -78,7 +78,7 @@ function formatTierMargin(pricing) {
  * numbers (wholesale price, customer estimate) and the arithmetic derived
  * from them.
  */
-export function WholesaleResultPanel({ selection, service, warranty, onConsultAnother }) {
+export function WholesaleResultPanel({ selection, service, warranty, onBack }) {
   const { t, formatPrice, formatDate, language } = useWholesaleLocale();
   const isQuote = service.pricing_type === "quote";
   const isRange = service.pricing_type === "range";
@@ -319,12 +319,12 @@ export function WholesaleResultPanel({ selection, service, warranty, onConsultAn
           button's solid green look, so nothing else is affected. */}
       <button
         type="button"
-        {...wholesaleHoverProps(onConsultAnother)}
-        className="wsp-btn wsp-result-consult-another"
-        aria-label={t("result.consultAnother")}
+        {...wholesaleHoverProps(onBack)}
+        className="wsp-btn wsp-btn-green wsp-result-consult-another"
+        aria-label={t("wizard.back")}
       >
         <ArrowLeft size={16} aria-hidden="true" />
-        {t("result.consultAnother")}
+        {t("wizard.back")}
       </button>
 
       {/* Large photo — the SELECTED service's own photo first, falling back
