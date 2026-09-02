@@ -16,6 +16,21 @@ export default {
         "torays-text": brand.colors.text.primary,
         "torays-text-secondary": brand.colors.text.secondary,
         "torays-text-muted": brand.colors.text.muted,
+        // Quote-wizard palette. Every value that ever carries white text was
+        // picked from a computed WCAG ratio, not by eye — see
+        // repairRequestWizard.test.js, which recomputes them on every run.
+        // The bright teal is deliberately NOT a button fill: it is 3.07:1 on
+        // white, fine for borders/icons/selected states, far short of 4.5:1
+        // for text.
+        "quote-accent": "#0B7285", // 5.59:1 on white — solid buttons
+        "quote-accent-hover": "#095E6E", // darker still
+        "quote-accent-soft": "#12A594", // borders, icons, selected outline
+        "quote-ink": "#075162", // text on the pale wash (7.69:1)
+        "quote-wash": "#E4F1F3",
+        "quote-line": "#D6E4E7",
+        "quote-surface": "#F7FAFB",
+        "quote-wa": "#15803D", // 5.02:1 on white — WhatsApp CTA
+        "quote-wa-hover": "#116B30", // 6.63:1
       },
       fontFamily: {
         heading: ["Space Grotesk", "sans-serif"],

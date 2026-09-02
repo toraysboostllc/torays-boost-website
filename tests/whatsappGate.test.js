@@ -16,6 +16,7 @@ const whatsappCtaSrc = read("src/components/layout/WhatsAppCta.jsx");
 const floatButtonSrc = read("src/components/layout/WhatsAppFloatButton.jsx");
 const contactSrc = read("src/sections/Contact.jsx");
 const repairModalSrc = read("src/components/repair/RepairRequestModal.jsx");
+const quoteReadySrc = read("src/components/repair/QuoteReadyModal.jsx");
 const whatsappLibSrc = read("src/lib/whatsapp.js");
 
 describe("WhatsAppGateModal: exact bilingual copy", () => {
@@ -176,31 +177,37 @@ describe("General WhatsApp buttons never open wa.me directly — Navbar, floatin
 });
 
 describe("Only the Smart Repair Request's final step opens a real wa.me link", () => {
-  it("RepairRequestModal's ReviewStep opens buildRepairRequestWhatsAppLink via window.open with noopener/noreferrer, gated on policyAccepted", () => {
-    const guard = repairModalSrc.match(/function ensurePolicyAccepted\(\) \{[\s\S]*?\n  \}/)[0];
-    expect(guard).toMatch(/if \(!answers\.policyAccepted\) \{/);
-    expect(guard).toContain("setShowPolicyError(true)");
-    expect(guard).toContain("policyCheckboxRef.current?.focus()");
+  it("the wa.me link is built only for the confirmation screen, which consent gates open", () => {
+    // Step 4's CTA cannot reach WhatsApp on its own: it calls handleSubmit,
+    // which refuses to open the confirmation modal until the box is ticked.
+    const guard = repairModalSrc.match(/function handleSubmit\(\) \{[\s\S]*?\n  \}/)[0];
+    expect(guard).toMatch(/if \(!estimator\.answers\.policyAccepted\) \{/);
+    expect(guard).toContain("setShowPolicyError(true);");
+    expect(guard).toContain("policyRef.current?.focus();");
+    expect(guard).toContain("return;");
+    expect(guard).toContain("setQuoteReadyOpen(true);");
 
-    const fn = repairModalSrc.match(/function handleGetQuote\(\) \{[\s\S]*?\n  \}/)[0];
-    expect(fn).toMatch(/if \(!ensurePolicyAccepted\(\)\) return;/);
-    expect(fn).toContain('window.open(buildRepairRequestWhatsAppLink(messageState), "_blank", "noopener,noreferrer")');
+    // The link itself is only constructed inside that gated branch.
+    const gatedBlock = repairModalSrc.slice(repairModalSrc.indexOf("{quoteReadyOpen"));
+    expect(gatedBlock).toContain("whatsappHref={buildRepairRequestWhatsAppLink(messageState)}");
   });
 
-  it("RepairRequestModal's ReviewStep also gates 'Send via Email' behind the same policyAccepted check", () => {
-    const fn = repairModalSrc.match(/function handleSendEmail\(\) \{[\s\S]*?\n  \}/)[0];
-    expect(fn).toMatch(/if \(!ensurePolicyAccepted\(\)\) return;/);
-    expect(fn).toContain("window.location.href = buildRepairRequestMailtoLink(messageState)");
+  it("the confirmation screen uses a real <a href> — deliberately, so no browser can popup-block the hand-off", () => {
+    expect(quoteReadySrc).toContain("href={whatsappHref}");
+    expect(quoteReadySrc).toContain('target="_blank"');
+    expect(quoteReadySrc).toContain('rel="noopener noreferrer"');
+    // and it never says the message was already sent
+    expect(quoteReadySrc).not.toMatch(/request sent|mensaje enviado/i);
   });
 
-  it("the email action is a gated <button>, not a plain <a href> that would bypass the checkbox", () => {
-    expect(repairModalSrc).not.toMatch(/<a\s+href=\{buildRepairRequestMailtoLink/);
-    const emailButtonIdx = repairModalSrc.indexOf("onClick={handleSendEmail}");
-    expect(emailButtonIdx).toBeGreaterThan(-1);
-    const buttonStart = repairModalSrc.lastIndexOf("<button", emailButtonIdx);
-    const buttonEnd = repairModalSrc.indexOf("</button>", emailButtonIdx) + "</button>".length;
-    const emailButton = repairModalSrc.slice(buttonStart, buttonEnd);
-    expect(emailButton).toContain('type="button"');
+  it("email is behind the same consent gate — it lives inside the modal, never as a rival CTA on the step", () => {
+    const gatedBlock = repairModalSrc.slice(repairModalSrc.indexOf("{quoteReadyOpen"));
+    expect(gatedBlock).toContain("mailtoHref=");
+    // No mailto action anywhere on the wizard steps themselves.
+    expect(repairModalSrc).not.toContain('t("wizard.sendEmail")');
+    expect(repairModalSrc).not.toContain("window.location.href");
+    // The mailto link is only offered once an email was actually given.
+    expect(repairModalSrc).toMatch(/estimator\.answers\.email\.trim\(\) \? buildRepairRequestMailtoLink\(messageState\) : null/);
   });
 
   it("buildWhatsAppLink (the only wa.me builder in the codebase) still targets siteConfig.whatsapp.number", () => {

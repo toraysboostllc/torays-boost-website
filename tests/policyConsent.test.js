@@ -86,10 +86,9 @@ describe("ReviewStep: the checkbox block itself", () => {
     expect(modalSrc).not.toMatch(/type="checkbox"[\s\S]{0,80}disabled/);
   });
 
-  it("checking the box clears any prior validation error", () => {
-    const onChangeBlock = modalSrc.match(/onChange=\{\(e\) => \{[\s\S]*?setField\("policyAccepted"[\s\S]*?\}\}/)[0];
-    expect(onChangeBlock).toContain('estimator.setField("policyAccepted", e.target.checked)');
-    expect(onChangeBlock).toMatch(/if \(e\.target\.checked\) setShowPolicyError\(false\)/);
+  it("the checkbox writes straight to the wizard's own state, and the CTA clears the error once accepted", () => {
+    expect(modalSrc).toContain('onChange={(e) => estimator.setField("policyAccepted", e.target.checked)}');
+    expect(modalSrc).toContain("setShowPolicyError(false);");
   });
 
   it("the entire label (checkbox + text) is one pressable <label> — not just the input", () => {
@@ -126,16 +125,22 @@ describe("ReviewStep: the checkbox block itself", () => {
 describe("ReviewStep: Get My Quote / Cotizar validates before opening WhatsApp", () => {
   it("the button is labeled wizard.getQuote — 'Get My Quote' / 'Cotizar'", () => {
     expect(modalSrc).toContain('{t("wizard.getQuote")}');
-    expect(translations.en.wizard.getQuote).toBe("Get My Quote");
-    expect(translations.es.wizard.getQuote).toBe("Cotizar");
+    expect(translations.en.wizard.getQuote).toBe("Get My Quote on WhatsApp");
+    expect(translations.es.wizard.getQuote).toBe("Cotizar por WhatsApp");
     expect(translations.en.wizard).not.toHaveProperty("sendWhatsApp");
     expect(translations.es.wizard).not.toHaveProperty("sendWhatsApp");
   });
 
-  it("clicking it calls handleGetQuote, not a bare href — WhatsApp never opens on an unvalidated click", () => {
-    const buttonBlock = modalSrc.match(/<button\s+type="button"\s+onClick=\{handleGetQuote\}[\s\S]*?<\/button>/)[0];
-    expect(buttonBlock).toContain('onClick={handleGetQuote}');
+  it("the step-4 CTA is a validated button, never a bare href — WhatsApp can't open on an unvalidated click", () => {
+    const buttonBlock = modalSrc.match(/<button\s+type="button"\s+onClick=\{onSubmit\}[\s\S]*?<\/button>/)[0];
+    expect(buttonBlock).toContain("onClick={onSubmit}");
     expect(buttonBlock).not.toMatch(/href=/);
+    // handleSubmit refuses to open the confirmation screen until consent is
+    // given — which is what puts the wa.me link out of reach until then.
+    expect(modalSrc).toContain("if (!estimator.answers.policyAccepted) {");
+    expect(modalSrc).toContain("setQuoteReadyOpen(true);");
+    // and the wa.me link only exists inside that gated modal
+    expect(modalSrc).toMatch(/\{quoteReadyOpen && \(/);
   });
 
   it("never mentions Twilio, SMS, STOP, or HELP anywhere in the wizard", () => {

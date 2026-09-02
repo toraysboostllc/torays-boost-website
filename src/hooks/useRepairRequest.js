@@ -1,70 +1,78 @@
 import { useMemo, useState } from "react";
-import { DEVICE_CATEGORIES, PROBLEMS_BY_GROUP, SMART_QUESTIONS_BY_GROUP, getCategoryById } from "../config/repairRequest.config.js";
+import { PROBLEMS_BY_GROUP, SMART_QUESTIONS_BY_GROUP, getCategoryById } from "../config/repairRequest.config.js";
+import {
+  DEVICE_TYPES,
+  getCategoryChoices,
+  getDeviceTypeForCategory,
+  getImpliedAnswers,
+  getModelChips,
+  getVisibleQuestions,
+} from "../config/repairFlow.config.js";
+import { isValidUsPhone } from "../lib/phone.js";
 
-export const TOTAL_STEPS = 8;
+export const TOTAL_STEPS = 4;
 const STEP = {
   DEVICE: 0,
   MODEL: 1,
-  PROBLEM: 2,
-  SMART_1: 3,
-  SMART_2: 4,
-  SMART_3: 5,
-  CONTACT: 6,
-  REVIEW: 7,
+  ISSUE: 2,
+  CONTACT: 3,
 };
 
 const initialAnswers = {
+  // Step 1 picks a device *type* (the catalog's own `group`); Step 2 resolves
+  // it back down to a real categoryId. Both are kept: the type drives what
+  // Step 2 offers, the category is what everything downstream already expects.
+  deviceTypeId: "",
   categoryId: "",
   brandId: "",
   customBrandName: "",
   model: "",
   modelNotSure: false,
   problemId: "",
+  // Manual answers ONLY. What a chosen problem answers for the visitor lives
+  // in the catalog's IMPLIED_ANSWERS and is merged on read (see
+  // resolvedSmartAnswers below), never written into state — so changing the
+  // problem can never leave a stale inferred answer behind, and a manual
+  // answer survives a detour through a problem that would have implied it.
   smartAnswers: {},
   name: "",
   phone: "",
   email: "",
   details: "",
-  // Policy-consent checkbox on the Review step — always starts unchecked,
-  // persists across Back/Next like every other answer, and resets to
-  // false whenever the wizard is reopened fresh (see `reset` below).
+  // Policy-consent checkbox, now on the final step. Always starts unchecked
+  // and resets to false whenever the wizard is reopened fresh.
   policyAccepted: false,
 };
 
 /**
- * Validates an optional `{ categoryId, problemId }` preselection (used by
- * the local SEO landing pages to open the wizard with a device already
- * picked) against the real catalog, so a stale/typo'd id can never render
- * a broken step instead of silently falling back to the normal blank
- * start. `problemId` only survives if it belongs to the resolved
- * category's own device group — e.g. passing a controller problem with a
- * phone category id drops the problem, not the category.
+ * Validates an optional `{ categoryId, problemId }` preselection (used by the
+ * local SEO landing pages) against the real catalog, and additionally resolves
+ * the device type the category belongs to, so the 4-step wizard opens with
+ * Step 1 already showing the right tile. A stale/typo'd id still falls back to
+ * a blank start rather than rendering a broken step — but
+ * repairRequestPreselection.test.js now fails loudly if any of the six real
+ * pages ever stops resolving, which is the check that did not exist before.
  */
 export function buildInitialAnswers(initialSelection) {
   if (!initialSelection) return initialAnswers;
   const category = initialSelection.categoryId ? getCategoryById(initialSelection.categoryId) : null;
   const categoryId = category ? category.id : "";
+  const deviceType = categoryId ? getDeviceTypeForCategory(categoryId) : null;
   const groupProblems = category ? PROBLEMS_BY_GROUP[category.group] || [] : [];
   const problemId =
     categoryId && initialSelection.problemId && groupProblems.some((p) => p.id === initialSelection.problemId)
       ? initialSelection.problemId
       : "";
-  return { ...initialAnswers, categoryId, problemId };
+  return { ...initialAnswers, deviceTypeId: deviceType ? deviceType.id : "", categoryId, problemId };
 }
 
 /**
- * Drives the 8-step public Smart Repair Request wizard. No price, no ETA
- * anywhere in this state or its derived data — see repairRequest.config.js.
- * Step index and answers are two separate pieces of state on purpose:
- * navigating Back/Next never clears anything the visitor already typed
- * ("estado preservado al regresar").
+ * Drives the 4-step public quote wizard: device type, brand+model,
+ * issue+diagnostic questions, contact details. No price and no ETA anywhere
+ * in this state or its derived data — see repairRequest.config.js.
  *
- * `initialSelection` (optional) pre-fills the device/problem answers — the
- * wizard still opens on Step 1 (Device) so the visitor sees what's already
- * selected and can change it normally, rather than jumping ahead. Since
- * RepairRequestModal only ever mounts while open (see Home.jsx and the
- * local SEO pages), this `useState` initializer runs fresh on every open —
- * no selection from a previous request can ever leak into the next one.
+ * Step index and answers are two separate pieces of state on purpose:
+ * navigating Back/Next never clears anything the visitor already typed.
  */
 export function useRepairRequest(initialSelection) {
   const [step, setStep] = useState(STEP.DEVICE);
@@ -72,25 +80,71 @@ export function useRepairRequest(initialSelection) {
 
   const category = useMemo(() => getCategoryById(answers.categoryId), [answers.categoryId]);
   const group = category?.group || null;
+  const categoryChoices = useMemo(() => getCategoryChoices(answers.deviceTypeId), [answers.deviceTypeId]);
+  // A type with a single category (Controller, Data Recovery) has nothing to
+  // choose — Step 2 goes straight to the model field.
+  const needsCategoryChoice = categoryChoices.length > 1;
   const brands = category?.brands || null;
   const brand = brands?.find((b) => b.id === answers.brandId) || null;
+  const modelChips = useMemo(() => getModelChips(answers.categoryId), [answers.categoryId]);
   const problems = useMemo(() => PROBLEMS_BY_GROUP[group] || [], [group]);
   const problem = problems.find((p) => p.id === answers.problemId) || null;
   const smartQuestions = useMemo(() => SMART_QUESTIONS_BY_GROUP[group] || [], [group]);
 
+  const impliedAnswers = useMemo(
+    () => getImpliedAnswers(group, answers.problemId),
+    [group, answers.problemId],
+  );
+  const visibleQuestions = useMemo(
+    () => getVisibleQuestions(group, answers.problemId),
+    [group, answers.problemId],
+  );
+  /** What the message and the summary read: manual answers plus whatever the
+   *  chosen problem already answered. Implied always wins. */
+  const resolvedSmartAnswers = useMemo(
+    () => ({ ...answers.smartAnswers, ...impliedAnswers }),
+    [answers.smartAnswers, impliedAnswers],
+  );
+  /** The exact shape repairRequestMessage.js expects — unchanged on purpose. */
+  const answersForMessage = useMemo(
+    () => ({ ...answers, smartAnswers: resolvedSmartAnswers }),
+    [answers, resolvedSmartAnswers],
+  );
+
+  function selectDeviceType(deviceTypeId) {
+    setAnswers((prev) => {
+      if (prev.deviceTypeId === deviceTypeId) return prev;
+      const choices = getCategoryChoices(deviceTypeId);
+      return {
+        ...prev,
+        deviceTypeId,
+        // A single-category type resolves immediately; anything else waits for
+        // Step 2. Everything tied to the old type's option lists is cleared —
+        // never the contact fields.
+        categoryId: choices.length === 1 ? choices[0].id : "",
+        brandId: "",
+        customBrandName: "",
+        model: "",
+        modelNotSure: false,
+        problemId: "",
+        smartAnswers: {},
+      };
+    });
+  }
+
   function selectCategory(categoryId) {
     setAnswers((prev) => {
-      const nextCategory = getCategoryById(categoryId);
-      const groupChanged = nextCategory?.group !== getCategoryById(prev.categoryId)?.group;
+      if (prev.categoryId === categoryId) return prev;
       return {
         ...prev,
         categoryId,
-        // A different device group invalidates brand/model/problem/smart
-        // answers tied to the old group's option lists — reset only those,
-        // never the contact fields (name/phone/email/details persist).
-        ...(groupChanged
-          ? { brandId: "", customBrandName: "", model: "", modelNotSure: false, problemId: "", smartAnswers: {} }
-          : {}),
+        // Sibling categories inside one type can have different brand lists and
+        // model chips, so those reset; the problem list is shared by the group,
+        // so the problem and its answers survive.
+        brandId: "",
+        customBrandName: "",
+        model: "",
+        modelNotSure: false,
       };
     });
   }
@@ -99,10 +153,6 @@ export function useRepairRequest(initialSelection) {
     setAnswers((prev) => ({
       ...prev,
       brandId,
-      // Only "Other" needs a custom brand name — switching away from it
-      // clears that field since it's no longer shown; the typed exact
-      // model is kept (the visitor may just be correcting a mis-click,
-      // not starting the model over).
       ...(prev.brandId === "other" && brandId !== "other" ? { customBrandName: "" } : {}),
     }));
   }
@@ -120,7 +170,7 @@ export function useRepairRequest(initialSelection) {
   }
 
   function selectProblem(problemId) {
-    setAnswers((prev) => ({ ...prev, problemId }));
+    setAnswers((prev) => (prev.problemId === problemId ? prev : { ...prev, problemId }));
   }
 
   function answerSmartQuestion(questionId, value) {
@@ -148,27 +198,27 @@ export function useRepairRequest(initialSelection) {
     setAnswers(initialAnswers);
   }
 
-  const smartQuestionForStep = (s) => smartQuestions[s - STEP.SMART_1] || null;
+  const modelAnswered = Boolean(answers.model.trim()) || answers.modelNotSure;
+
+  /** The final CTA's own gate. The consent checkbox is checked separately on
+   *  click so the visitor gets an explanation instead of a dead button. */
+  const canSubmit = Boolean(answers.name.trim()) && isValidUsPhone(answers.phone);
 
   const canGoNext = (() => {
-    if (step === STEP.DEVICE) return Boolean(answers.categoryId);
+    if (step === STEP.DEVICE) return Boolean(answers.deviceTypeId);
     if (step === STEP.MODEL) {
+      if (!answers.categoryId) return false;
       if (brands) {
         if (!answers.brandId) return false;
-        if (answers.brandId === "other") {
-          return Boolean(answers.customBrandName.trim()) && Boolean(answers.model.trim());
-        }
-        return Boolean(answers.model.trim());
+        if (answers.brandId === "other" && !answers.customBrandName.trim()) return false;
       }
-      return Boolean(answers.model.trim()) || answers.modelNotSure;
+      return modelAnswered;
     }
-    if (step === STEP.PROBLEM) return Boolean(answers.problemId);
-    if (step === STEP.SMART_1 || step === STEP.SMART_2 || step === STEP.SMART_3) {
-      const question = smartQuestionForStep(step);
-      return question ? Boolean(answers.smartAnswers[question.id]) : true;
+    if (step === STEP.ISSUE) {
+      if (!answers.problemId) return false;
+      return visibleQuestions.every((q) => Boolean(answers.smartAnswers[q.id]));
     }
-    if (step === STEP.CONTACT) return Boolean(answers.name.trim()) && Boolean(answers.phone.trim());
-    return true;
+    return canSubmit;
   })();
 
   return {
@@ -176,15 +226,23 @@ export function useRepairRequest(initialSelection) {
     TOTAL_STEPS,
     step,
     answers,
+    answersForMessage,
     category,
+    categoryChoices,
+    needsCategoryChoice,
     group,
     brands,
     brand,
+    modelChips,
     problems,
     problem,
     smartQuestions,
-    smartQuestionForStep,
+    visibleQuestions,
+    impliedAnswers,
+    resolvedSmartAnswers,
     canGoNext,
+    canSubmit,
+    selectDeviceType,
     selectCategory,
     selectBrand,
     setCustomBrandName,
@@ -197,6 +255,6 @@ export function useRepairRequest(initialSelection) {
     goNext,
     goBack,
     reset,
-    devices: DEVICE_CATEGORIES,
+    deviceTypes: DEVICE_TYPES,
   };
 }
