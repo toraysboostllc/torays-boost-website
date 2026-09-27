@@ -72,6 +72,8 @@ export default function App() {
     <Suspense fallback={<RouteLoadingFallback />}>
       <Routes>
         <Route path="/" element={<Home />} />
+        {/* Direct link to the repair quote wizard — see Home's openRepairRequestOnLoad. */}
+        <Route path="/quote" element={<Home openRepairRequestOnLoad />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/image-credits" element={<ImageCredits />} />

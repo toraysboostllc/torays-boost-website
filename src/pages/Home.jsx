@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useSEO } from "../lib/seo.js";
 import { Navbar } from "../components/layout/Navbar.jsx";
 import { Footer } from "../components/layout/Footer.jsx";
@@ -14,10 +15,22 @@ import { Testimonials } from "../sections/Testimonials.jsx";
 import { FAQ } from "../sections/FAQ.jsx";
 import { Contact } from "../sections/Contact.jsx";
 
-export function Home() {
+/**
+ * `openRepairRequestOnLoad` is set only by the /quote route: a shareable
+ * direct link (Instagram bio, NFC tags, WhatsApp replies) that lands on Home
+ * with the quote wizard already open. Closing it drops the visitor on "/"
+ * so a refresh or a Back doesn't pop the wizard open again.
+ */
+export function Home({ openRepairRequestOnLoad = false }) {
   useSEO({});
-  const [repairRequestOpen, setRepairRequestOpen] = useState(false);
+  const navigate = useNavigate();
+  const [repairRequestOpen, setRepairRequestOpen] = useState(openRepairRequestOnLoad);
   const [whatsappGateOpen, setWhatsappGateOpen] = useState(false);
+
+  function closeRepairRequest() {
+    setRepairRequestOpen(false);
+    if (openRepairRequestOnLoad) navigate("/", { replace: true });
+  }
 
   // Every general/"any time" WhatsApp button (Navbar, floating button,
   // Contact card) calls this instead of opening wa.me directly — the
@@ -47,7 +60,7 @@ export function Home() {
       </main>
       <Footer />
       <WhatsAppFloatButton onClick={openWhatsAppGate} />
-      {repairRequestOpen && <RepairRequestModal onClose={() => setRepairRequestOpen(false)} />}
+      {repairRequestOpen && <RepairRequestModal onClose={closeRepairRequest} />}
       {whatsappGateOpen && (
         <WhatsAppGateModal onClose={() => setWhatsappGateOpen(false)} onStart={startRepairRequestFromGate} />
       )}

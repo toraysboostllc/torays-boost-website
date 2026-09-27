@@ -191,7 +191,7 @@ describe("Home.jsx: mounts the wizard modal only while open, old QuoteEstimator 
 
   it("mounts RepairRequestModal conditionally on open state, wired to Hero's CTA", () => {
     expect(homeSrc).toContain('import { RepairRequestModal } from "../components/repair/RepairRequestModal.jsx"');
-    expect(homeSrc).toContain("{repairRequestOpen && <RepairRequestModal onClose={() => setRepairRequestOpen(false)} />}");
+    expect(homeSrc).toContain("{repairRequestOpen && <RepairRequestModal onClose={closeRepairRequest} />}");
     expect(homeSrc).toContain("onOpenRepairRequest={() => setRepairRequestOpen(true)}");
   });
 });

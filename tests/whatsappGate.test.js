@@ -113,7 +113,7 @@ describe("WhatsAppGateModal: Not Now / notNow only closes, never opens WhatsApp 
 
 describe("Home.jsx: wires the gate between general WhatsApp buttons and the wizard", () => {
   it("owns whatsappGateOpen state, separate from repairRequestOpen", () => {
-    expect(homeSrc).toContain("const [repairRequestOpen, setRepairRequestOpen] = useState(false);");
+    expect(homeSrc).toContain("const [repairRequestOpen, setRepairRequestOpen] = useState(openRepairRequestOnLoad);");
     expect(homeSrc).toContain("const [whatsappGateOpen, setWhatsappGateOpen] = useState(false);");
   });
 

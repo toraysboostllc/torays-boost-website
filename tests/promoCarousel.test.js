@@ -188,7 +188,7 @@ describe("PromoCarousel.jsx: CTA reuses the existing wizard, no duplicated modal
   });
 
   it("Home.jsx still owns the single repairRequestOpen state and the single RepairRequestModal mount — untouched by this feature", () => {
-    expect(homeSrc).toContain("const [repairRequestOpen, setRepairRequestOpen] = useState(false);");
+    expect(homeSrc).toContain("const [repairRequestOpen, setRepairRequestOpen] = useState(openRepairRequestOnLoad);");
     // 3 occurrences: the import specifier, the import path, and the one
     // conditional JSX mount — i.e. still exactly one <RepairRequestModal>.
     expect((homeSrc.match(/RepairRequestModal/g) || []).length).toBe(3);
