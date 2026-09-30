@@ -33,6 +33,18 @@ const WholesaleLegal = lazy(() =>
   import("./pages/WholesaleLegal.jsx").then((m) => ({ default: m.WholesaleLegal }))
 );
 
+// Online store (/tienda) — its own chunks, so Home and /quote never
+// download any store code. Everything under /tienda is new; no existing
+// route (/, /quote, /wholesale/*, the SEO pages) changes.
+const shopPage = (name) =>
+  lazy(() => import(`./pages/shop/${name}.jsx`).then((m) => ({ default: m[name] })));
+const ShopHome = shopPage("ShopHome");
+const ShopProduct = shopPage("ShopProduct");
+const ShopCheckout = shopPage("ShopCheckout");
+const ShopOrder = shopPage("ShopOrder");
+const ShopAccount = shopPage("ShopAccount");
+const ShopAdmin = lazy(() => import("./pages/shop/admin/ShopAdmin.jsx").then((m) => ({ default: m.ShopAdmin })));
+
 // The local SEO landing pages are deliberately NOT lazy, unlike Privacy/
 // Terms/etc above — they're organic-search entry points, so a visitor
 // lands directly on one of these paths with nothing else competing for
@@ -80,6 +92,12 @@ export default function App() {
         <Route path="/wholesale" element={<WholesaleLogin />} />
         <Route path="/wholesale/prices" element={<WholesalePrices />} />
         <Route path="/wholesale/legal" element={<WholesaleLegal />} />
+        <Route path="/tienda" element={<ShopHome />} />
+        <Route path="/tienda/producto/:id" element={<ShopProduct />} />
+        <Route path="/tienda/checkout" element={<ShopCheckout />} />
+        <Route path="/tienda/pedido/:number" element={<ShopOrder />} />
+        <Route path="/tienda/cuenta" element={<ShopAccount />} />
+        <Route path="/tienda/admin/*" element={<ShopAdmin />} />
         <Route path="/phone-repair-miami" element={<PhoneRepairMiami />} />
         <Route path="/ps5-repair-miami" element={<Ps5RepairMiami />} />
         <Route path="/ps5-controller-repair-miami" element={<Ps5ControllerRepairMiami />} />

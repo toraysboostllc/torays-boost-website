@@ -173,22 +173,23 @@ describe("Accessibility: WCAG AA contrast (>=4.5:1) for both public CTA buttons"
   });
 });
 
-describe("Navbar: exactly one WhatsApp CTA and one Torays Boost Pro CTA per context", () => {
-  it("desktop header group renders exactly one WholesalePortalLink and one WhatsAppCta, both variant=\"header\"", () => {
-    expect(navbarSrc).toContain('import { WholesalePortalLink } from "./WholesalePortalLink.jsx"');
+describe("Navbar: exactly one WhatsApp CTA and one Shop CTA per context (Torays Boost Pro chip retired)", () => {
+  it("desktop header group renders exactly one ShopLink and one WhatsAppCta, both variant=\"header\"", () => {
+    expect(navbarSrc).toContain('import { ShopLink } from "./ShopLink.jsx"');
+    expect(navbarSrc).not.toContain("WholesalePortalLink");
     expect(navbarSrc).toContain('import { WhatsAppCta } from "./WhatsAppCta.jsx"');
     const desktopGroup = navbarSrc.match(/<div className="hidden xl:flex items-center gap-3">[\s\S]*?<\/div>/)[0];
-    expect((desktopGroup.match(/<WholesalePortalLink/g) || []).length).toBe(1);
+    expect((desktopGroup.match(/<ShopLink/g) || []).length).toBe(1);
     expect((desktopGroup.match(/<WhatsAppCta/g) || []).length).toBe(1);
-    expect(desktopGroup).toContain('<WholesalePortalLink variant="header" />');
+    expect(desktopGroup).toContain('<ShopLink variant="header" />');
     expect(desktopGroup).toContain('<WhatsAppCta variant="header" onClick={onWhatsAppClick} />');
   });
 
-  it("mobile drawer renders exactly one WholesalePortalLink and one WhatsAppCta, both variant=\"mobile\", each closing the drawer on click", () => {
+  it("mobile drawer renders exactly one ShopLink and one WhatsAppCta, both variant=\"mobile\", each closing the drawer on click", () => {
     const drawer = navbarSrc.match(/<div className="flex flex-col gap-6 px-8 py-10">[\s\S]*?<\/div>\s*<\/motion\.div>/)[0];
-    expect((drawer.match(/<WholesalePortalLink/g) || []).length).toBe(1);
+    expect((drawer.match(/<ShopLink/g) || []).length).toBe(1);
     expect((drawer.match(/<WhatsAppCta/g) || []).length).toBe(1);
-    expect(drawer).toMatch(/<WholesalePortalLink variant="mobile"[^>]*onClick=\{\(\) => setOpen\(false\)\}/);
+    expect(drawer).toMatch(/<ShopLink variant="mobile"[^>]*onClick=\{\(\) => setOpen\(false\)\}/);
     const mobileWhatsAppBlock = drawer.match(/<WhatsAppCta\s+variant="mobile"[\s\S]*?\/>/)[0];
     expect(mobileWhatsAppBlock).toContain("setOpen(false)");
     expect(mobileWhatsAppBlock).toContain("onWhatsAppClick()");

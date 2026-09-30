@@ -15,6 +15,7 @@
  * for this round and remain English-only — see the final report for why.
  * Wholesale/Torays Boost Pro is never touched by this file.
  */
+import { shopTranslations } from "./shopTranslations.js";
 import { DEVICE_CATEGORIES, PROBLEMS_BY_GROUP, SMART_QUESTIONS_BY_GROUP } from "../config/repairRequest.config.js";
 import { services } from "../config/services.config.js";
 import { PROMO_SLIDES } from "../config/promoCarousel.config.js";
@@ -60,6 +61,7 @@ const enPromoSlides = Object.fromEntries(
 
 export const translations = {
   en: {
+    shop: shopTranslations.en,
     common: {
       langEn: "English",
       langEs: "Español",
@@ -72,6 +74,9 @@ export const translations = {
       howItWorks: "How It Works",
       faq: "FAQ",
       contact: "Contact",
+      shop: "Shop",
+      shopSub: "Buy online",
+      shopAria: "Torays Boost Shop — buy online",
       openMenu: "Open menu",
       closeMenu: "Close menu",
     },
@@ -313,6 +318,7 @@ export const translations = {
     },
   },
   es: {
+    shop: shopTranslations.es,
     common: {
       langEn: "English",
       langEs: "Español",
@@ -325,6 +331,9 @@ export const translations = {
       howItWorks: "Cómo funciona",
       faq: "Preguntas",
       contact: "Contacto",
+      shop: "Tienda",
+      shopSub: "Compra en línea",
+      shopAria: "Tienda Torays Boost — compra en línea",
       openMenu: "Abrir menú",
       closeMenu: "Cerrar menú",
     },
