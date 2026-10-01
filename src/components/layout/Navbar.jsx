@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { Logo } from "../ui/Logo.jsx";
-import { WholesalePortalLink } from "./WholesalePortalLink.jsx";
 import { WhatsAppCta } from "./WhatsAppCta.jsx";
 import { LanguageSwitcher } from "./LanguageSwitcher.jsx";
 import { useLanguage } from "../../i18n/LanguageContext.jsx";
@@ -69,7 +68,6 @@ export function Navbar({ onWhatsAppClick }) {
 
         <div className="hidden xl:flex items-center gap-3">
           <LanguageSwitcher variant="header" />
-          <WholesalePortalLink variant="header" />
           <WhatsAppCta variant="header" onClick={onWhatsAppClick} />
         </div>
 
@@ -115,7 +113,6 @@ export function Navbar({ onWhatsAppClick }) {
                 </a>
               ))}
               <LanguageSwitcher variant="mobile" className="mt-2" />
-              <WholesalePortalLink variant="mobile" onClick={() => setOpen(false)} />
               <WhatsAppCta
                 variant="mobile"
                 onClick={() => {

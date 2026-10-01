@@ -1,13 +1,7 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
-  "headers": [
-    {
-      "source": "/wholesale",
-      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive" }]
-    },
-    {
-      "source": "/wholesale/:path*",
-      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive" }]
-    }
-  ]
+  "redirects": [
+    { "source": "/wholesale", "destination": "/", "permanent": false },
+    { "source": "/wholesale/:path*", "destination": "/", "permanent": false }
+  ],
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }

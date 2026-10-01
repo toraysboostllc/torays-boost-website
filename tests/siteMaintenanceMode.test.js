@@ -51,12 +51,11 @@ describe("App.jsx: global maintenance gate", () => {
     expect(appSrc).toMatch(/TO RELAUNCH/);
   });
 
-  it("does not delete or rewrite any existing route — Home, Privacy, Terms, WholesaleLogin, WholesalePrices, and the catch-all all remain defined, just unreachable while the flag is on", () => {
+  it("does not delete or rewrite any existing route — Home, /quote, Privacy, Terms, and the catch-all all remain defined, just unreachable while the flag is on", () => {
     expect(appSrc).toContain('<Route path="/" element={<Home />} />');
     expect(appSrc).toContain('<Route path="/privacy" element={<Privacy />} />');
     expect(appSrc).toContain('<Route path="/terms" element={<Terms />} />');
-    expect(appSrc).toContain('<Route path="/wholesale" element={<WholesaleLogin />} />');
-    expect(appSrc).toContain('<Route path="/wholesale/prices" element={<WholesalePrices />} />');
+    expect(appSrc).toContain('<Route path="/quote" element={<Home openRepairRequestOnLoad />} />');
     expect(appSrc).toContain('<Route path="*" element={<NotFound />} />');
   });
 });

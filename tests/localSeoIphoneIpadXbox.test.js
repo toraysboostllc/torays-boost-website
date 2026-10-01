@@ -214,10 +214,9 @@ describe("Home: the general Start Repair Request flow opens the wizard with no p
   });
 });
 
-describe("sitemap.xml / robots.txt: 3 new pages indexable, /wholesale still excluded", () => {
-  it("robots.txt was not touched — still just the one Disallow", () => {
-    expect(robotsSrc).toMatch(/Disallow:\s*\/wholesale/);
-    expect(robotsSrc.match(/Disallow:/g)?.length).toBe(1);
+describe("sitemap.xml / robots.txt: 3 new pages indexable", () => {
+  it("robots.txt disallows nothing (the retired /wholesale portal redirects instead)", () => {
+    expect(robotsSrc).not.toMatch(/Disallow:/);
   });
 
   it("none of the 3 new pages carry noindex anywhere in their own translations (no accidental exclusion)", () => {

@@ -28,12 +28,11 @@ function upsertMeta(attr, key, content) {
  * Every field beyond title/description/noindex is opt-in via `path` — a
  * page that doesn't pass `path` gets exactly the old behavior (title +
  * description + optional noindex, nothing else touched), so every existing
- * call site (Home, Privacy, Terms, ImageCredits, Wholesale pages) is
- * unaffected by this extension.
+ * call site (Home, Privacy, Terms, ImageCredits) is unaffected by this
+ * extension.
  *
- * The noindex meta tag is defense-in-depth only — the real guarantee for
- * /wholesale is the X-Robots-Tag HTTP header set in vercel.json, since a
- * crawler that doesn't execute JS would never see this React-added tag.
+ * The noindex meta tag only works for crawlers that execute JS; a page
+ * that must never be indexed also needs an X-Robots-Tag header in vercel.json.
  */
 export function useSEO({ title, description, noindex = false, path, image, jsonLd } = {}) {
   useEffect(() => {

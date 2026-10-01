@@ -13,25 +13,12 @@ import { IpadRepairMiami } from "./pages/IpadRepairMiami.jsx";
 import { XboxRepairMiami } from "./pages/XboxRepairMiami.jsx";
 
 // Not needed to land on Home or start a repair quote — split into their
-// own chunks so visiting "/" never downloads the Wholesale portal or the
-// legal pages. NotFound stays a static import: it only needs Button +
+// own chunks so visiting "/" never downloads the legal pages. NotFound stays a static import: it only needs Button +
 // useSEO, both already pulled in by Home, so lazy-loading it would add a
 // network round-trip for zero real byte savings.
 const Privacy = lazy(() => import("./pages/Privacy.jsx").then((m) => ({ default: m.Privacy })));
 const Terms = lazy(() => import("./pages/Terms.jsx").then((m) => ({ default: m.Terms })));
 const ImageCredits = lazy(() => import("./pages/ImageCredits.jsx").then((m) => ({ default: m.ImageCredits })));
-const WholesaleLogin = lazy(() =>
-  import("./pages/WholesaleLogin.jsx").then((m) => ({ default: m.WholesaleLogin }))
-);
-const WholesalePrices = lazy(() =>
-  import("./pages/WholesalePrices.jsx").then((m) => ({ default: m.WholesalePrices }))
-);
-// Public, no-login legal reference page (Torays Boost Pro Legal Bundle) —
-// lazy for the same reason as the other Wholesale routes above: visiting
-// "/" should never download this chunk.
-const WholesaleLegal = lazy(() =>
-  import("./pages/WholesaleLegal.jsx").then((m) => ({ default: m.WholesaleLegal }))
-);
 
 // The local SEO landing pages are deliberately NOT lazy, unlike Privacy/
 // Terms/etc above — they're organic-search entry points, so a visitor
@@ -61,8 +48,7 @@ function RouteLoadingFallback() {
 export default function App() {
   // Global site lock — see maintenance.config.js. While true, NONE of the
   // routes below mount for ANY path: this return happens before <Routes>
-  // is ever reached, so Home/WholesaleLogin/WholesalePrices never render
-  // and nothing they do (including the Wholesale API) ever runs.
+  // is ever reached, so no page ever renders and nothing they do ever runs.
   // TO RELAUNCH: set SITE_MAINTENANCE_MODE to false in maintenance.config.js.
   if (SITE_MAINTENANCE_MODE) {
     return <MaintenancePage />;
@@ -77,9 +63,6 @@ export default function App() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/image-credits" element={<ImageCredits />} />
-        <Route path="/wholesale" element={<WholesaleLogin />} />
-        <Route path="/wholesale/prices" element={<WholesalePrices />} />
-        <Route path="/wholesale/legal" element={<WholesaleLegal />} />
         <Route path="/phone-repair-miami" element={<PhoneRepairMiami />} />
         <Route path="/ps5-repair-miami" element={<Ps5RepairMiami />} />
         <Route path="/ps5-controller-repair-miami" element={<Ps5ControllerRepairMiami />} />
