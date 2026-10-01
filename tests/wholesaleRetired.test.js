@@ -45,6 +45,7 @@ describe("Wholesale / Torays Boost Pro is retired", () => {
   it("old /wholesale links redirect to the home page instead of a 404", () => {
     const sources = (vercel.redirects || []).filter((r) => r.destination === "/").map((r) => r.source);
     expect(sources).toContain("/wholesale");
+    expect(sources).toContain("/wholesale/"); // trailing slash: not matched by /wholesale/:path*
     expect(sources).toContain("/wholesale/:path*");
   });
 });

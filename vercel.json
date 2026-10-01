@@ -1,6 +1,7 @@
 {
   "redirects": [
     { "source": "/wholesale", "destination": "/", "permanent": false },
+    { "source": "/wholesale/", "destination": "/", "permanent": false },
     { "source": "/wholesale/:path*", "destination": "/", "permanent": false }
   ],
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
