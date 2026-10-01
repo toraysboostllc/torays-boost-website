@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 /**
- * Structural/text-based checks on the public CTAs — WhatsApp and the Shop
- * button (the Torays Boost Pro entry was retired on 2026-10-01) — same approach as every other
+ * Structural/text-based checks on the public CTAs (WhatsApp, Navbar, Hero).
+ * The Torays Boost Pro entry was retired on 2026-10-01. Same approach as every other
  * test file in this project (no React render harness configured), reading
  * the actual component source as text and asserting the specific
  * properties this feature requires.
@@ -97,23 +97,18 @@ describe("Accessibility: WCAG AA contrast (>=4.5:1) for the WhatsApp CTA", () =>
   });
 });
 
-describe("Navbar: exactly one WhatsApp CTA and one Shop CTA per context (Torays Boost Pro chip retired)", () => {
-  it("desktop header group renders exactly one ShopLink and one WhatsAppCta, both variant=\"header\"", () => {
-    expect(navbarSrc).toContain('import { ShopLink } from "./ShopLink.jsx"');
+describe("Navbar: exactly one WhatsApp CTA per context, no Torays Boost Pro link", () => {
+  it("desktop header group renders exactly one WhatsAppCta, variant=\"header\"", () => {
     expect(navbarSrc).not.toContain("WholesalePortalLink");
     expect(navbarSrc).toContain('import { WhatsAppCta } from "./WhatsAppCta.jsx"');
     const desktopGroup = navbarSrc.match(/<div className="hidden xl:flex items-center gap-3">[\s\S]*?<\/div>/)[0];
-    expect((desktopGroup.match(/<ShopLink/g) || []).length).toBe(1);
     expect((desktopGroup.match(/<WhatsAppCta/g) || []).length).toBe(1);
-    expect(desktopGroup).toContain('<ShopLink variant="header" />');
     expect(desktopGroup).toContain('<WhatsAppCta variant="header" onClick={onWhatsAppClick} />');
   });
 
-  it("mobile drawer renders exactly one ShopLink and one WhatsAppCta, both variant=\"mobile\", each closing the drawer on click", () => {
+  it("mobile drawer renders exactly one WhatsAppCta, variant=\"mobile\", closing the drawer on click", () => {
     const drawer = navbarSrc.match(/<div className="flex flex-col gap-6 px-8 py-10">[\s\S]*?<\/div>\s*<\/motion\.div>/)[0];
-    expect((drawer.match(/<ShopLink/g) || []).length).toBe(1);
     expect((drawer.match(/<WhatsAppCta/g) || []).length).toBe(1);
-    expect(drawer).toMatch(/<ShopLink variant="mobile"[^>]*onClick=\{\(\) => setOpen\(false\)\}/);
     const mobileWhatsAppBlock = drawer.match(/<WhatsAppCta\s+variant="mobile"[\s\S]*?\/>/)[0];
     expect(mobileWhatsAppBlock).toContain("setOpen(false)");
     expect(mobileWhatsAppBlock).toContain("onWhatsAppClick()");
