@@ -8,9 +8,8 @@ import { useLanguage } from "../../i18n/LanguageContext.jsx";
  * header keeps its layout; only the destination and copy changed. Internal
  * SPA navigation via <Link>, same tab, nothing fetched before a click.
  *
- * /wholesale itself is deliberately still routed in App.jsx (the owner
- * retires it separately, after Wholesale leaves the DESK) — this component
- * just stops advertising it.
+ * The Wholesale portal was retired on 2026-10-01; old /wholesale links
+ * redirect to the home page (vercel.json).
  *
  * Two variants, sized per placement:
  *  - "header": compact chip before the WhatsApp CTA, desktop only.

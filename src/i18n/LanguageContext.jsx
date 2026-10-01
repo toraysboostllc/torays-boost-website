@@ -18,9 +18,7 @@ function lookup(dict, key) {
 
 /**
  * App-wide language state — English/Spanish only, per the approved i18n
- * scope. Wraps the whole app in main.jsx, but Wholesale pages never import
- * useLanguage(), so they're completely unaffected (still English, exactly
- * as before this change).
+ * scope. Wraps the whole app in main.jsx.
  */
 export function LanguageProvider({ children }) {
   const [lang, setLangState] = useState(detectInitialLanguage);

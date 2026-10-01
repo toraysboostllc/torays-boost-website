@@ -19,10 +19,8 @@ describe("Hero: real asset, public-only, no price, no old placeholder", () => {
     expect(existsSync(join(root, "src/assets/public-repair-hero-source.png"))).toBe(false);
   });
 
-  it("Hero.jsx is the only file that imports the public repair hero asset", () => {
+  it("Hero.jsx imports the public repair hero asset", () => {
     expect(heroSrc).toMatch(/import heroImage from ["']\.\.\/assets\/public-repair-hero\.webp["']/);
-    const otherSrcFiles = ["src/pages/WholesaleLogin.jsx", "src/pages/WholesalePrices.jsx", "src/styles/wholesalePortal.css"].map(read);
-    otherSrcFiles.forEach((src) => expect(src).not.toMatch(/public-repair-hero/));
   });
 
   it("never uses the private Wholesale login collage or PCB background", () => {
@@ -249,7 +247,7 @@ describe("Confirmed public contacts wired through site.config.js only", () => {
   });
 });
 
-describe("Wholesale stays completely untouched by this feature", () => {
+describe("The repair-request flow has no Wholesale coupling", () => {
   it("no repair-request file imports any Wholesale module or asset", () => {
     // strip doc comments first — Hero.jsx's own header explains "never the
     // private Wholesale login collage" in prose, which isn't an import and
@@ -269,11 +267,4 @@ describe("Wholesale stays completely untouched by this feature", () => {
     });
   });
 
-  it("Wholesale's own catalog UI never imports the new repair-request config or components", () => {
-    const wholesaleFiles = ["src/pages/WholesaleLogin.jsx", "src/pages/WholesalePrices.jsx"];
-    wholesaleFiles.forEach((relPath) => {
-      const src = read(relPath);
-      expect(src).not.toMatch(/repairRequest|RepairRequestModal|useRepairRequest/);
-    });
-  });
 });

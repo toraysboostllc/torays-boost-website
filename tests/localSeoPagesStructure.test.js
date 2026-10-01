@@ -201,15 +201,15 @@ describe("Services.jsx: iPhone and PS5 cards link to their local SEO pages", () 
   });
 });
 
-describe("robots.txt: allows the 3 new pages, still blocks /wholesale, points at the www sitemap", () => {
+describe("robots.txt: allows the 3 new pages, points at the www sitemap", () => {
   it("does not disallow any of the 3 new paths", () => {
     expect(robotsSrc).not.toMatch(/Disallow:\s*\/phone-repair-miami/);
     expect(robotsSrc).not.toMatch(/Disallow:\s*\/ps5-repair-miami/);
     expect(robotsSrc).not.toMatch(/Disallow:\s*\/ps5-controller-repair-miami/);
   });
 
-  it("still disallows /wholesale", () => {
-    expect(robotsSrc).toMatch(/Disallow:\s*\/wholesale/);
+  it("no longer mentions /wholesale (retired; vercel.json redirects it)", () => {
+    expect(robotsSrc).not.toMatch(/wholesale/);
   });
 
   it("Sitemap directive uses the www canonical host", () => {

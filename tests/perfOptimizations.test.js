@@ -42,8 +42,8 @@ describe("App.jsx: route-level code-splitting — Home stays eager, non-critical
     expect(appSrc).not.toMatch(/lazy\(\(\) => import\(["']\.\/pages\/NotFound\.jsx["']/);
   });
 
-  it("Privacy, Terms, ImageCredits, WholesaleLogin, and WholesalePrices are all lazy-loaded", () => {
-    ["Privacy", "Terms", "ImageCredits", "WholesaleLogin", "WholesalePrices"].forEach((name) => {
+  it("Privacy, Terms, and ImageCredits are all lazy-loaded", () => {
+    ["Privacy", "Terms", "ImageCredits"].forEach((name) => {
       expect(appSrc).toMatch(new RegExp(`const ${name} = lazy\\(\\(\\) =>\\s*\\n?\\s*import\\("\\./pages/${name}\\.jsx"\\)`));
     });
   });

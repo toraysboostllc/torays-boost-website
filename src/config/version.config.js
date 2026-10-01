@@ -3,9 +3,15 @@
  * approved for production — never mid-round. Keep in sync with the
  * "version" field in package.json.
  */
-export const APP_VERSION = "1.3.1";
+export const APP_VERSION = "1.4.0";
 
 export const VERSION_HISTORY = [
+  {
+    version: "1.4.0",
+    date: "2026-10-01",
+    summary:
+      "Retired the Wholesale / Torays Boost Pro partner portal: removed /wholesale, /wholesale/prices and /wholesale/legal, the Navbar portal link, the portal pages, components, styles, images and its 8 serverless endpoints. Old /wholesale links (with or without a trailing slash or sub-path) now redirect to the home page. /quote, the Privacy and Terms pages, their links and the consent wording are unchanged, now pinned by a test. Supabase wholesale data is kept as-is.",
+  },
   {
     version: "1.3.1",
     date: "2026-08-25",

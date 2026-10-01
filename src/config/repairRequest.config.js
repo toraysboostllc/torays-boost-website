@@ -3,8 +3,7 @@
  * Request wizard. Deliberately has NO price and NO etaDays anywhere in
  * this file — the public site never quotes a number automatically. This
  * replaces the old pricing.config.js (deleted) as the estimator's data
- * source; Wholesale is unaffected — it reads its own catalog from Supabase
- * behind login, never from this file.
+ * source.
  */
 function slugify(label) {
   return label

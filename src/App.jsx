@@ -13,29 +13,16 @@ import { IpadRepairMiami } from "./pages/IpadRepairMiami.jsx";
 import { XboxRepairMiami } from "./pages/XboxRepairMiami.jsx";
 
 // Not needed to land on Home or start a repair quote — split into their
-// own chunks so visiting "/" never downloads the Wholesale portal or the
-// legal pages. NotFound stays a static import: it only needs Button +
+// own chunks so visiting "/" never downloads the legal pages. NotFound stays a static import: it only needs Button +
 // useSEO, both already pulled in by Home, so lazy-loading it would add a
 // network round-trip for zero real byte savings.
 const Privacy = lazy(() => import("./pages/Privacy.jsx").then((m) => ({ default: m.Privacy })));
 const Terms = lazy(() => import("./pages/Terms.jsx").then((m) => ({ default: m.Terms })));
 const ImageCredits = lazy(() => import("./pages/ImageCredits.jsx").then((m) => ({ default: m.ImageCredits })));
-const WholesaleLogin = lazy(() =>
-  import("./pages/WholesaleLogin.jsx").then((m) => ({ default: m.WholesaleLogin }))
-);
-const WholesalePrices = lazy(() =>
-  import("./pages/WholesalePrices.jsx").then((m) => ({ default: m.WholesalePrices }))
-);
-// Public, no-login legal reference page (Torays Boost Pro Legal Bundle) —
-// lazy for the same reason as the other Wholesale routes above: visiting
-// "/" should never download this chunk.
-const WholesaleLegal = lazy(() =>
-  import("./pages/WholesaleLegal.jsx").then((m) => ({ default: m.WholesaleLegal }))
-);
 
 // Online store (/tienda) — its own chunks, so Home and /quote never
 // download any store code. Everything under /tienda is new; no existing
-// route (/, /quote, /wholesale/*, the SEO pages) changes.
+// route (/, /quote, the SEO pages) changes.
 const shopPage = (name) =>
   lazy(() => import(`./pages/shop/${name}.jsx`).then((m) => ({ default: m[name] })));
 const ShopHome = shopPage("ShopHome");
@@ -73,8 +60,7 @@ function RouteLoadingFallback() {
 export default function App() {
   // Global site lock — see maintenance.config.js. While true, NONE of the
   // routes below mount for ANY path: this return happens before <Routes>
-  // is ever reached, so Home/WholesaleLogin/WholesalePrices never render
-  // and nothing they do (including the Wholesale API) ever runs.
+  // is ever reached, so no page ever renders and nothing they do ever runs.
   // TO RELAUNCH: set SITE_MAINTENANCE_MODE to false in maintenance.config.js.
   if (SITE_MAINTENANCE_MODE) {
     return <MaintenancePage />;
@@ -89,9 +75,6 @@ export default function App() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/image-credits" element={<ImageCredits />} />
-        <Route path="/wholesale" element={<WholesaleLogin />} />
-        <Route path="/wholesale/prices" element={<WholesalePrices />} />
-        <Route path="/wholesale/legal" element={<WholesaleLegal />} />
         <Route path="/tienda" element={<ShopHome />} />
         <Route path="/tienda/producto/:id" element={<ShopProduct />} />
         <Route path="/tienda/checkout" element={<ShopCheckout />} />
