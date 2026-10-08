@@ -11,6 +11,7 @@ import { Ps5ControllerRepairMiami } from "./pages/Ps5ControllerRepairMiami.jsx";
 import { IphoneRepairMiami } from "./pages/IphoneRepairMiami.jsx";
 import { IpadRepairMiami } from "./pages/IpadRepairMiami.jsx";
 import { XboxRepairMiami } from "./pages/XboxRepairMiami.jsx";
+import { Links } from "./pages/Links.jsx";
 
 // Not needed to land on Home or start a repair quote — split into their
 // own chunks so visiting "/" never downloads the legal pages. NotFound stays a static import: it only needs Button +
@@ -69,6 +70,7 @@ export default function App() {
         <Route path="/iphone-repair-miami" element={<IphoneRepairMiami />} />
         <Route path="/ipad-repair-miami" element={<IpadRepairMiami />} />
         <Route path="/xbox-repair-miami" element={<XboxRepairMiami />} />
+        <Route path="/links" element={<Links />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>

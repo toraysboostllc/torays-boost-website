@@ -35,9 +35,10 @@ export const siteConfig = {
   ],
 
   social: {
-    instagram: "",
+    instagram: "https://www.instagram.com/toraysboostllc",
     facebook: "",
-    tiktok: "",
+    tiktok: "https://www.tiktok.com/@toraysboost",
+    youtube: "https://www.youtube.com/@toraysboost",
   },
 
   seo: {
