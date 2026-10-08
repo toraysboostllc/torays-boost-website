@@ -3,9 +3,15 @@
  * approved for production — never mid-round. Keep in sync with the
  * "version" field in package.json.
  */
-export const APP_VERSION = "1.4.0";
+export const APP_VERSION = "1.5.0";
 
 export const VERSION_HISTORY = [
+  {
+    version: "1.5.0",
+    date: "2026-10-08",
+    summary:
+      "New /links page: one own-domain link for the NFC keychains and social bios, with WhatsApp first, then TikTok, YouTube, Instagram and the website. The confirmed social profiles are now filled in site.config.js, so the Footer also shows the Instagram icon. No other page changes.",
+  },
   {
     version: "1.4.0",
     date: "2026-10-01",
