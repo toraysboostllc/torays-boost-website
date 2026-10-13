@@ -3,9 +3,15 @@
  * approved for production — never mid-round. Keep in sync with the
  * "version" field in package.json.
  */
-export const APP_VERSION = "1.5.0";
+export const APP_VERSION = "1.5.1";
 
 export const VERSION_HISTORY = [
+  {
+    version: "1.5.1",
+    date: "2026-10-13",
+    summary:
+      "/links gets a \"Share this page\" button: on phones it opens the native share sheet with https://toraysboost.com/links; on desktops without one it copies that URL and shows \"Link copied\". No other page changes.",
+  },
   {
     version: "1.5.0",
     date: "2026-10-08",
