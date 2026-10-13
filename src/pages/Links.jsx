@@ -1,4 +1,5 @@
-import { MessageCircle, Music2, Youtube, Instagram, Globe } from "lucide-react";
+import { useState } from "react";
+import { MessageCircle, Music2, Youtube, Instagram, Globe, Share2, Check } from "lucide-react";
 import { siteConfig } from "../config/site.config.js";
 import { buildWhatsAppLink } from "../lib/whatsapp.js";
 import { useSEO } from "../lib/seo.js";
@@ -17,7 +18,42 @@ export const LINKS = [
   { id: "website", label: "Website — toraysboost.com", href: siteConfig.url, Icon: Globe },
 ].filter((l) => l.href);
 
+/** The page always shares its own public URL, never the address bar (which may carry NFC/query noise). */
+export const SHARE_URL = `${siteConfig.url}/links`;
+
+/**
+ * Native share sheet on phones (WhatsApp, Instagram, SMS…); on desktops
+ * without it, copy the link instead. Returns "shared", "copied" or "cancelled".
+ */
+export async function shareLinksPage(nav = typeof navigator !== "undefined" ? navigator : undefined) {
+  const data = { title: siteConfig.shortName, text: `${siteConfig.shortName} — repairs & socials`, url: SHARE_URL };
+  if (nav?.share) {
+    try {
+      await nav.share(data);
+      return "shared";
+    } catch (err) {
+      if (err?.name === "AbortError") return "cancelled";
+    }
+  }
+  if (nav?.clipboard?.writeText) {
+    try {
+      await nav.clipboard.writeText(SHARE_URL);
+      return "copied";
+    } catch {
+      /* nothing else to try */
+    }
+  }
+  return "cancelled";
+}
+
 export function Links() {
+  const [copied, setCopied] = useState(false);
+  const onShare = async () => {
+    if ((await shareLinksPage()) === "copied") {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
   useSEO({
     title: "Links",
     description: "Torays Boost — WhatsApp, TikTok, YouTube, Instagram and website. Microsoldering & electronics repair in Miami, FL.",
@@ -57,6 +93,16 @@ export function Links() {
             </li>
           ))}
         </ul>
+
+        <button
+          type="button"
+          onClick={onShare}
+          data-share
+          className="mx-auto mt-6 flex items-center gap-2 rounded-full border border-torays-line bg-torays-surface px-5 py-2.5 text-sm font-semibold text-torays-navy shadow-sm transition hover:border-torays-navy/30 hover:shadow-glow-navy"
+        >
+          {copied ? <Check className="h-4 w-4" aria-hidden="true" /> : <Share2 className="h-4 w-4" aria-hidden="true" />}
+          <span aria-live="polite">{copied ? "Link copied" : "Share this page"}</span>
+        </button>
 
         <p className="mt-10 text-center text-xs text-torays-text-muted">© {siteConfig.businessName}</p>
       </div>

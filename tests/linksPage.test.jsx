@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { Links, LINKS } from "../src/pages/Links.jsx";
+import { Links, LINKS, SHARE_URL, shareLinksPage } from "../src/pages/Links.jsx";
 import { siteConfig } from "../src/config/site.config.js";
 
 describe("/links page (NFC keychains + social bio link)", () => {
@@ -32,5 +32,22 @@ describe("/links page (NFC keychains + social bio link)", () => {
       expect(a.getAttribute("rel")).toContain("noopener");
     }
     expect(container.textContent).not.toMatch(/\$\s?\d/);
+    expect(container.querySelector("button[data-share]")?.textContent).toMatch(/Share/);
+  });
+
+  it("shares its own public URL: native sheet first, clipboard as fallback", async () => {
+    expect(SHARE_URL).toBe("https://toraysboost.com/links");
+
+    const share = vi.fn().mockResolvedValue();
+    expect(await shareLinksPage({ share })).toBe("shared");
+    expect(share.mock.calls[0][0].url).toBe(SHARE_URL);
+
+    const writeText = vi.fn().mockResolvedValue();
+    expect(await shareLinksPage({ clipboard: { writeText } })).toBe("copied");
+    expect(writeText).toHaveBeenCalledWith(SHARE_URL);
+
+    const abort = Object.assign(new Error("x"), { name: "AbortError" });
+    expect(await shareLinksPage({ share: vi.fn().mockRejectedValue(abort), clipboard: { writeText } })).toBe("cancelled");
+    expect(writeText).toHaveBeenCalledTimes(1);
   });
 });
