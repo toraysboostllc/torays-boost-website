@@ -36,7 +36,11 @@ function releaseLock() {
   document.body.style.left = prev.left;
   document.body.style.right = prev.right;
   document.body.style.width = prev.width;
-  window.scrollTo(0, savedScrollY);
+  // "instant", not the default: the page sets `scroll-behavior: smooth` on
+  // <html>, so a plain scrollTo here became an animation starting from the
+  // top that a re-render (closing /quote navigates to "/") could cut short,
+  // dropping the visitor near the top of the page instead of where they were.
+  window.scrollTo({ top: savedScrollY, left: 0, behavior: "instant" });
 }
 
 /** Locks background scroll for as long as the calling component is mounted. */
