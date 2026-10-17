@@ -3,9 +3,15 @@
  * approved for production — never mid-round. Keep in sync with the
  * "version" field in package.json.
  */
-export const APP_VERSION = "1.6.0";
+export const APP_VERSION = "1.6.1";
 
 export const VERSION_HISTORY = [
+  {
+    version: "1.6.1",
+    date: "2026-10-17",
+    summary:
+      "Hero gets four quick links under the main CTA — Controllers, Consoles, Deep Cleaning (each opens /quote with that service preselected) and Mail-in service (scrolls to the mail-in block). Hero min-heights re-measured for the extra row. Fix: closing a modal (e.g. the quote wizard) now restores the page position instantly instead of animating from the top under the site-wide smooth scrolling, which could leave the visitor near the top.",
+  },
   {
     version: "1.6.0",
     date: "2026-10-17",
