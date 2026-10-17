@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach, beforeAll } from "vitest";
-import { render, screen, cleanup, within } from "@testing-library/react";
+import { describe, it, expect, afterEach, beforeAll, vi } from "vitest";
+import { render, screen, cleanup, within, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import App from "../src/App.jsx";
 import { LanguageProvider } from "../src/i18n/LanguageContext.jsx";
@@ -198,4 +198,28 @@ describe("Hero quick links to the Consoles & Controllers services", () => {
     expect(document.getElementById("gaming-mail-in")).not.toBeNull();
     expect(keyShape(translations.es.hero.quickLinks)).toEqual(keyShape(translations.en.hero.quickLinks));
   });
+});
+
+describe("Mail-in: how it works + short share links", () => {
+  it("shows the 4 steps, and step 2 sends the address on WhatsApp instead of publishing it", () => {
+    renderAt("/");
+    const block = document.getElementById("gaming-mail-in");
+    const steps = within(block).getAllByRole("listitem");
+    expect(steps).toHaveLength(4);
+    expect(steps[1].textContent).toMatch(/Get the shipping address/);
+    expect(block.textContent).not.toMatch(/9700|159th|SW \d+/i);
+  });
+
+  for (const path of ["/envios", "/mail-in"]) {
+    it(`${path} opens Home scrolled to the mail-in block, without opening the wizard`, async () => {
+      const scrolled = vi.fn();
+      Element.prototype.scrollIntoView = function () {
+        scrolled(this.id);
+      };
+      renderAt(path);
+      expect(screen.queryAllByRole("dialog")).toHaveLength(0);
+      await waitFor(() => expect(scrolled).toHaveBeenCalledWith("gaming-mail-in"));
+      delete Element.prototype.scrollIntoView;
+    });
+  }
 });

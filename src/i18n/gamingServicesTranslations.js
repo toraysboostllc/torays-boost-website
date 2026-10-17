@@ -121,6 +121,25 @@ export const gamingServicesTranslations = {
       cta: "Coordinate shipping on WhatsApp",
       whatsappMessage:
         "Hi! I'd like to send my device by mail for repair or maintenance. Device and model: ___ . Problem or service: ___ .",
+      stepsTitle: "How it works",
+      steps: {
+        contact: {
+          title: "Message us on WhatsApp",
+          description: "Tell us the device, its model and the problem or service you need.",
+        },
+        address: {
+          title: "Get the shipping address",
+          description: "We reply with our address and the instructions to ship your device.",
+        },
+        ship: {
+          title: "Ship your device",
+          description: "Pack it well and send it with the carrier of your choice. Share the tracking number with us.",
+        },
+        repair: {
+          title: "Diagnosis and estimate",
+          description: "We diagnose it and send you the estimate. Once you approve it, we do the work and ship it back to you.",
+        },
+      },
     },
   },
   es: {
@@ -231,6 +250,25 @@ export const gamingServicesTranslations = {
       cta: "Coordinar envío por WhatsApp",
       whatsappMessage:
         "¡Hola! Quiero enviar mi equipo por correo para reparación o mantenimiento. Equipo y modelo: ___ . Problema o servicio: ___ .",
+      stepsTitle: "Cómo funciona",
+      steps: {
+        contact: {
+          title: "Escríbenos por WhatsApp",
+          description: "Cuéntanos qué equipo es, el modelo y la falla o el servicio que necesitas.",
+        },
+        address: {
+          title: "Recibe la dirección de envío",
+          description: "Te respondemos con nuestra dirección y las instrucciones para enviar tu equipo.",
+        },
+        ship: {
+          title: "Envía tu equipo",
+          description: "Empácalo bien y envíalo con la transportadora que prefieras. Compártenos el número de rastreo.",
+        },
+        repair: {
+          title: "Diagnóstico y presupuesto",
+          description: "Lo diagnosticamos y te enviamos el presupuesto. Cuando lo apruebas, hacemos el trabajo y te lo enviamos de vuelta.",
+        },
+      },
     },
   },
 };

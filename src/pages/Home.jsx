@@ -25,8 +25,12 @@ import { Contact } from "../sections/Contact.jsx";
  * `/quote?service=<id>` (the Consoles & Controllers CTAs) additionally
  * preselects that service in the wizard — see gamingServices.config.js. A
  * missing or unknown `service` leaves /quote exactly as it always was.
+ *
+ * `scrollToSectionId` is set by the short share links /envios and /mail-in:
+ * Home opens already scrolled to that block. A `#id` in the URL does the same,
+ * since the browser's own hash jump fires before React has rendered anything.
  */
-export function Home({ openRepairRequestOnLoad = false }) {
+export function Home({ openRepairRequestOnLoad = false, scrollToSectionId = null }) {
   useSEO({});
   const navigate = useNavigate();
   const location = useLocation();
@@ -40,6 +44,16 @@ export function Home({ openRepairRequestOnLoad = false }) {
   useEffect(() => {
     if (openRepairRequestOnLoad) setRepairRequestOpen(true);
   }, [openRepairRequestOnLoad, location.key]);
+
+  useEffect(() => {
+    const id = scrollToSectionId || decodeURIComponent(location.hash.slice(1));
+    if (!id) return undefined;
+    // One frame later, so the target block is laid out before measuring it.
+    const frame = requestAnimationFrame(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: "instant", block: "start" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [scrollToSectionId, location.key]);
 
   function closeRepairRequest() {
     setRepairRequestOpen(false);

@@ -61,6 +61,9 @@ export default function App() {
         <Route path="/" element={<Home />} />
         {/* Direct link to the repair quote wizard — see Home's openRepairRequestOnLoad. */}
         <Route path="/quote" element={<Home openRepairRequestOnLoad />} />
+        {/* Short share links for the mail-in service: Home, scrolled to that block. */}
+        <Route path="/envios" element={<Home scrollToSectionId="gaming-mail-in" />} />
+        <Route path="/mail-in" element={<Home scrollToSectionId="gaming-mail-in" />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/image-credits" element={<ImageCredits />} />

@@ -2,7 +2,10 @@ import { Link } from "react-router-dom";
 import {
   Battery,
   Cable,
+  ClipboardCheck,
   Crosshair,
+  MapPin,
+  Truck,
   Fan,
   Gamepad2,
   Gauge,
@@ -144,10 +147,21 @@ function ServiceBlock({ block }) {
   );
 }
 
+// How mail-in works. Step 2 is deliberately "we send you the address": the
+// shop's postal address is never published on the site, only shared on
+// WhatsApp once the device and the fault are known.
+const MAIL_IN_STEPS = [
+  { id: "contact", icon: MessageCircle },
+  { id: "address", icon: MapPin },
+  { id: "ship", icon: Truck },
+  { id: "repair", icon: ClipboardCheck },
+];
+
 function MailInBlock() {
   const { t } = useLanguage();
   return (
-    <Card id="gaming-mail-in" className="scroll-mt-28 flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-8 sm:p-8">
+    <Card id="gaming-mail-in" className="scroll-mt-28 sm:p-8">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-8">
       <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-torays-bg text-torays-navy">
         <Package size={28} aria-hidden="true" />
       </span>
@@ -169,6 +183,27 @@ function MailInBlock() {
         <MessageCircle size={18} aria-hidden="true" />
         {t("gamingServices.mailIn.cta")}
       </a>
+      </div>
+
+      <h4 className="mt-7 font-heading text-sm font-semibold uppercase tracking-wide text-torays-text-secondary">
+        {t("gamingServices.mailIn.stepsTitle")}
+      </h4>
+      <ol className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {MAIL_IN_STEPS.map(({ id, icon: Icon }, i) => (
+          <li key={id} className="flex gap-3 rounded-xl border border-torays-line bg-torays-bg p-4">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-torays-red bg-white font-heading text-sm font-semibold text-torays-red">
+              {i + 1}
+            </span>
+            <div>
+              <p className="flex items-center gap-1.5 font-heading text-sm font-semibold text-torays-text">
+                <Icon size={15} className="text-torays-navy" aria-hidden="true" />
+                {t(`gamingServices.mailIn.steps.${id}.title`)}
+              </p>
+              <p className="mt-1 text-sm text-torays-text-secondary">{t(`gamingServices.mailIn.steps.${id}.description`)}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
     </Card>
   );
 }
