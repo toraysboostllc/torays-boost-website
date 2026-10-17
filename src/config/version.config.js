@@ -3,9 +3,15 @@
  * approved for production — never mid-round. Keep in sync with the
  * "version" field in package.json.
  */
-export const APP_VERSION = "1.6.1";
+export const APP_VERSION = "1.6.2";
 
 export const VERSION_HISTORY = [
+  {
+    version: "1.6.2",
+    date: "2026-10-17",
+    summary:
+      "Mail-in block gets a 4-step \"How it works\" (message us on WhatsApp, we send the shipping address, ship your device, diagnosis and estimate); the postal address is still never published on the site. New short share links /envios and /mail-in open the home page scrolled to that block, and a #section in the URL now works on load too.",
+  },
   {
     version: "1.6.1",
     date: "2026-10-17",
