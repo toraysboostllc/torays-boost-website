@@ -88,6 +88,8 @@ export const translations = {
       trustTurnaround: "Fast Turnaround",
       trustPricing: "Honest Pricing",
       trustTechnicians: "Experienced Technicians",
+      quickLinksLabel: "Console and controller services",
+      quickLinks: { controllers: "Controllers", consoles: "Consoles", maintenance: "Deep Cleaning", mailIn: "Mail-in service" },
     },
     promoCarousel: {
       regionLabel: "Current promotions",
@@ -342,6 +344,8 @@ export const translations = {
       trustTurnaround: "Entrega Rápida",
       trustPricing: "Precios Honestos",
       trustTechnicians: "Técnicos Experimentados",
+      quickLinksLabel: "Servicios de consolas y controles",
+      quickLinks: { controllers: "Controles", consoles: "Consolas", maintenance: "Deep Cleaning", mailIn: "Envíos por correo" },
     },
     promoCarousel: {
       regionLabel: "Promociones actuales",

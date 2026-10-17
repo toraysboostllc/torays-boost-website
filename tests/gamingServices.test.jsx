@@ -182,3 +182,20 @@ describe("Home renders the section", () => {
     expect(scope.getAllByText("Illustrative image")).toHaveLength(3);
   });
 });
+
+describe("Hero quick links to the Consoles & Controllers services", () => {
+  it("shows the four shortcuts right under the main CTA, in both languages", () => {
+    renderAt("/");
+    const nav = screen.getByRole("navigation", { name: "Console and controller services" });
+    const links = within(nav).getAllByRole("link");
+    expect(links.map((a) => a.getAttribute("href"))).toEqual([
+      "/quote?service=controllers",
+      "/quote?service=consoles",
+      "/quote?service=maintenance",
+      "#gaming-mail-in",
+    ]);
+    expect(links.map((a) => a.textContent)).toEqual(["Controllers", "Consoles", "Deep Cleaning", "Mail-in service"]);
+    expect(document.getElementById("gaming-mail-in")).not.toBeNull();
+    expect(keyShape(translations.es.hero.quickLinks)).toEqual(keyShape(translations.en.hero.quickLinks));
+  });
+});

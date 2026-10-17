@@ -137,9 +137,9 @@ describe("Hero framing: stable across languages (no re-crop/zoom on the collage 
   });
 
   it("locks in the exact measured min-height per tier (base/390/sm), each equal to Spanish's own natural height at that width — sm and lg were later found identical (content height stops changing past sm) and collapsed into one tier", () => {
-    expect(heroSrc).toContain("min-h-[720px]");
-    expect(heroSrc).toContain("min-[390px]:min-h-[686px]");
-    expect(heroSrc).toContain("sm:min-h-[633px]");
+    expect(heroSrc).toContain("min-h-[859px]");
+    expect(heroSrc).toContain("min-[390px]:min-h-[781px]");
+    expect(heroSrc).toContain("sm:min-h-[685px]");
     expect(heroSrc).not.toMatch(/lg:min-h-\[\d+px\]/);
   });
 

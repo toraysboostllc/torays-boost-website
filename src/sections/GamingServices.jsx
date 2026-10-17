@@ -147,7 +147,7 @@ function ServiceBlock({ block }) {
 function MailInBlock() {
   const { t } = useLanguage();
   return (
-    <Card className="flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-8 sm:p-8">
+    <Card id="gaming-mail-in" className="scroll-mt-28 flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-8 sm:p-8">
       <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-torays-bg text-torays-navy">
         <Package size={28} aria-hidden="true" />
       </span>

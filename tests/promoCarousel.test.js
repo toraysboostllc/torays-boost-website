@@ -216,9 +216,9 @@ describe("PromoCarousel.jsx: compact single-card layout — title/description/CT
 });
 
 describe("Hero stability: the sm/lg text-column budget was re-tightened to remove legacy carousel-era slack, mobile untouched", () => {
-  it("Hero.jsx's MIN_H_CLASSES sm tier was re-measured down to the column's true zero-slack content height (633px), collapsing the old separate sm/lg tiers into one — mobile tiers (base/390) are untouched", () => {
+  it("Hero.jsx's MIN_H_CLASSES sm tier was re-measured to the column's true zero-slack Spanish content height (685px since the 1.6.x hero quick links), with the old separate sm/lg tiers collapsed into one; mobile tiers re-measured at 360px (859) and 390px (781)", () => {
     expect(heroSrc).toContain(
-      'const MIN_H_CLASSES = "min-h-[720px] min-[390px]:min-h-[686px] sm:min-h-[633px]";'
+      'const MIN_H_CLASSES = "min-h-[859px] min-[390px]:min-h-[781px] sm:min-h-[685px]";'
     );
     expect(heroSrc).not.toMatch(/lg:min-h-\[\d+px\]/);
   });

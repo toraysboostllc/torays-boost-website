@@ -1,4 +1,6 @@
-import { ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ArrowRight, Fan, Gamepad2, MonitorPlay, Package } from "lucide-react";
+import { quotePathFor } from "../config/gamingServices.config.js";
 import { Button } from "../components/ui/Button.jsx";
 import { CircuitBackground } from "../components/ui/CircuitBackground.jsx";
 import { PromoCarousel } from "../components/promo/PromoCarousel.jsx";
@@ -21,7 +23,7 @@ import heroImage from "../assets/public-repair-hero.webp";
 // unchanged. Content height stops changing entirely past the sm
 // breakpoint (max-w-xl caps the column at 576px and text-6xl doesn't grow
 // again at lg), so sm: and lg: now share one value.
-const MIN_H_CLASSES = "min-h-[720px] min-[390px]:min-h-[686px] sm:min-h-[633px]";
+const MIN_H_CLASSES = "min-h-[859px] min-[390px]:min-h-[781px] sm:min-h-[685px]";
 
 const TRUST_BADGE_IDS = ["warranty", "turnaround", "pricing", "technicians"];
 const TRUST_LABEL_KEYS = {
@@ -49,6 +51,55 @@ function TrustBadges() {
         );
       })}
     </div>
+  );
+}
+
+// Shortcuts to the "Consoles & Controllers" section's services, right under
+// the main CTA. The three repair/maintenance pills open the existing /quote
+// wizard with that service preselected (see gamingServices.config.js); the
+// mail-in pill scrolls to the mail-in block, which owns the contact button.
+const GAMING_QUICK_LINKS = [
+  { id: "controllers", icon: Gamepad2, to: quotePathFor("controllers") },
+  { id: "consoles", icon: MonitorPlay, to: quotePathFor("consoles") },
+  { id: "maintenance", icon: Fan, to: quotePathFor("maintenance") },
+  { id: "mailIn", icon: Package, href: "#gaming-mail-in" },
+];
+
+const QUICK_LINK_CLASS =
+  "inline-flex min-h-9 items-center gap-1.5 rounded-full border border-torays-line bg-white/85 px-3.5 py-1.5 text-sm font-medium text-torays-text shadow-sm transition-colors hover:border-torays-red/40 hover:text-torays-red focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-torays-red/50";
+
+// The native "#hash" jump doesn't fire reliably inside the SPA, so the
+// in-page pill scrolls explicitly (the target carries scroll-mt for the
+// fixed navbar); the href stays a real anchor for no-JS and middle-click.
+function scrollToHash(e) {
+  const target = document.getElementById(e.currentTarget.getAttribute("href").slice(1));
+  if (!target) return;
+  e.preventDefault();
+  target.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function GamingQuickLinks() {
+  const { t } = useLanguage();
+  return (
+    <nav aria-label={t("hero.quickLinksLabel")} className="flex flex-wrap gap-2">
+      {GAMING_QUICK_LINKS.map(({ id, icon: Icon, to, href }) => {
+        const content = (
+          <>
+            <Icon size={15} className="text-torays-red" aria-hidden="true" />
+            {t(`hero.quickLinks.${id}`)}
+          </>
+        );
+        return to ? (
+          <Link key={id} to={to} className={QUICK_LINK_CLASS}>
+            {content}
+          </Link>
+        ) : (
+          <a key={id} href={href} onClick={scrollToHash} className={QUICK_LINK_CLASS}>
+            {content}
+          </a>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -128,9 +179,12 @@ export function Hero({ onOpenRepairRequest }) {
 
           <p className="text-lg leading-relaxed text-[#3D4A66] sm:text-xl">{t("hero.description")}</p>
 
-          <Button type="button" onClick={onOpenRepairRequest} size="lg" icon={ArrowRight} iconPosition="right">
-            {t("hero.cta")}
-          </Button>
+          <div className="flex flex-col items-start gap-4">
+            <Button type="button" onClick={onOpenRepairRequest} size="lg" icon={ArrowRight} iconPosition="right">
+              {t("hero.cta")}
+            </Button>
+            <GamingQuickLinks />
+          </div>
 
           <div className="mt-1 border-t border-torays-line pt-5">
             <TrustBadges />
