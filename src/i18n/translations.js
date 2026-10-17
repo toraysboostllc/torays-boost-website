@@ -18,6 +18,7 @@
 import { DEVICE_CATEGORIES, PROBLEMS_BY_GROUP, SMART_QUESTIONS_BY_GROUP } from "../config/repairRequest.config.js";
 import { services } from "../config/services.config.js";
 import { PROMO_SLIDES } from "../config/promoCarousel.config.js";
+import { gamingServicesTranslations } from "./gamingServicesTranslations.js";
 
 function idLabelMap(list) {
   return Object.fromEntries(list.map((item) => [item.id, item.label]));
@@ -112,6 +113,7 @@ export const translations = {
         xbox: "Xbox repair in Miami",
       },
     },
+    gamingServices: gamingServicesTranslations.en,
     howItWorks: {
       eyebrow: "Process",
       title: "How It Works",
@@ -393,6 +395,7 @@ export const translations = {
         xbox: "Reparación de Xbox en Miami",
       },
     },
+    gamingServices: gamingServicesTranslations.es,
     howItWorks: {
       eyebrow: "Proceso",
       title: "Cómo Funciona",

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
+import { UNSAFE_LocationContext } from "react-router-dom";
 import {
   X, ChevronLeft, ArrowRight, MessageCircle, Check, Lock,
   Smartphone, Tablet, Gamepad2, Laptop, Database, ShieldCheck,
@@ -11,6 +12,25 @@ import { buildRepairRequestWhatsAppLink, buildRepairRequestMailtoLink } from "..
 import { formatPhone, isValidUsPhone } from "../../lib/phone.js";
 import { useLanguage } from "../../i18n/LanguageContext.jsx";
 import { QuoteReadyModal } from "./QuoteReadyModal.jsx";
+import { getQuoteServicePreset } from "../../config/gamingServices.config.js";
+
+/**
+ * The `/quote?service=<id>` preselection (Home's Consoles & Controllers CTAs),
+ * resolved once when the wizard mounts. Read through the raw location context
+ * rather than useSearchParams() so the modal still renders outside a Router
+ * (the wizard's own unit tests mount it bare). An explicit `initialSelection`
+ * prop — the local SEO pages — always wins over the URL.
+ */
+function useUrlServicePreset(t) {
+  const search = useContext(UNSAFE_LocationContext)?.location?.search || "";
+  const [selection] = useState(() => {
+    const preset = getQuoteServicePreset(new URLSearchParams(search).get("service"));
+    if (!preset) return undefined;
+    const { detailsKey, ...rest } = preset;
+    return detailsKey ? { ...rest, details: t(detailsKey) } : rest;
+  });
+  return selection;
+}
 
 const FOCUS_RING =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quote-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white";
@@ -488,7 +508,8 @@ function ContactStep({ estimator, onSubmit, showPolicyError, policyRef, phoneTou
  */
 export function RepairRequestModal({ onClose, initialSelection }) {
   const { t } = useLanguage();
-  const estimator = useRepairRequest(initialSelection);
+  const urlServicePreset = useUrlServicePreset(t);
+  const estimator = useRepairRequest(initialSelection ?? urlServicePreset);
   const { step, STEP } = estimator;
   const overlayRef = useRef(null);
   const panelRef = useRef(null);

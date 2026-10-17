@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useSEO } from "../lib/seo.js";
 import { Navbar } from "../components/layout/Navbar.jsx";
 import { Footer } from "../components/layout/Footer.jsx";
@@ -8,6 +8,7 @@ import { RepairRequestModal } from "../components/repair/RepairRequestModal.jsx"
 import { WhatsAppGateModal } from "../components/repair/WhatsAppGateModal.jsx";
 import { Hero } from "../sections/Hero.jsx";
 import { Services } from "../sections/Services.jsx";
+import { GamingServices } from "../sections/GamingServices.jsx";
 import { WhyChooseUs } from "../sections/WhyChooseUs.jsx";
 import { AboutUs } from "../sections/AboutUs.jsx";
 import { HowItWorks } from "../sections/HowItWorks.jsx";
@@ -20,12 +21,25 @@ import { Contact } from "../sections/Contact.jsx";
  * direct link (Instagram bio, NFC tags, WhatsApp replies) that lands on Home
  * with the quote wizard already open. Closing it drops the visitor on "/"
  * so a refresh or a Back doesn't pop the wizard open again.
+ *
+ * `/quote?service=<id>` (the Consoles & Controllers CTAs) additionally
+ * preselects that service in the wizard — see gamingServices.config.js. A
+ * missing or unknown `service` leaves /quote exactly as it always was.
  */
 export function Home({ openRepairRequestOnLoad = false }) {
   useSEO({});
   const navigate = useNavigate();
+  const location = useLocation();
   const [repairRequestOpen, setRepairRequestOpen] = useState(openRepairRequestOnLoad);
   const [whatsappGateOpen, setWhatsappGateOpen] = useState(false);
+
+  // Home stays mounted when an in-page CTA navigates "/" → "/quote?service=…"
+  // (same element type on both routes), so the initial useState above can't
+  // see that navigation — this effect opens the wizard for it. The wizard
+  // itself reads `?service=` when it mounts (see useUrlServicePreset).
+  useEffect(() => {
+    if (openRepairRequestOnLoad) setRepairRequestOpen(true);
+  }, [openRepairRequestOnLoad, location.key]);
 
   function closeRepairRequest() {
     setRepairRequestOpen(false);
@@ -51,6 +65,7 @@ export function Home({ openRepairRequestOnLoad = false }) {
       <main>
         <Hero onOpenRepairRequest={() => setRepairRequestOpen(true)} />
         <Services />
+        <GamingServices />
         <WhyChooseUs />
         <AboutUs />
         <HowItWorks />

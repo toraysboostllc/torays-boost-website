@@ -3,6 +3,7 @@ import { PROBLEMS_BY_GROUP, SMART_QUESTIONS_BY_GROUP, getCategoryById } from "..
 import {
   DEVICE_TYPES,
   getCategoryChoices,
+  getDeviceTypeById,
   getDeviceTypeForCategory,
   getImpliedAnswers,
   getModelChips,
@@ -57,13 +58,30 @@ export function buildInitialAnswers(initialSelection) {
   if (!initialSelection) return initialAnswers;
   const category = initialSelection.categoryId ? getCategoryById(initialSelection.categoryId) : null;
   const categoryId = category ? category.id : "";
-  const deviceType = categoryId ? getDeviceTypeForCategory(categoryId) : null;
+  // A bare `deviceTypeId` (no category) preselects only the Step-1 tile — used
+  // by Home's /quote?service=consoles, where the visitor still picks PS5 or
+  // Xbox in Step 2. A type with a single category resolves straight through,
+  // exactly like selectDeviceType() does on a tap.
+  const bareType =
+    !categoryId && initialSelection.deviceTypeId ? getDeviceTypeById(initialSelection.deviceTypeId) : null;
+  const bareTypeChoices = bareType ? getCategoryChoices(bareType.id) : [];
+  const resolvedCategoryId = categoryId || (bareTypeChoices.length === 1 ? bareTypeChoices[0].id : "");
+  const deviceType = categoryId ? getDeviceTypeForCategory(categoryId) : bareType;
   const groupProblems = category ? PROBLEMS_BY_GROUP[category.group] || [] : [];
   const problemId =
     categoryId && initialSelection.problemId && groupProblems.some((p) => p.id === initialSelection.problemId)
       ? initialSelection.problemId
       : "";
-  return { ...initialAnswers, deviceTypeId: deviceType ? deviceType.id : "", categoryId, problemId };
+  // Optional prefilled "additional details" line (Home's maintenance preset),
+  // still fully editable by the visitor on the last step.
+  const details = typeof initialSelection.details === "string" ? initialSelection.details : "";
+  return {
+    ...initialAnswers,
+    deviceTypeId: deviceType ? deviceType.id : "",
+    categoryId: resolvedCategoryId,
+    problemId,
+    details,
+  };
 }
 
 /**
