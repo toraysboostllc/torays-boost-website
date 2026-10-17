@@ -3,9 +3,15 @@
  * approved for production — never mid-round. Keep in sync with the
  * "version" field in package.json.
  */
-export const APP_VERSION = "1.5.1";
+export const APP_VERSION = "1.6.0";
 
 export const VERSION_HISTORY = [
+  {
+    version: "1.6.0",
+    date: "2026-10-17",
+    summary:
+      "New \"Consoles & Controllers\" section on Home (EN/ES): PS5/PS4/Xbox controller repair (battery, drift, joysticks and TMR on compatible models, buttons and triggers, charging port), PlayStation/Xbox console repair, preventive maintenance (Deep Cleaning) with a manufacturer-rated liquid-metal note, and a mail-in notice with a \"Coordinate shipping on WhatsApp\" button. No prices anywhere — every block says \"Estimate after diagnosis\" and its CTA opens the existing /quote wizard with the service preselected through an optional ?service= parameter; plain /quote is unchanged. Media are short silent looping illustration clips labelled \"Illustrative image\"; the Deep Cleaning picture is temporary.",
+  },
   {
     version: "1.5.1",
     date: "2026-10-13",
